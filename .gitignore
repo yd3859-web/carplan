@@ -1,0 +1,30 @@
+# Build
+build/
+.gradle/
+.kotlin/
+*.apk
+!apk/*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets (never commit)
+local.properties
+google-services.json
+keystore.properties
+*.jks
+*.keystore
+.env
+.firebaserc.local
+
+# Firebase
+firebase-debug.log
+firestore-debug.log
+.firebase/
+functions/node_modules/
