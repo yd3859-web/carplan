@@ -40,7 +40,8 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - release 서명 키는 저장소 밖에 보관한다. 잃어버리면 같은 앱으로 업데이트할 수 없다.
 
 ## 작업 방식
-- 기능 하나 = 브랜치 하나 = PR 하나. 브랜치 이름에 장 번호: `car/09-next-destination`, `phone/03-create-stop`.
-- `main`에 직접 커밋하지 않는다.
+- 지금은 정원 혼자 만든다: **`main`에 바로 커밋하고 push**. 커밋 메시지에 장 번호를 쓴다(예: `phone 2장: 캘린더 월 보기`).
+- 나중에 작업을 나눌 때부터는 기능 하나 = 브랜치 하나 = PR 하나(`car/09-next-destination`)로 바꾼다.
+- 로그인(구글·카카오)은 맨 뒤에 만든다. 그 전까지는 Firebase **익명 로그인**으로 uid를 얻고, 첫 실행 때 그 uid의 나만 그룹을 만든다. 나중에 구글 계정을 익명 계정에 연결하면 uid와 데이터가 그대로 유지된다.
 - 사용자는 한국어, 쉬운 말과 표·단계로 설명받기를 원한다.
 - 빌드 확인: `./gradlew assembleDebug`. 제출 APK: `./gradlew assembleRelease`.
