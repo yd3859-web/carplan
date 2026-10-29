@@ -1,0 +1,293 @@
+package com.htb.carplan.phone.calendar
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.Palette
+import com.htb.carplan.phone.ui.argb
+import com.htb.carplan.shared.calendar.CategoryColors
+import com.htb.carplan.shared.model.BuiltInCategory
+import com.htb.carplan.shared.model.ChecklistItem
+import com.htb.carplan.shared.model.CustomCategory
+import com.htb.carplan.shared.model.Event
+import com.htb.carplan.shared.model.Place
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+
+private val REMINDERS = listOf<Int?>(null, 0, 10, 30, 60, 1440)
+
+/** Repeat options kept inside the date chip (출퇴근용). */
+private enum class Repeat(val label: String, val rule: (LocalDate) -> String?) {
+    NONE("반복 안 함", { null }),
+    DAILY("매일", { "DAILY" }),
+    WEEKDAYS("평일마다", { "WEEKLY:MO,TU,WE,TH,FR" }),
+    WEEKLY("매주 같은 요일", { d -> "WEEKLY:" + d.dayOfWeek.name.take(2) }),
+}
+
+/**
+ * Q09 빠른 입력 (예시 이미지): one line "할 일을 입력하세요" with chips
+ * [날짜] [알림] [메모] [체크리스트] [카테고리 ∨] plus our [장소].
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuickAddSheet(
+    initialDate: LocalDate,
+    categories: List<CustomCategory>,
+    onAddCategory: (String, Long, (String) -> Unit) -> Unit,
+    onSave: (Event) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var title by remember { mutableStateOf("") }
+    var start by remember { mutableStateOf(initialDate) }
+    var end by remember { mutableStateOf(initialDate) }
+    var time by remember { mutableStateOf<String?>(null) }
+    var repeat by remember { mutableStateOf(Repeat.NONE) }
+    var reminder by remember { mutableStateOf<Int?>(null) }
+    var memo by remember { mutableStateOf<String?>(null) }
+    val checklist = remember { mutableStateListOf<String>() }
+    var categoryId by remember { mutableStateOf(BuiltInCategory.OTHER.id) }
+    var place by remember { mutableStateOf<String?>(null) }
+
+    var dateMenu by remember { mutableStateOf(false) }
+    var rangePicker by remember { mutableStateOf(false) }
+    var timePicker by remember { mutableStateOf(false) }
+    var reminderMenu by remember { mutableStateOf(false) }
+    var categorySheet by remember { mutableStateOf(false) }
+
+    fun save() {
+        if (title.isBlank()) return
+        onSave(
+            Event(
+                categoryId = categoryId,
+                title = title.trim(),
+                startDate = start.toString(),
+                endDate = end.toString(),
+                allDay = time == null,
+                startTime = time,
+                place = place?.takeIf { it.isNotBlank() }?.let { Place(name = it.trim()) },
+                repeat = repeat.rule(start),
+                reminderMinutes = reminder,
+                memo = memo.orEmpty().trim(),
+                checklist = checklist.filter { it.isNotBlank() }.map { ChecklistItem(it.trim()) },
+            ),
+        )
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFFF5F8FE),
+    ) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    placeholder = { Text("할 일을 입력하세요", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { save() }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = ::save, enabled = title.isNotBlank()) {
+                    Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Today else Palette.TextSoft)
+                }
+            }
+
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    Chip(Icons.Filled.DateRange, dateLabel(start, end, time, repeat), active = true) { dateMenu = true }
+                    DropdownMenu(dateMenu, onDismissRequest = { dateMenu = false }) {
+                        DropdownMenuItem({ Text("날짜 고르기 (여러 날 가능)") }, onClick = { dateMenu = false; rangePicker = true })
+                        DropdownMenuItem({ Text(if (time == null) "시간 정하기" else "시간 바꾸기 ($time)") }, onClick = { dateMenu = false; timePicker = true })
+                        if (time != null) DropdownMenuItem({ Text("하루 종일로") }, onClick = { dateMenu = false; time = null })
+                        HorizontalDivider()
+                        Repeat.entries.forEach { r ->
+                            DropdownMenuItem({ Text((if (r == repeat) "✓ " else "   ") + r.label) }, onClick = { dateMenu = false; repeat = r })
+                        }
+                    }
+                }
+                Box {
+                    Chip(Icons.Filled.Notifications, reminder?.let(::reminderLabel), active = reminder != null) { reminderMenu = true }
+                    DropdownMenu(reminderMenu, onDismissRequest = { reminderMenu = false }) {
+                        REMINDERS.forEach { m ->
+                            DropdownMenuItem({ Text(m?.let(::reminderLabel) ?: "알림 없음") }, onClick = { reminderMenu = false; reminder = m })
+                        }
+                    }
+                }
+                Chip(Icons.Filled.Edit, null, active = memo != null) { memo = if (memo == null) "" else memo }
+                Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
+                Chip(Icons.Filled.Place, null, active = place != null) { if (place == null) place = "" }
+                CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
+            }
+
+            memo?.let { m ->
+                SmallField(m, { memo = it }, "메모", onRemove = { memo = null })
+            }
+            place?.let { p ->
+                // TODO(3장): Kakao Local keyword search once the Kakao key is issued.
+                SmallField(p, { place = it }, "장소 이름 (카카오 검색은 키 받으면 연결)", onRemove = { place = null })
+            }
+            checklist.forEachIndexed { i, item ->
+                SmallField(item, { checklist[i] = it }, "체크리스트 항목", onRemove = { checklist.removeAt(i) })
+            }
+        }
+    }
+
+    if (rangePicker) {
+        val state = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = start.toMillis(),
+            initialSelectedEndDateMillis = end.toMillis(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { rangePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedStartDateMillis?.let { s ->
+                        start = s.toLocalDate()
+                        end = (state.selectedEndDateMillis ?: s).toLocalDate()
+                    }
+                    rangePicker = false
+                }) { Text("확인") }
+            },
+            dismissButton = { TextButton(onClick = { rangePicker = false }) { Text("취소") } },
+        ) {
+            DateRangePicker(state, modifier = Modifier.height(480.dp), title = null, headline = null, showModeToggle = false)
+        }
+    }
+
+    if (timePicker) {
+        val parts = time?.split(":")?.map { it.toInt() }
+        val state = rememberTimePickerState(initialHour = parts?.get(0) ?: 9, initialMinute = parts?.get(1) ?: 0, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { timePicker = false },
+            title = { Text("시간") },
+            text = { TimeInput(state) },
+            confirmButton = { TextButton(onClick = { time = "%02d:%02d".format(state.hour, state.minute); timePicker = false }) { Text("확인") } },
+            dismissButton = { TextButton(onClick = { timePicker = false }) { Text("취소") } },
+        )
+    }
+
+    if (categorySheet) {
+        CategorySheet(
+            selectedId = categoryId,
+            custom = categories,
+            onPick = { categoryId = it; categorySheet = false },
+            onAddCategory = onAddCategory,
+            onDismiss = { categorySheet = false },
+        )
+    }
+}
+
+@Composable
+private fun Chip(icon: ImageVector, label: String?, active: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = if (active) Color.White else Color.Transparent) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Color(0xFF8FB0E8), modifier = Modifier.size(22.dp))
+            label?.let {
+                Spacer(Modifier.size(6.dp))
+                Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7D9AD0))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(label: String, color: Color, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = Color.White) {
+        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+            Spacer(Modifier.size(6.dp))
+            Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7D9AD0))
+            Icon(Icons.Filled.ArrowDropDown, null, tint = Color(0xFF7D9AD0))
+        }
+    }
+}
+
+@Composable
+private fun SmallField(value: String, onChange: (String) -> Unit, hint: String, onRemove: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        TextField(
+            value, onChange, placeholder = { Text(hint) }, singleLine = true, modifier = Modifier.weight(1f),
+            colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+        )
+        IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "지우기", tint = Palette.TextSoft) }
+    }
+}
+
+private fun dateLabel(start: LocalDate, end: LocalDate, time: String?, repeat: Repeat): String {
+    val today = LocalDate.now()
+    fun one(d: LocalDate) = when (d) {
+        today -> "오늘"
+        today.plusDays(1) -> "내일"
+        else -> "${d.monthValue}/${d.dayOfMonth}"
+    }
+    val days = if (start == end) one(start) else "${one(start)}–${one(end)}"
+    return listOfNotNull(days, time, repeat.takeIf { it != Repeat.NONE }?.label).joinToString(" ")
+}
+
+private fun LocalDate.toMillis() = atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+private fun Long.toLocalDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()

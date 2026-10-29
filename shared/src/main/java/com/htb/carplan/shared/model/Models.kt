@@ -119,7 +119,10 @@ data class Event(
     val place: Place? = null,
     /** Repeat rule for commutes, e.g. "WEEKLY:MO,TU,WE,TH,FR". */
     val repeat: String? = null,
+    /** Minutes before start to remind; null = no reminder. */
+    val reminderMinutes: Int? = null,
     val memo: String = "",
+    val checklist: List<ChecklistItem> = emptyList(),
     val createdBy: String = "",
     val deleted: Boolean = false,
     // 여행 only
@@ -127,6 +130,11 @@ data class Event(
     val driverUid: String? = null,
     // 차량 관리 only
     val maintenance: Maintenance? = null,
+)
+
+data class ChecklistItem(
+    val text: String = "",
+    val done: Boolean = false,
 )
 
 enum class DayStatus { READY, DRIVING, DONE }
