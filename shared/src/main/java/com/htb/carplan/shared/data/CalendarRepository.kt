@@ -2,9 +2,11 @@ package com.htb.carplan.shared.data
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.htb.carplan.shared.model.Car
 import com.htb.carplan.shared.model.CustomCategory
 import com.htb.carplan.shared.model.Event
 import com.htb.carplan.shared.model.Group
+import com.htb.carplan.shared.model.User
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -43,6 +45,21 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
 
     suspend fun addCustomCategory(uid: String, name: String, color: Long): String =
         db.collection(FirestorePaths.customCategories(uid)).add(CustomCategory(name = name, color = color)).await().id
+
+    fun observeUser(uid: String): Flow<User?> = db.document(FirestorePaths.user(uid)).observeDoc(User::class.java)
+
+    fun observeCar(carId: String): Flow<Car?> = db.document(FirestorePaths.car(carId)).observeDoc(Car::class.java)
+
+    private fun <T : Any> com.google.firebase.firestore.DocumentReference.observeDoc(type: Class<T>): Flow<T?> = callbackFlow {
+        val reg = addSnapshotListener { snap, err ->
+            if (err != null) {
+                close(err)
+                return@addSnapshotListener
+            }
+            trySend(snap?.toObject(type))
+        }
+        awaitClose { reg.remove() }
+    }
 
     private fun Flow<List<Event>>.mapEvents(groupId: String, from: String): Flow<List<CalendarEvent>> =
         map { events -> events.filter { !it.deleted && it.endDate >= from }.map { CalendarEvent(groupId, it) } }

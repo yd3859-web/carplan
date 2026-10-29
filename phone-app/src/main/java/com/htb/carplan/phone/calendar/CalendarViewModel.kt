@@ -6,6 +6,7 @@ import com.htb.carplan.shared.data.CalendarEvent
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.Session
 import com.htb.carplan.shared.data.SessionRepository
+import com.htb.carplan.shared.model.Car
 import com.htb.carplan.shared.model.CustomCategory
 import com.htb.carplan.shared.model.Event
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,6 +49,22 @@ class CalendarViewModel : ViewModel() {
         }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Today and the next 60 days, independent of the month being browsed (오늘 카드). */
+    val upcoming: StateFlow<List<CalendarEvent>> = groupIds
+        .flatMapLatest { ids ->
+            val today = LocalDate.now()
+            calendar.observeEvents(ids, today.toString(), today.plusDays(60).toString())
+        }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The linked car (7장); null until the car app is linked. */
+    val car: StateFlow<Car?> = _session.filterNotNull()
+        .flatMapLatest { calendar.observeUser(it.uid) }
+        .flatMapLatest { user -> user?.carId?.let(calendar::observeCar) ?: kotlinx.coroutines.flow.flowOf(null) }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val customCategories: StateFlow<List<CustomCategory>> = _session
         .flatMapLatest { s -> if (s == null) emptyFlow() else calendar.observeCustomCategories(s.uid) }

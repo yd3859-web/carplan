@@ -276,7 +276,7 @@
     <div class="step"><div class="step-n">·</div><div class="step-t">카테고리 기본 3개: <b>여행 · 차량 관리 · 다른 일정</b>. 사용자가 더 추가(출퇴근, 여가…) <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">일정은 <b>각 유저의 캘린더에 담긴다</b> — 그룹 일정도 멤버 각자 캘린더에 보임 <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">하단 바: <b>캘린더 · 그룹 · 기록 · 차량 · 설정</b> (예시처럼 화면 아래 떠 있는 둥근 바) <span class="decided">정함</span></div></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">화면 모양은 <b>폴더의 "캘린더 예시" 이미지</b> 기준 <span class="decided">정함</span>: 큰 "10월" + ‹ ›, 일요일 시작, 일·공휴일 빨강, 토 파랑, 공휴일 이름 표시. 일정은 연한 배경 + 왼쪽 색 막대 칩, <b>여러 날 일정은 이어진 막대</b>. 날짜를 누르면 "10월 29일 (목) · 오늘" 패널(넓은 화면은 오른쪽, 폰은 아래에서 올라옴) + "+ 할 일을 추가하세요"</div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">화면 = <b>A안 "오늘 카드 + 월 보기"</b> <span class="decided">정함</span> 2026-10-30: 맨 위 남색 <b>오늘 카드</b>(다음 목적지·시간, 🚗 연료·주행가능거리, 🔧 다가오는 차량 관리) → 아래 월 보기(하루 일정은 점, 장소 있는 일정은 청록 점, <b>여러 날 여행만 막대</b>, 차량 관리는 🔧) → 날짜를 누르면 <b>그날 동선</b>(시간순 세로선, 장소 사이 🚗 이동 구간; 넓은 화면은 오른쪽, 폰은 아래에서 올라옴). "캘린더 예시" 이미지는 입력 칸 참고용일 뿐 화면을 따라 하지 않음</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">공휴일: 2026–2027 목록을 앱에 넣어 둠. 나중에 공공데이터 특일 API로 교체 <span class="suggest">Claude 제안</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t"><b>+ 버튼</b> → 일정 만들기(3장). 카테고리를 먼저 고름</div></div>
     <div class="sub-block">
@@ -314,7 +314,7 @@
     <div class="ask"><span class="qid">Q06</span><b>시간 칸은 "도착 시각"인가 "머무는 시간"인가?</b><span class="rec">추천: 도착 시각 하나만(선택). 머무는 시간까지 받으면 입력이 무거워짐.</span></div>
     <div class="ask"><span class="qid">Q07</span><b>두 사람이 동시에 같은 칸을 고치면?</b><span class="rec">추천: 나중에 저장한 게 이김. 칸 위에 "○○님이 방금 수정" 작게 표시.</span></div>
     <div class="ask"><span class="qid">Q08</span><b>칸을 추가할 때도 알림을 줄까?</b> (정한 건 "뺄 때 알림")<span class="rec">추천: 추가·순서 변경은 알림 없이 화면에만, 빼기만 푸시.</span></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">보통 일정 입력 = 예시처럼 <b>한 줄 빠른 입력</b>: "할 일을 입력하세요" + 칩 [날짜] [알림] [메모] [체크리스트] [카테고리 ∨] <span class="decided">정함</span>. 우리 앱에 더함: [장소] 칩(차에서 "여기로 갈까요?"용, 카카오 검색은 키 생기면), 반복(출퇴근)은 날짜 칩 안 <span class="suggest">Claude 제안</span></div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">보통 일정 입력 = <b>한 줄 빠른 입력</b>: "무슨 일정이에요?" + 칩 [날짜] [알림] [메모] [체크리스트] [카테고리 ∨] <span class="decided">정함</span>. 우리 앱에 더함: [장소] 칩(차에서 "여기로 갈까요?"용, 카카오 검색은 키 생기면), 반복(출퇴근)은 날짜 칩 안 <span class="suggest">Claude 제안</span></div></div>
   </div>
 </div>
 
@@ -851,7 +851,7 @@
     </div>
 
     <div class="qgroup">✓ 정함 (질문에서 옮겨 온 것)</div>
-    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 예시 이미지처럼 한 줄 빠른 입력 + 칩 (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)</div>
+    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)</div>
   </div>
 </div>
 

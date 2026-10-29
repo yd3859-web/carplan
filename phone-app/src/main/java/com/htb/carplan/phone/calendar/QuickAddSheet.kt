@@ -83,8 +83,8 @@ private enum class Repeat(val label: String, val rule: (LocalDate) -> String?) {
 }
 
 /**
- * Q09 빠른 입력 (예시 이미지): one line "할 일을 입력하세요" with chips
- * [날짜] [알림] [메모] [체크리스트] [카테고리 ∨] plus our [장소].
+ * Q09 빠른 입력: one line plus chips. [장소] comes first because a place is what lets
+ * the car take you there; then [날짜] [알림] [메모] [체크리스트] [카테고리 ∨].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,14 +134,14 @@ fun QuickAddSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color(0xFFF5F8FE),
+        containerColor = Palette.Panel,
     ) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text("할 일을 입력하세요", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                    placeholder = { Text("무슨 일정이에요?", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -153,11 +153,12 @@ fun QuickAddSheet(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = ::save, enabled = title.isNotBlank()) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Today else Palette.TextSoft)
+                    Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Teal else Palette.TextSoft)
                 }
             }
 
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Chip(Icons.Filled.Place, place?.takeIf { it.isNotBlank() } ?: "장소", active = place != null) { if (place == null) place = "" }
                 Box {
                     Chip(Icons.Filled.DateRange, dateLabel(start, end, time, repeat), active = true) { dateMenu = true }
                     DropdownMenu(dateMenu, onDismissRequest = { dateMenu = false }) {
@@ -180,7 +181,6 @@ fun QuickAddSheet(
                 }
                 Chip(Icons.Filled.Edit, null, active = memo != null) { memo = if (memo == null) "" else memo }
                 Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
-                Chip(Icons.Filled.Place, null, active = place != null) { if (place == null) place = "" }
                 CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
             }
 
@@ -246,10 +246,10 @@ fun QuickAddSheet(
 private fun Chip(icon: ImageVector, label: String?, active: Boolean, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = if (active) Color.White else Color.Transparent) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = Color(0xFF8FB0E8), modifier = Modifier.size(22.dp))
+            Icon(icon, null, tint = if (active) Palette.Teal else Palette.TextSoft, modifier = Modifier.size(22.dp))
             label?.let {
                 Spacer(Modifier.size(6.dp))
-                Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7D9AD0))
+                Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Navy)
             }
         }
     }
@@ -261,8 +261,8 @@ private fun CategoryChip(label: String, color: Color, onClick: () -> Unit) {
         Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(10.dp).clip(CircleShape).background(color))
             Spacer(Modifier.size(6.dp))
-            Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7D9AD0))
-            Icon(Icons.Filled.ArrowDropDown, null, tint = Color(0xFF7D9AD0))
+            Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Navy)
+            Icon(Icons.Filled.ArrowDropDown, null, tint = Palette.Navy)
         }
     }
 }

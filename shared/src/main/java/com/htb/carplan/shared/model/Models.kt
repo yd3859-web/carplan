@@ -54,6 +54,9 @@ data class CarState(
     val drivingRestricted: Boolean = false,
     val lat: Double? = null,
     val lng: Double? = null,
+    /** 0–100, from android.car FUEL_LEVEL or EV battery. */
+    val fuelPercent: Double? = null,
+    val rangeKm: Double? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 
