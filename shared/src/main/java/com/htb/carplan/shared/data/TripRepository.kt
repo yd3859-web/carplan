@@ -14,8 +14,8 @@ import kotlinx.coroutines.tasks.await
 class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     /** Live list of the day's stops in route order, soft-deleted ones excluded. */
-    fun observeStops(groupId: String, tripId: String, date: String): Flow<List<Stop>> = callbackFlow {
-        val reg = db.collection(FirestorePaths.stops(groupId, tripId, date))
+    fun observeStops(groupId: String, eventId: String, date: String): Flow<List<Stop>> = callbackFlow {
+        val reg = db.collection(FirestorePaths.stops(groupId, eventId, date))
             .orderBy("order")
             .addSnapshotListener { snap, err ->
                 if (err != null) {
@@ -28,8 +28,8 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         awaitClose { reg.remove() }
     }
 
-    fun observeDay(groupId: String, tripId: String, date: String): Flow<TripDay?> = callbackFlow {
-        val reg = db.document(FirestorePaths.day(groupId, tripId, date))
+    fun observeDay(groupId: String, eventId: String, date: String): Flow<TripDay?> = callbackFlow {
+        val reg = db.document(FirestorePaths.day(groupId, eventId, date))
             .addSnapshotListener { snap, err ->
                 if (err != null) {
                     close(err)
@@ -41,13 +41,13 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
     }
 
     /** Appends a stop and bumps the day version in one batch. */
-    suspend fun addStop(groupId: String, tripId: String, date: String, stop: Stop, byUid: String) {
-        val stops = db.collection(FirestorePaths.stops(groupId, tripId, date))
+    suspend fun addStop(groupId: String, eventId: String, date: String, stop: Stop, byUid: String) {
+        val stops = db.collection(FirestorePaths.stops(groupId, eventId, date))
         val nextOrder = stops.get().await().size()
         db.runBatch { batch ->
             batch.set(stops.document(), stop.copy(order = nextOrder, createdBy = byUid))
             batch.set(
-                db.document(FirestorePaths.day(groupId, tripId, date)),
+                db.document(FirestorePaths.day(groupId, eventId, date)),
                 mapOf(
                     "version" to FieldValue.increment(1),
                     "lastChangedBy" to byUid,

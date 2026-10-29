@@ -41,7 +41,7 @@ class TripSyncService : LifecycleService() {
             if (auth.currentUser == null) auth.signInAnonymously().await()
             val today = LocalDate.now().toString()
             TripRepository()
-                .observeStops(DevTrip.GROUP_ID, DevTrip.TRIP_ID, today)
+                .observeStops(DevTrip.GROUP_ID, DevTrip.EVENT_ID, today)
                 .distinctUntilChanged()
                 .catch { Log.e(TAG, "stop sync failed", it) }
                 .collect { stops ->

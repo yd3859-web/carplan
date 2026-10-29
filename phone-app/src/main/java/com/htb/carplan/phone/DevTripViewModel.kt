@@ -33,7 +33,7 @@ class DevTripViewModel : ViewModel() {
 
     val stops: StateFlow<List<Stop>> = signedIn
         .flatMapLatest { ok ->
-            if (ok) repo.observeStops(DevTrip.GROUP_ID, DevTrip.TRIP_ID, today) else emptyFlow()
+            if (ok) repo.observeStops(DevTrip.GROUP_ID, DevTrip.EVENT_ID, today) else emptyFlow()
         }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -50,7 +50,7 @@ class DevTripViewModel : ViewModel() {
     fun addStop(place: Place) {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            runCatching { repo.addStop(DevTrip.GROUP_ID, DevTrip.TRIP_ID, today, Stop(place = place), uid) }
+            runCatching { repo.addStop(DevTrip.GROUP_ID, DevTrip.EVENT_ID, today, Stop(place = place), uid) }
                 .onFailure { _error.value = it.message }
         }
     }

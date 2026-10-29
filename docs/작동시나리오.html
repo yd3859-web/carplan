@@ -237,7 +237,7 @@
       <div class="sb-row"><b>운전자</b>: 그날 차를 모는 사람. 주행 중엔 일정 편집 막힘 (06장 정함)</div>
       <div class="sb-row"><b>차</b>: 그룹과 연결된 차 앱 하나. "이 차 = 오늘 우리 그룹 차"</div>
     </div>
-    <div class="ask"><span class="qid">Q01</span><b>혼자 쓸 때도 그룹이 있어야 하나?</b><span class="rec">추천: 가입하면 "나만" 그룹(멤버 1명)을 자동으로 만든다. 그러면 혼자든 여럿이든 같은 코드로 돈다.</span></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">혼자 써도 그룹 하나: 가입하면 <b>"나만" 그룹</b>(멤버 1명) 자동 생성. 혼자든 여럿이든 같은 코드로 돈다 <span class="decided">정함</span></div></div>
   </div>
 </div>
 
@@ -283,7 +283,7 @@
       <div class="sb-row"><b>보통 일정</b>: 시간 + 제목 + (장소). 다른 일정·출퇴근·차량 관리. 장소가 있으면 차에서 "여기로 갈까요?" 가능</div>
     </div>
     <div class="ask"><span class="qid">Q03</span><b>카테고리마다 색·아이콘을 줄까? 사용자가 고르게 할까?</b><span class="rec">추천: 기본 3개는 고정 색, 추가 카테고리는 8색 중 고르기.</span></div>
-    <div class="ask"><span class="qid">Q04</span><b>여행이 며칠짜리면?</b> 하루마다 경로가 따로인가?<span class="rec">추천: 여행 = 여러 날 묶음, 내비 경로는 하루 단위. 차 앱은 "오늘" 것만 띄움.</span></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">여러 날 여행: 사용자가 날짜를 골라 만든다. 캘린더엔 <b>이어진 여행 하나</b>로 보이고, 날짜를 누르면 <b>그날 일정</b>이 따로 보인다. 내비 경로는 하루 단위, 차는 오늘 것만 <span class="decided">정함</span></div></div>
     <div class="ask"><span class="qid">Q05</span><b>구글 캘린더 불러오기는 넣음 — 어디까지?</b><span class="rec">추천: 읽기만. 구글 일정을 "구글" 카테고리로 같이 보여 주고, 우리 앱 일정은 구글로 보내지 않음(양방향 동기화는 충돌 처리가 큼).</span></div>
   </div>
 </div>
@@ -670,32 +670,30 @@
     <div class="sec-ico">🗄️</div>
     <div>
       <div class="sec-title">18 · 데이터 구조 (Firestore)</div>
-      <div class="sec-sub">shared 모듈에 그대로 · <span style="color:#6d3fe0">Claude 제안</span></div>
+      <div class="sec-sub">shared 모듈에 그대로 · 캘린더 중심 · <span class="decided">정함</span> 2026-10-30</div>
     </div>
   </div>
   <div class="sec-body">
+    <div class="note-in wide"><b>원칙:</b> 캘린더의 모든 일정은 하나의 "일정(event)" 형태. 여행·차량 관리·다른 일정·출퇴근·직접 추가한 카테고리는 <b>카테고리만 다름</b>. 모든 일정은 그룹 안에 있고, 혼자 쓰는 사람은 가입 때 자동으로 생기는 <b>"나만" 그룹</b>에 들어감(Q01). 캘린더 = "내가 속한 그룹들의 일정"</div>
     <div class="sub-block wide">
       <div class="sb-t">👤 사람 · 차</div>
-      <div class="sb-row"><code>users/{uid}</code> 이름, 사진, fcmTokens[], carId</div>
-      <div class="sb-row"><code>users/{uid}/categories/{id}</code> 이름, 색, 기본여부</div>
-      <div class="sb-row"><code>users/{uid}/events/{id}</code> 보통 일정: 카테고리, 제목, 시작·끝, 장소?, 반복?</div>
-      <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 여행 tripId, <b>state</b>{기어, 주행제한, 위치, updatedAt}</div>
-      <div class="sb-row"><code>cars/{carId}/maintenance/{id}</code> 항목, 날짜, 주행거리, 자동여부, 금액?</div>
+      <div class="sb-row"><code>users/{uid}</code> 이름, 사진, fcmTokens[], <b>soloGroupId</b>, carId?</div>
+      <div class="sb-row"><code>users/{uid}/categories/{id}</code> 사용자가 추가한 카테고리: 이름, 색 (기본 3개는 앱에 고정)</div>
+      <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 쓰는 일정 {groupId, eventId}, <b>state</b>{기어, 주행제한, 위치, updatedAt}</div>
     </div>
     <div class="sub-block wide">
-      <div class="sb-t">👥 그룹 · 여행</div>
-      <div class="sb-row"><code>groups/{gid}</code> 이름, memberIds[], ownerUid, inviteCode</div>
-      <div class="sb-row"><code>groups/{gid}/trips/{tripId}</code> 이름, 날짜들, carId, driverUid</div>
-      <div class="sb-row"><code>…/trips/{tripId}/days/{yyyy-MM-dd}</code> <b>version</b>, 지금 칸 번호, 상태(준비/이동중/끝)</div>
-      <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 순서, 장소{이름,좌표,주소,kakaoId}, 시간?, 메모, 만든사람, deleted</div>
+      <div class="sb-t">👥 그룹 · 일정</div>
+      <div class="sb-row"><code>groups/{gid}</code> 이름, memberIds[], ownerUid, inviteCode, solo(나만 그룹 여부)</div>
+      <div class="sb-row"><code>groups/{gid}/events/{eid}</code> <b>캘린더의 모든 일정</b>: 카테고리, 제목, 시작·끝 날짜(시간), 하루종일?, 장소?, 반복?, 메모, 만든사람, deleted<br>· 여행: 사용자가 고른 날짜들(여러 날 가능), carId?, driverUid?<br>· 차량 관리: 항목(주유·점검…), 주행거리, 자동여부, 금액?·리터? — 차 주인의 나만 그룹에 들어감</div>
+      <div class="sb-row"><code>…/events/{eid}/days/{yyyy-MM-dd}</code> 여행의 <b>하루</b>: version, 지금 칸 번호, 상태(준비/이동중/끝)</div>
+      <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 장소 칸: 순서, 장소{이름,좌표,주소,kakaoId}, 시간?, 메모, 만든사람, deleted, 다녀옴</div>
       <div class="sb-row"><code>…/days/{date}/pickups/{uid}</code> 장소, 순서, 상태(대기/탔음/끝), 예상도착</div>
-      <div class="sb-row"><code>…/days/{date}/records/{id}</code> 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[]</div>
+      <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[]</div>
       <div class="sb-row"><code>…/records/{id}/comments/{id}</code> uid, 글, 시각</div>
       <div class="sb-row"><code>groups/{gid}/votes/{id}</code> 질문, 후보[], 표{uid:번호}, 상태</div>
     </div>
-    <div class="note-in wide">멤버 캘린더에 그룹 여행을 보이게 하는 법: 캘린더가 <b>내 events + 내가 속한 그룹의 trips</b>를 같이 읽음. 복사하지 않음(한 곳만 고치면 됨)</div>
-    <div class="note-in wide">보안 규칙: 그룹 문서는 memberIds에 든 사람만 읽기·쓰기. 차 state는 차 주인과 그 여행 멤버만 읽기</div>
-    <div class="ask wide"><span class="qid">Q48</span><b>이 구조로 시작해도 될까?</b><span class="rec">추천: 이대로 shared 모듈 만들고, 바뀌면 이 표를 같이 고침.</span></div>
+    <div class="note-in wide"><b>여러 날 여행(Q04):</b> 사용자가 날짜를 골라 만든다. 캘린더에는 이어진 여행 하나로 보이고, 날짜를 누르면 <b>그날 일정(장소 칸)</b>이 따로 보인다. 내비 경로도 하루 단위, 차 앱은 오늘 것만 띄움</div>
+    <div class="note-in wide">보안 규칙: 그룹과 그 아래 일정은 memberIds에 든 사람만 읽기·쓰기. 차 state는 차 주인과 지금 그 차를 쓰는 그룹 멤버만 읽기</div>
   </div>
 </div>
 
@@ -789,9 +787,6 @@
 
     <div class="qgroup">🔴 뼈대 만들기 전에 (나중에 바꾸기 비쌈)</div>
     <div class="qlist">
-      <div class="q"><div class="qh"><span class="qid">Q48</span><span class="qt">데이터 구조 이대로 시작?</span><span class="qwhere">18장</span></div><div class="qr"><b>추천</b> 이대로</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q01</span><span class="qt">혼자 쓸 때 "나만" 그룹 자동 생성?</span><span class="qwhere">0장</span></div><div class="qr"><b>추천</b> 예</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q04</span><span class="qt">여러 날 여행 = 하루 단위 경로?</span><span class="qwhere">2장</span></div><div class="qr"><b>추천</b> 예</div></div>
       <div class="q"><div class="qh"><span class="qid">Q16·Q17</span><span class="qt">여행 없을 때 QR 그룹 · 차는 주인 계정 하나 + 여행마다 운전자 지정?</span><span class="qwhere">7장</span></div><div class="qr"><b>추천</b> 차에서 [새 그룹] · 예</div></div>
       <div class="q"><div class="qh"><span class="qid">Q47</span><span class="qt">Blaze 예산 알림 금액 (Blaze는 필수)</span><span class="qwhere">17장</span></div><div class="qr"><b>추천</b> 1만 원</div></div>
     </div>
@@ -856,7 +851,7 @@
     </div>
 
     <div class="qgroup">✓ 정함 (질문에서 옮겨 온 것)</div>
-    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)</div>
+    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)</div>
   </div>
 </div>
 

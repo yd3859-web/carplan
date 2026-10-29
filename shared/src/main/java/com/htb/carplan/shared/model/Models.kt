@@ -4,9 +4,11 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.ServerTimestamp
 
-// Firestore data model shared by car-app and phone-app.
-// Mirrors 작동시나리오 18장. Every field has a default so Firestore can deserialize.
-// Change this file only through a PR both apps agree on.
+// Firestore data model shared by car-app and phone-app (작동시나리오 18장).
+// Calendar-centric: every calendar item is one Event inside a group; a solo user
+// has an automatic one-person group (Q01). Categories only change what extra
+// fields an Event uses. Every field has a default so Firestore can deserialize.
+// Change this file only together with 18장.
 
 /** A place picked from Kakao Local search. */
 data class Place(
@@ -25,29 +27,23 @@ data class User(
     val name: String = "",
     val photoUrl: String? = null,
     val fcmTokens: List<String> = emptyList(),
+    /** The automatic one-person group created at sign-up (Q01). */
+    val soloGroupId: String = "",
     val carId: String? = null,
-    /** The automatic one-person group (Q01). */
-    val soloGroupId: String? = null,
 )
 
-/** users/{uid}/categories/{id} */
-data class Category(
+/** Built-in categories; users can add their own (users/{uid}/categories). */
+enum class BuiltInCategory(val id: String, val label: String) {
+    TRIP("trip", "여행"),
+    CAR("car", "차량 관리"),
+    OTHER("other", "다른 일정"),
+}
+
+/** users/{uid}/categories/{id} — a category the user added (출퇴근, 여가…). */
+data class CustomCategory(
     @DocumentId val id: String = "",
     val name: String = "",
     val color: Long = 0xFF5B8DEF,
-    val isDefault: Boolean = false,
-)
-
-/** users/{uid}/events/{id} — a plain (non-trip) event. */
-data class Event(
-    @DocumentId val id: String = "",
-    val categoryId: String = "",
-    val title: String = "",
-    val startAt: Timestamp? = null,
-    val endAt: Timestamp? = null,
-    val place: Place? = null,
-    /** RRULE-like string for commute repeats, e.g. "WEEKLY:MO,TU,WE,TH,FR". */
-    val repeat: String? = null,
 )
 
 enum class Gear { P, R, N, D, UNKNOWN }
@@ -65,30 +61,17 @@ data class CarState(
 data class Car(
     @DocumentId val id: String = "",
     val ownerUid: String? = null,
-    /** Short code shown on the car screen to link the owner's account. */
+    /** Short code shown on the car screen to link the owner's account (7장). */
     val linkCode: String = "",
-    /** groups/{groupId}/trips/{tripId} currently using this car. */
+    /** The trip event this car is driving today. */
     val activeGroupId: String? = null,
-    val activeTripId: String? = null,
+    val activeEventId: String? = null,
     val state: CarState = CarState(),
 )
 
-enum class MaintenanceItem { FUEL, INSPECTION, TIRE_PRESSURE, ENGINE_OIL, TIRE_CHANGE, CAR_WASH, INSURANCE }
+// ---------- Groups & calendar events ----------
 
-/** cars/{carId}/maintenance/{id} */
-data class MaintenanceRecord(
-    @DocumentId val id: String = "",
-    val item: MaintenanceItem = MaintenanceItem.FUEL,
-    val date: Timestamp? = null,
-    val odometerKm: Double? = null,
-    val auto: Boolean = false,
-    val amountWon: Long? = null,
-    val liters: Double? = null,
-)
-
-// ---------- Groups & trips ----------
-
-/** groups/{gid} */
+/** groups/{gid} — a solo group or a shared one. */
 data class Group(
     @DocumentId val id: String = "",
     val name: String = "",
@@ -98,19 +81,57 @@ data class Group(
     val solo: Boolean = false,
 )
 
-/** groups/{gid}/trips/{tripId} — may span several days (Q04: routes are per day). */
-data class Trip(
+enum class MaintenanceItem(val label: String) {
+    FUEL("주유"),
+    INSPECTION("차량 점검"),
+    TIRE_PRESSURE("공기압"),
+    ENGINE_OIL("엔진오일"),
+    TIRE_CHANGE("타이어 교체"),
+    CAR_WASH("세차"),
+    INSURANCE("보험 갱신"),
+}
+
+/** Extra fields of a 차량 관리 event. */
+data class Maintenance(
+    val item: MaintenanceItem = MaintenanceItem.FUEL,
+    val carId: String = "",
+    val odometerKm: Double? = null,
+    val auto: Boolean = false,
+    val amountWon: Long? = null,
+    val liters: Double? = null,
+)
+
+/**
+ * groups/{gid}/events/{eid} — every calendar item.
+ * [startDate]/[endDate] are yyyy-MM-dd so a multi-day trip shows as one span (Q04).
+ */
+data class Event(
     @DocumentId val id: String = "",
-    val name: String = "",
-    /** yyyy-MM-dd, ascending. */
-    val dates: List<String> = emptyList(),
+    /** A [BuiltInCategory.id] or a [CustomCategory.id]. */
+    val categoryId: String = BuiltInCategory.OTHER.id,
+    val title: String = "",
+    val startDate: String = "",
+    val endDate: String = "",
+    val allDay: Boolean = true,
+    /** "HH:mm" when not all-day. */
+    val startTime: String? = null,
+    val endTime: String? = null,
+    val place: Place? = null,
+    /** Repeat rule for commutes, e.g. "WEEKLY:MO,TU,WE,TH,FR". */
+    val repeat: String? = null,
+    val memo: String = "",
+    val createdBy: String = "",
+    val deleted: Boolean = false,
+    // 여행 only
     val carId: String? = null,
     val driverUid: String? = null,
+    // 차량 관리 only
+    val maintenance: Maintenance? = null,
 )
 
 enum class DayStatus { READY, DRIVING, DONE }
 
-/** .../trips/{tripId}/days/{yyyy-MM-dd} */
+/** .../events/{eid}/days/{yyyy-MM-dd} — one day of a trip. */
 data class TripDay(
     @DocumentId val date: String = "",
     /** Bumped on every stop change so the car can tell what is new. */
@@ -126,7 +147,7 @@ data class Stop(
     @DocumentId val id: String = "",
     val order: Int = 0,
     val place: Place = Place(),
-    /** Planned arrival time "HH:mm" (Q06). */
+    /** Planned arrival time "HH:mm". */
     val time: String? = null,
     val memo: String = "",
     val createdBy: String = "",
