@@ -53,6 +53,18 @@ class GroupViewModel : ViewModel() {
         .catch { _message.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** For the list: each group's next trip (today or later), else its last one — "다음 여행 11/2" / "지난 여행 10/30". */
+    val groupTrips: StateFlow<Map<String, CalendarEvent>> = myGroups
+        .flatMapLatest { gs -> if (gs.isEmpty()) flowOf(emptyList()) else calendar.observeEvents(gs.map { it.id }, "2000-01-01", "2100-12-31") }
+        .map { all ->
+            val today = java.time.LocalDate.now().toString()
+            all.filter { it.event.categoryId == BuiltInCategory.TRIP.id && !it.event.deleted }
+                .groupBy { it.groupId }
+                .mapValues { (_, list) -> list.filter { it.event.endDate >= today }.minByOrNull { it.event.startDate } ?: list.maxByOrNull { it.event.startDate }!! }
+        }
+        .catch { emit(emptyMap()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     val selected: StateFlow<Group?> = _selectedId
         .flatMapLatest { id -> id?.let { groups.observeGroup(it) } ?: flowOf(null) }
         .catch { _message.value = it.message }

@@ -22,6 +22,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -90,32 +93,54 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
     }
 
     val scan = rememberLauncherForActivityResult(ScanContract()) { result -> result.contents?.let { InviteInbox.offer(it) } }
+    val groupTrips by vm.groupTrips.collectAsStateWithLifecycle()
+    var plus by remember { mutableStateOf(false) }
+    var joining by remember { mutableStateOf(false) }
+    var addingFriend by remember { mutableStateOf(false) }
+    val today = LocalDate.now().toString()
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
-        Text("그룹", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-        Text("한 번 만든 그룹은 남겨서 다시 써요", fontSize = 14.sp, color = Palette.TextSoft)
-        message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
-        LazyColumn(Modifier.weight(1f).padding(top = 12.dp)) {
-            items(groups.filterNot { it.solo }, key = { it.id }) { g -> GroupRow(g, vm.nameOf(g.ownerUid), g.memberIds.size) { vm.open(g.id) } }
-            item {
-                if (groups.none { !it.solo }) Text("아직 그룹이 없어요. 새 그룹을 만들거나 코드로 들어와요.", color = Palette.TextSoft, fontSize = 15.sp, modifier = Modifier.padding(vertical = 12.dp))
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { creating = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("새 그룹", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-                    OutlinedButton(onClick = { scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt("차 화면의 QR을 비춰 주세요")) }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("차 QR 찍기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-                }
-                SectionTitle("코드로 참여")
-                CodeRow(code, { code = it }, "초대 코드 6자리", "참여") { InviteInbox.offerCode(code); code = "" }
-
-                SectionTitle("친구")
-                Text("내 친구 코드  ${me?.friendCode ?: "…"}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-                Text("같은 그룹에 있었던 사람은 자동으로 친구 후보예요. 코드로도 추가할 수 있어요.", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
-                CodeRow(friendCode, { friendCode = it }, "친구 코드", "추가") { vm.addFriendByCode(friendCode); friendCode = "" }
-                if (friends.isEmpty()) Text("아직 친구가 없어요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
-                friends.forEach { uid ->
-                    Text(vm.nameOf(uid), fontSize = 16.sp, color = Palette.TextStrong, modifier = Modifier.padding(vertical = 8.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("그룹", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+            // One [+] for everything that is not "open a group": make · join by code · scan the car QR · add a friend.
+            Box {
+                IconButton(onClick = { plus = true }, modifier = Modifier.background(Palette.Navy, Corner)) { Icon(Icons.Filled.Add, "추가", tint = androidx.compose.ui.graphics.Color.White) }
+                DropdownMenu(plus, onDismissRequest = { plus = false }) {
+                    DropdownMenuItem({ Text("새 그룹 만들기") }, onClick = { plus = false; creating = true })
+                    DropdownMenuItem({ Text("초대 코드로 참여") }, onClick = { plus = false; joining = true })
+                    DropdownMenuItem({ Text("차 QR 찍기") }, onClick = { plus = false; scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt("차 화면의 QR을 비춰 주세요")) })
                     HorizontalDivider(color = Palette.Line)
+                    DropdownMenuItem({ Text("친구 추가 (코드)") }, onClick = { plus = false; addingFriend = true })
                 }
-                Spacer(Modifier.height(24.dp))
+            }
+        }
+        message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
+        val shared = groups.filterNot { it.solo }
+        LazyColumn(Modifier.weight(1f).padding(top = 10.dp)) {
+            items(shared, key = { it.id }) { g ->
+                val t = groupTrips[g.id]
+                val tripLine = t?.let { ce ->
+                    val d = LocalDate.parse(ce.event.startDate)
+                    (if (ce.event.endDate >= today) "다음 여행" else "지난 여행") + "  ${d.monthValue}/${d.dayOfMonth} ${ce.event.title}"
+                }
+                val others = g.memberIds.filter { it != me?.uid }
+                val who = when {
+                    others.isEmpty() -> "나 혼자"
+                    others.size == 1 -> vm.nameOf(others[0])
+                    else -> "${vm.nameOf(others[0])} 외 ${others.size - 1}명"
+                }
+                GroupRow(g, who, tripLine) { vm.open(g.id) }
+            }
+            item {
+                if (shared.isEmpty()) Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("아직 그룹이 없어요", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                    Text("오른쪽 위 [+]에서 만들거나 초대 코드로 들어와요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+                }
+                groups.firstOrNull { it.solo }?.let { solo ->
+                    Spacer(Modifier.height(16.dp))
+                    GroupRow(solo, "혼자 쓰는 일정 · 차량 관리", null) { vm.open(solo.id) }
+                }
+                Text("내 친구 코드  ${me?.friendCode ?: "…"}  ·  친구 ${friends.size}명", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 22.dp, bottom = 24.dp))
             }
         }
     }
@@ -123,6 +148,22 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
     if (creating) NameDialog(title = "새 그룹", hint = "예: 대학 동기, 우리 가족", confirm = "만들기", onDismiss = { creating = false }) { name ->
         creating = false
         vm.createGroup(name) { vm.open(it) }
+    }
+    if (joining) CodeDialog(title = "초대 코드로 참여", hint = "초대 코드 6자리", action = "참여", onDismiss = { joining = false }) { joining = false; InviteInbox.offerCode(it) }
+    if (addingFriend) CodeDialog(title = "친구 추가", hint = "친구 코드 6자리", action = "추가", note = "내 친구 코드는 ${me?.friendCode ?: "…"} 예요. 같은 그룹에 있었던 사람은 자동으로 친구예요.", onDismiss = { addingFriend = false }) { addingFriend = false; vm.addFriendByCode(it) }
+}
+
+/** A 6-character code in its own small sheet (join / friend). */
+@Composable
+private fun CodeDialog(title: String, hint: String, action: String, note: String? = null, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var code by remember { mutableStateOf("") }
+    com.htb.carplan.phone.ui.CenterSheet(onDismiss = onDismiss) {
+        Column {
+            Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            note?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp)) }
+            Spacer(Modifier.height(12.dp))
+            CodeRow(code, { code = it }, hint, action) { onConfirm(code) }
+        }
     }
 }
 
@@ -141,10 +182,13 @@ private fun CodeRow(value: String, onChange: (String) -> Unit, hint: String, act
 }
 
 @Composable
-private fun GroupRow(g: Group, owner: String, members: Int, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp)) {
-        Text(g.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-        Text("${members}명 · 그룹장 $owner", fontSize = 14.sp, color = Palette.TextSoft)
+private fun GroupRow(g: Group, who: String, tripLine: String?, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(g.name, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text(who, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
+        }
+        tripLine?.let { Text(it, fontSize = 14.sp, color = if (it.startsWith("다음")) Palette.Teal else Palette.TextSoft, fontWeight = if (it.startsWith("다음")) FontWeight.SemiBold else FontWeight.Normal) }
     }
     HorizontalDivider(color = Palette.Line)
 }
