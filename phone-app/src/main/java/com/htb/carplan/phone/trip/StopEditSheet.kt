@@ -1,6 +1,7 @@
 package com.htb.carplan.phone.trip
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
@@ -58,41 +60,37 @@ fun StopEditSheet(
     var searchOpen by remember { mutableStateOf(existing == null) }
     var timePicker by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Background,
-        shape = Corner,
-    ) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding()) {
-            Text(if (existing == null) "장소 칸 추가" else "장소 칸 고치기", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+    CenterSheet(onDismiss = onDismiss) {
+        Column(Modifier.imePadding()) {
+            Text(if (existing == null) "장소 칸 추가" else "장소 칸 고치기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
 
             Field(label = "장소", modifier = Modifier.padding(top = 14.dp)) {
-                Column(Modifier.fillMaxWidth().clip(Corner).background(Palette.InputBg).clickable { searchOpen = true }.padding(12.dp)) {
-                    Text(place?.name?.ifBlank { null } ?: "눌러서 장소 고르기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = if (place == null) Palette.TextSoft else Palette.TextStrong)
+                Column(Modifier.fillMaxWidth().clip(Corner).background(Palette.Background).border(1.dp, Palette.SheetEdge, Corner).clickable { searchOpen = true }.padding(16.dp)) {
+                    Text(place?.name?.ifBlank { null } ?: "눌러서 장소 고르기", fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = if (place == null) Palette.TextSoft else Palette.TextStrong)
                     place?.let { p ->
                         val sub = when {
                             p.address.isNotBlank() -> p.address
                             !p.hasCoords() -> "좌표 없음 · 카카오 검색으로 바꾸면 내비에 바로 들어가요"
                             else -> null
                         }
-                        sub?.let { Text(it, fontSize = 12.sp, color = Palette.TextSoft) }
+                        sub?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft) }
                     }
                 }
             }
 
             Field(label = "도착 시각 (선택)", modifier = Modifier.padding(top = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { timePicker = true }) { Text(time ?: "시간 정하기", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
-                    if (time != null) TextButton(onClick = { time = null }) { Text("지우기", color = Palette.TextSoft) }
+                    TextButton(onClick = { timePicker = true }) { Text(time ?: "시간 정하기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
+                    if (time != null) TextButton(onClick = { time = null }) { Text("지우기", color = Palette.TextSoft, fontSize = 16.sp) }
                 }
             }
 
             Field(label = "메모 (선택)", modifier = Modifier.padding(top = 4.dp)) {
                 TextField(
-                    memo, { memo = it }, placeholder = { Text("뭐 먹을지, 뭐 할지") }, modifier = Modifier.fillMaxWidth(),
+                    memo, { memo = it }, placeholder = { Text("뭐 먹을지, 뭐 할지", fontSize = 17.sp) }, modifier = Modifier.fillMaxWidth(),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
                     shape = Corner,
-                    colors = TextFieldDefaults.colors(focusedContainerColor = Palette.InputBg, unfocusedContainerColor = Palette.InputBg, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Color.Transparent),
+                    colors = TextFieldDefaults.colors(focusedContainerColor = Palette.Background, unfocusedContainerColor = Palette.Background, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Palette.SheetEdge),
                 )
             }
 
@@ -100,10 +98,10 @@ fun StopEditSheet(
             Button(
                 onClick = { place?.let { onSave(it, time, memo.trim()) } },
                 enabled = place != null && place!!.name.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-            ) { Text(if (existing == null) "칸 추가" else "저장", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+            ) { Text(if (existing == null) "칸 추가" else "저장", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
 
@@ -134,7 +132,7 @@ fun StopEditSheet(
 @Composable
 private fun Field(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(modifier) {
-        Text(label, fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 4.dp))
+        Text(label, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 6.dp))
         content()
     }
 }

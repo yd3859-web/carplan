@@ -61,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
@@ -140,19 +141,15 @@ fun QuickAddSheet(
         )
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Background,
-        shape = Corner,
-    ) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding()) {
+    CenterSheet(onDismiss = onDismiss) {
+        Column(Modifier.imePadding()) {
+            Text(if (isTrip) "여행 추가" else "일정 추가", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(bottom = 6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text(if (isTrip) "어디로 떠나요? (여행 이름)" else "무슨 일정이에요?", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    placeholder = { Text(if (isTrip) "어디로 떠나요? (여행 이름)" else "무슨 일정이에요?", fontSize = 26.sp, fontWeight = FontWeight.Bold) },
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { save() }),
@@ -167,7 +164,7 @@ fun QuickAddSheet(
                 }
             }
 
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (!isTrip) Chip(Icons.Filled.Place, place?.takeIf { it.isNotBlank() } ?: "장소", active = place != null) { if (place == null) place = "" }
                 Box {
                     Chip(Icons.Filled.DateRange, dateLabel(start, end, if (isTrip) null else time, if (isTrip) Repeat.NONE else repeat), active = true) { if (isTrip) rangePicker = true else dateMenu = true }
@@ -195,7 +192,7 @@ fun QuickAddSheet(
             }
             if (isTrip) Text(
                 "여행은 날짜만 고르고 추가하면, 바로 날짜별 장소 칸을 짜는 화면으로 가요 (3장)",
-                fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp),
+                fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp),
             )
 
             memo?.let { m ->
@@ -258,12 +255,12 @@ fun QuickAddSheet(
 
 @Composable
 private fun Chip(icon: ImageVector, label: String?, active: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = Corner, color = Color.Transparent, border = BorderStroke(1.dp, if (active) Palette.Navy else Palette.Line)) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = if (active) Palette.Navy else Palette.TextSoft, modifier = Modifier.size(20.dp))
+    Surface(onClick = onClick, shape = Corner, color = Palette.Background, border = BorderStroke(1.dp, if (active) Palette.Navy else Palette.SheetEdge)) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = if (active) Palette.Navy else Palette.TextSoft, modifier = Modifier.size(24.dp))
             label?.let {
-                Spacer(Modifier.size(6.dp))
-                Text(it, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
+                Spacer(Modifier.size(8.dp))
+                Text(it, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
             }
         }
     }
@@ -271,11 +268,11 @@ private fun Chip(icon: ImageVector, label: String?, active: Boolean, onClick: ()
 
 @Composable
 private fun CategoryChip(label: String, color: Color, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = Corner, color = Color.Transparent, border = BorderStroke(1.dp, Palette.Line)) {
-        Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(Corner).background(color))
-            Spacer(Modifier.size(6.dp))
-            Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
+    Surface(onClick = onClick, shape = Corner, color = Palette.Background, border = BorderStroke(1.dp, Palette.SheetEdge)) {
+        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(12.dp).clip(Corner).background(color))
+            Spacer(Modifier.size(8.dp))
+            Text(label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
             Icon(Icons.Filled.ArrowDropDown, null, tint = Palette.Navy)
         }
     }
@@ -285,9 +282,10 @@ private fun CategoryChip(label: String, color: Color, onClick: () -> Unit) {
 private fun SmallField(value: String, onChange: (String) -> Unit, hint: String, onRemove: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextField(
-            value, onChange, placeholder = { Text(hint) }, singleLine = true, modifier = Modifier.weight(1f),
+            value, onChange, placeholder = { Text(hint, fontSize = 17.sp) }, singleLine = true, modifier = Modifier.weight(1f),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
             shape = Corner,
-            colors = TextFieldDefaults.colors(focusedContainerColor = Palette.InputBg, unfocusedContainerColor = Palette.InputBg, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Color.Transparent),
+            colors = TextFieldDefaults.colors(focusedContainerColor = Palette.Background, unfocusedContainerColor = Palette.Background, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Palette.SheetEdge),
         )
         IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "지우기", tint = Palette.TextSoft) }
     }

@@ -63,12 +63,12 @@ fun DayRoutePanel(
     val allDay = ordered.filter { it.event.allDay && it.event.place == null } - trips.toSet()
     val route = ordered - allDay.toSet() - trips.toSet()
     Column(modifier.padding(20.dp)) {
-        Text(dayTitle(date), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+        Text(dayTitle(date), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
         val sub = listOfNotNull(if (date == LocalDate.now()) "오늘" else null, KoreanHolidays.nameOf(date)).joinToString(" · ")
-        if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft)
+        if (sub.isNotEmpty()) Text(sub, fontSize = 15.sp, color = Palette.TextSoft)
 
         LazyColumn(Modifier.weight(1f).padding(top = 16.dp)) {
-            if (events.isEmpty()) item { Text("이날은 일정이 없어요", color = Palette.TextSoft, fontSize = 14.sp) }
+            if (events.isEmpty()) item { Text("이날은 일정이 없어요", color = Palette.TextSoft, fontSize = 16.sp) }
             items(trips, key = { "trip-" + it.groupId + it.event.id }) { trip ->
                 TripBlock(trip, tripStops[trip.event.id].orEmpty(), categories) { onOpenTrip(trip) }
             }
@@ -85,10 +85,10 @@ fun DayRoutePanel(
         }
         Button(
             onClick = onAdd,
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = Corner,
             colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-        ) { Text("일정 추가", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+        ) { Text("일정 추가", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
     }
 }
 
@@ -100,19 +100,19 @@ private fun TripBlock(trip: CalendarEvent, stops: List<Stop>, categories: List<C
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(3.dp).height(16.dp).background(color))
             Spacer(Modifier.width(8.dp))
-            Text(trip.event.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            Text("편집", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal)
+            Text(trip.event.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+            Text("편집", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal)
         }
         if (stops.isEmpty()) {
-            Text("이날 장소 칸이 아직 없어요 · 눌러서 짜기", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+            Text("이날 장소 칸이 아직 없어요 · 눌러서 짜기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
         }
         stops.forEachIndexed { i, s ->
             Row(Modifier.padding(top = 6.dp, start = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${i + 1}", Modifier.width(18.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
-                s.time?.let { Text(it, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, modifier = Modifier.width(44.dp)) }
-                Text(s.place.name, fontSize = 14.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                Text("${i + 1}", Modifier.width(22.dp), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
+                s.time?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, modifier = Modifier.width(52.dp)) }
+                Text(s.place.name, fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             }
-            if (s.memo.isNotBlank()) Text(s.memo, fontSize = 12.sp, color = Palette.ChipText, modifier = Modifier.padding(start = 29.dp))
+            if (s.memo.isNotBlank()) Text(s.memo, fontSize = 14.sp, color = Palette.ChipText, modifier = Modifier.padding(start = 33.dp))
         }
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 12.dp))
     }
@@ -124,8 +124,8 @@ private fun AllDayRow(item: CalendarEvent, categories: List<CustomCategory>) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(3.dp).height(16.dp).background(color))
         Spacer(Modifier.width(8.dp))
-        Text(item.event.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-        Text("하루 종일", fontSize = 12.sp, color = Palette.TextSoft)
+        Text(item.event.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+        Text("하루 종일", fontSize = 14.sp, color = Palette.TextSoft)
     }
 }
 
@@ -134,21 +134,21 @@ private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isL
     val e = item.event
     val color = argb(CategoryColors.of(e.categoryId, categories))
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        Text(e.startTime ?: "", Modifier.width(48.dp).padding(top = 2.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+        Text(e.startTime ?: "", Modifier.width(56.dp).padding(top = 2.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
         Column(Modifier.width(20.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.padding(top = 4.dp).size(12.dp).clip(CircleShape).background(if (e.place != null) Palette.Teal else color))
             if (!isLast) Box(Modifier.width(2.dp).weight(1f).background(Palette.Line))
         }
         Column(Modifier.padding(start = 8.dp, bottom = 10.dp).weight(1f)) {
-            Text(e.place?.name?.takeIf { it.isNotBlank() } ?: e.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text(e.place?.name?.takeIf { it.isNotBlank() } ?: e.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             val meta = listOfNotNull(
                 e.title.takeIf { e.place != null && it != e.place?.name },
                 CategoryColors.label(e.categoryId, categories),
                 e.reminderMinutes?.let { "알림 ${reminderLabel(it)}" },
             ).joinToString("  ·  ")
-            Text(meta, fontSize = 12.sp, color = Palette.TextSoft)
-            if (e.memo.isNotBlank()) Text(e.memo, fontSize = 13.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
-            e.checklist.forEach { c -> Text((if (c.done) "✓ " else "– ") + c.text, fontSize = 13.sp, color = if (c.done) Palette.TextSoft else Palette.ChipText) }
+            Text(meta, fontSize = 14.sp, color = Palette.TextSoft)
+            if (e.memo.isNotBlank()) Text(e.memo, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
+            e.checklist.forEach { c -> Text((if (c.done) "✓ " else "– ") + c.text, fontSize = 15.sp, color = if (c.done) Palette.TextSoft else Palette.ChipText) }
         }
     }
 }
@@ -157,11 +157,11 @@ private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isL
 @Composable
 private fun Leg(drive: Boolean) {
     Row(Modifier.fillMaxWidth().height(28.dp)) {
-        Spacer(Modifier.width(48.dp))
+        Spacer(Modifier.width(56.dp))
         Box(Modifier.width(20.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
             Box(Modifier.width(2.dp).fillMaxHeight().background(if (drive) Palette.Teal.copy(alpha = 0.5f) else Palette.Line))
         }
-        if (drive) Text("차로 이동", Modifier.padding(start = 8.dp).align(Alignment.CenterVertically), fontSize = 12.sp, color = Palette.Teal)
+        if (drive) Text("차로 이동", Modifier.padding(start = 8.dp).align(Alignment.CenterVertically), fontSize = 14.sp, color = Palette.Teal)
     }
 }
 

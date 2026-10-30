@@ -55,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.htb.carplan.phone.trip.TripDayScreen
 import com.htb.carplan.phone.trip.TripRef
+import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
@@ -66,10 +67,10 @@ import com.htb.carplan.shared.model.CustomCategory
 import java.time.LocalDate
 import java.time.YearMonth
 
-private val DATE_AREA = 30.dp
-private val BAR_HEIGHT = 16.dp
-private val BAR_GAP = 2.dp
-private val MARK_AREA = 16.dp
+private val DATE_AREA = 38.dp
+private val BAR_HEIGHT = 20.dp
+private val BAR_GAP = 3.dp
+private val MARK_AREA = 18.dp
 private const val MAX_LANES = 2
 private val WEEKDAYS = listOf("일", "월", "화", "수", "목", "금", "토")
 private val TripRefSaver = Saver<TripRef?, List<String>>(
@@ -124,7 +125,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     events = MonthGrid.eventsOn(selected, events),
                     categories = categories,
                     onAdd = { quickAddDate = selected },
-                    modifier = Modifier.width(360.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) },
+                    modifier = Modifier.width(400.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) },
                     tripStops = tripStops,
                     onOpenTrip = { openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
                 )
@@ -133,7 +134,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     }
 
     if (daySheetOpen) {
-        ModalBottomSheet(onDismissRequest = { daySheetOpen = false }, containerColor = Palette.Background) {
+        CenterSheet(onDismiss = { daySheetOpen = false }) {
             DayRoutePanel(
                 date = selected,
                 events = MonthGrid.eventsOn(selected, events),
@@ -167,7 +168,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
 private fun MonthHeader(month: YearMonth, onPrev: () -> Unit, onNext: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         val title = if (month.year == YearMonth.now().year) "${month.monthValue}월" else "${month.year}년 ${month.monthValue}월"
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+        Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
         IconButton(onClick = onPrev) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "이전 달", tint = Palette.TextSoft) }
         IconButton(onClick = onNext) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "다음 달", tint = Palette.TextSoft) }
     }
@@ -186,7 +187,7 @@ private fun MonthGridView(
     val singleDay = events - multiDay.toSet()
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            WEEKDAYS.forEach { Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, color = Palette.TextSoft, fontSize = 12.sp) }
+            WEEKDAYS.forEachIndexed { i, d -> Text(d, Modifier.weight(1f), textAlign = TextAlign.Start, color = when (i) { 0 -> Palette.Sunday; 6 -> Palette.Saturday; else -> Palette.TextSoft }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
         }
         MonthGrid.weeks(month).forEach { weekStart ->
             HorizontalDivider(color = Palette.Line)
@@ -260,7 +261,7 @@ private fun DayCell(
     }
     Column(modifier.padding(horizontal = 2.dp), horizontalAlignment = Alignment.Start) {
         Box(
-            Modifier.padding(top = 4.dp, start = 2.dp).size(22.dp).clip(Corner).background(
+            Modifier.padding(top = 5.dp, start = 2.dp).size(30.dp).clip(Corner).background(
                 when {
                     isToday -> Palette.Navy
                     selected -> Palette.InputBg
@@ -270,7 +271,7 @@ private fun DayCell(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "${date.dayOfMonth}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                "${date.dayOfMonth}", fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                 color = when {
                     isToday -> Color.White
                     inMonth -> base
@@ -278,7 +279,7 @@ private fun DayCell(
                 },
             )
         }
-        Spacer(Modifier.height(DATE_AREA - 27.dp + barsHeight))
+        Spacer(Modifier.height(DATE_AREA - 35.dp + barsHeight))
         DayMarks(marks, hiddenBars, categories, holiday?.takeIf { inMonth })
     }
 }
@@ -287,14 +288,14 @@ private fun DayCell(
 @Composable
 private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: List<CustomCategory>, holiday: String?) {
     Row(Modifier.height(MARK_AREA).padding(start = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (marks.any { it.event.categoryId == BuiltInCategory.CAR.id }) Icon(Icons.Filled.Build, "차량 관리", tint = Palette.ChipText, modifier = Modifier.size(9.dp))
+        if (marks.any { it.event.categoryId == BuiltInCategory.CAR.id }) Icon(Icons.Filled.Build, "차량 관리", tint = Palette.ChipText, modifier = Modifier.size(12.dp))
         marks.filter { it.event.categoryId != BuiltInCategory.CAR.id }.take(3).forEach {
             val c = if (it.event.place != null) Palette.Teal else argb(CategoryColors.of(it.event.categoryId, categories))
-            Box(Modifier.size(5.dp).clip(CircleShape).background(c))
+            Box(Modifier.size(7.dp).clip(CircleShape).background(c))
         }
         val more = marks.size - 3 + hiddenBars
-        if (more > 0) Text("+$more", fontSize = 8.sp, color = Palette.TextSoft)
-        if (marks.isEmpty() && hiddenBars == 0 && holiday != null) Text(holiday, fontSize = 8.sp, color = Palette.Sunday, maxLines = 1, overflow = TextOverflow.Clip)
+        if (more > 0) Text("+$more", fontSize = 11.sp, color = Palette.TextSoft)
+        if (marks.isEmpty() && hiddenBars == 0 && holiday != null) Text(holiday, fontSize = 11.sp, color = Palette.Sunday, maxLines = 1, overflow = TextOverflow.Clip)
     }
 }
 
@@ -302,6 +303,6 @@ private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: Li
 @Composable
 private fun TripBar(label: String, color: Color, modifier: Modifier = Modifier) {
     Box(modifier.clip(Corner).background(color.copy(alpha = 0.16f)).drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)) }, contentAlignment = Alignment.CenterStart) {
-        Text(label, Modifier.padding(start = 7.dp, end = 4.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, Modifier.padding(start = 8.dp, end = 4.dp), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

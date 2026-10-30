@@ -47,6 +47,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import androidx.compose.material3.HorizontalDivider
@@ -112,26 +113,23 @@ fun PlaceSearchSheet(
         pendingCategory = null
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Background,
-        shape = Corner,
-    ) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding().height(560.dp)) {
+    CenterSheet(onDismiss = onDismiss) {
+        Column(Modifier.imePadding().height(520.dp)) {
+            Text("장소 고르기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(bottom = 12.dp))
             TextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text(if (hasKey) "장소 검색 (카카오)" else "장소 이름 (카카오 키 없음 → 이름만 저장)") },
+                placeholder = { Text(if (hasKey) "장소 검색 (카카오)" else "장소 이름 (카카오 키 없음 → 이름만 저장)", fontSize = 17.sp) },
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { runSearch() }),
                 shape = Corner,
-                colors = TextFieldDefaults.colors(focusedContainerColor = Palette.InputBg, unfocusedContainerColor = Palette.InputBg, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Color.Transparent),
+                colors = TextFieldDefaults.colors(focusedContainerColor = Palette.Background, unfocusedContainerColor = Palette.Background, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Palette.SheetEdge),
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("근처 추천", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp))
+                Text("근처 추천", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp))
                 RECOMMEND.forEach { c ->
                     FilterChip(
                         selected = activeCategory == c,
@@ -145,7 +143,7 @@ fun PlaceSearchSheet(
                                 askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                             }
                         },
-                        label = { Text(c.label) },
+                        label = { Text(c.label, fontSize = 16.sp) },
                         shape = Corner,
                     )
                 }
@@ -153,7 +151,7 @@ fun PlaceSearchSheet(
             if (!hasKey) {
                 Text(
                     "카카오 REST 키가 없어서 검색이 꺼져 있어요. 이름을 쓰고 아래 버튼을 누르면 이름만 저장돼요(좌표는 나중에 검색으로 채움).",
-                    fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp),
                 )
             }
             message?.let { Text(it, fontSize = 13.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 8.dp)) }
@@ -165,7 +163,7 @@ fun PlaceSearchSheet(
 
             if (query.isNotBlank()) {
                 TextButton(onClick = { onPick(Place(name = query.trim())) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (hasKey) "\"${query.trim()}\" 이름만으로 넣기" else "\"${query.trim()}\" 넣기", color = Palette.Navy, fontWeight = FontWeight.SemiBold)
+                    Text(if (hasKey) "\"${query.trim()}\" 이름만으로 넣기" else "\"${query.trim()}\" 넣기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
                 }
             }
         }
@@ -177,8 +175,8 @@ private fun PlaceRow(p: Place, onClick: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
     ) {
-        Text(p.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-        if (p.address.isNotBlank()) Text(p.address, fontSize = 12.sp, color = Palette.TextSoft)
+        Text(p.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+        if (p.address.isNotBlank()) Text(p.address, fontSize = 14.sp, color = Palette.TextSoft)
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))
     }
 }

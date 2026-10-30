@@ -17,6 +17,9 @@ object Palette {
     val Background = Color(0xFFFFFFFF)
     /** Input fields and pressed states only, never whole sections. */
     val Panel = Color(0xFFF4F5F7)
+    /** Dialogs sit on a light grey sheet with a visible edge so they read as a layer over the white page. */
+    val Sheet = Color(0xFFF0F2F5)
+    val SheetEdge = Color(0xFFC9CED4)
     /** Primary (buttons, today marker). Kept under its old name so call sites stay. */
     val Navy = Color(0xFF111111)
     val NavySoft = Color(0xFF2B2F33)

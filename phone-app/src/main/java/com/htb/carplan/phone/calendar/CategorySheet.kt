@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
@@ -53,14 +54,14 @@ fun CategorySheet(
 ) {
     var editing by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Palette.Background, shape = Corner) {
-        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
+    CenterSheet(onDismiss = onDismiss) {
+        Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("카테고리 선택", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { editing = !editing }) { Text(if (editing) "완료" else "편집", fontSize = 16.sp) }
+                Text("카테고리 선택", fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { editing = !editing }) { Text(if (editing) "완료" else "편집", fontSize = 18.sp, color = Palette.Navy) }
             }
-            Spacer(Modifier.height(12.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Spacer(Modifier.height(16.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 BuiltInCategory.entries.forEach { c ->
                     CategoryCard(c.label, argb(CategoryColors.BUILT_IN.getValue(c.id)), c.id == selectedId) { onPick(c.id) }
                 }
@@ -80,15 +81,15 @@ fun CategorySheet(
 @Composable
 private fun CategoryCard(name: String, color: Color, selected: Boolean, onClick: () -> Unit) {
     Column(
-        Modifier.size(width = 96.dp, height = 88.dp).clip(Corner)
-            .border(if (selected) 2.dp else 1.dp, if (selected) Palette.TextStrong else Palette.Line, Corner)
+        Modifier.size(width = 132.dp, height = 104.dp).clip(Corner).background(Palette.Background)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Palette.TextStrong else Palette.SheetEdge, Corner)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(Modifier.size(14.dp).clip(Corner).background(color))
-        Spacer(Modifier.height(10.dp))
-        Text(name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+        Box(Modifier.size(16.dp).clip(Corner).background(color))
+        Spacer(Modifier.height(12.dp))
+        Text(name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
     }
 }
 
