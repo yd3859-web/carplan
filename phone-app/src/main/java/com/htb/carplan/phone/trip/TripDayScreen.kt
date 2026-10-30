@@ -9,6 +9,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
 import com.htb.carplan.phone.record.DayExport
+import com.htb.carplan.phone.record.DayVideo
 import com.htb.carplan.phone.record.ExportItem
 import com.htb.carplan.phone.record.Photos
 import com.htb.carplan.phone.ui.CenterSheet
@@ -196,19 +197,35 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 TextButton(onClick = { voteOpen = true }) { Text("투표", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 TextButton(onClick = { dartOpen = true }) { Text("다트", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
             }
-            if (records.isNotEmpty()) TextButton(onClick = {
-                scope.launch {
-                    val items = buildList {
-                        stops.forEachIndexed { i, s ->
-                            val r = recordByStop[s.id]
-                            add(ExportItem(r?.arrivedAt?.let { hhmm(it) } ?: s.time, s.place.name, r?.note?.ifBlank { null } ?: s.memo, r?.photoUrls?.firstOrNull(), false))
-                            unplannedAfter(i).forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true)) }
-                        }
-                        if (stops.isEmpty()) unplanned.forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true)) }
-                    }
-                    runCatching { DayExport.share(context, event?.title ?: "하루 기록", "${date}  ·  ${group?.name ?: ""}", items) }
+            // 14장 내보내기: 이미지 1장(Q39) 또는 짧은 영상(사진 슬라이드 + 장소·시간 자막)
+            var exportMenu by remember { mutableStateOf(false) }
+            var exporting by remember { mutableStateOf<String?>(null) }
+            fun exportItems() = buildList {
+                stops.forEachIndexed { i, s ->
+                    val r = recordByStop[s.id]
+                    add(ExportItem(r?.arrivedAt?.let { hhmm(it) } ?: s.time, s.place.name, r?.note?.ifBlank { null } ?: s.memo, r?.photoUrls?.firstOrNull(), false, r?.photoUrls.orEmpty()))
+                    unplannedAfter(i).forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true, u.photoUrls)) }
                 }
-            }) { Text("내보내기", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                if (stops.isEmpty()) unplanned.forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true, u.photoUrls)) }
+            }
+            if (records.isNotEmpty()) Box {
+                TextButton(onClick = { exportMenu = true }, enabled = exporting == null) { Text(exporting ?: "내보내기", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                androidx.compose.material3.DropdownMenu(exportMenu, onDismissRequest = { exportMenu = false }) {
+                    androidx.compose.material3.DropdownMenuItem({ Text("이미지 1장") }, onClick = {
+                        exportMenu = false
+                        scope.launch { runCatching { DayExport.share(context, event?.title ?: "하루 기록", "${date}  ·  ${group?.name ?: ""}", exportItems()) } }
+                    })
+                    androidx.compose.material3.DropdownMenuItem({ Text("짧은 영상") }, onClick = {
+                        exportMenu = false
+                        scope.launch {
+                            exporting = "영상 준비 중"
+                            runCatching { DayVideo.share(context, event?.title ?: "하루 기록", "${date}  ·  ${group?.name ?: ""}", exportItems()) { exporting = it } }
+                                .onFailure { vm.setError("영상 만들기 실패: ${it.message}") }
+                            exporting = null
+                        }
+                    })
+                }
+            }
             // 7장 2: "오늘 이 차로 가요" — the trip gets my car and me as driver; the car app then shows it.
             val e = event
             when {

@@ -63,6 +63,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     val date: StateFlow<String> = _date.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+    fun setError(message: String?) { _error.value = message }
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 

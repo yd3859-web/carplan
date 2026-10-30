@@ -17,7 +17,7 @@ import coil3.toBitmap
 import java.io.File
 
 /** One row of the exported day image: a planned stop or an unplanned record. */
-data class ExportItem(val time: String?, val title: String, val line: String, val photoUrl: String?, val unplanned: Boolean)
+data class ExportItem(val time: String?, val title: String, val line: String, val photoUrl: String?, val unplanned: Boolean, val photoUrls: List<String> = listOfNotNull(photoUrl))
 
 /**
  * Q39: the whole day as one tall image — title, then each stop with its first photo, place,
