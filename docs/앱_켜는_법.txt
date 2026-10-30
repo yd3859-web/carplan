@@ -1,0 +1,131 @@
+carplan 앱 켜는 법 (2026-10-30 정리)
+====================================
+
+앱은 두 개다.
+  - 차 앱  : com.htb.carplan.car   → Pleos 에뮬레이터(또는 실차)에서 돈다
+  - 폰 앱  : com.htb.carplan.phone → 실제 안드로이드 폰(또는 같은 에뮬레이터)에서 돈다
+둘 다 같은 Firebase(carplan-htb)에 붙어서 서로 실시간으로 바뀐다.
+
+모든 명령은 저장소 폴더에서:
+  cd ~/AndroidStudioProjects/carplan
+
+
+------------------------------------------------------------
+1. 처음 한 번만 확인할 것
+------------------------------------------------------------
+  - local.properties 에 아래가 있어야 함 (git에는 안 올라감)
+      sdk.dir=/Users/gimjeong-won/Library/Android/sdk
+      KAKAO_REST_KEY=...   (없으면 장소 검색이 이름 입력으로 바뀜)
+      OPINET_KEY=...       (없으면 주유소가 내비 검색으로 바뀜)
+  - phone-app/google-services.json, car-app/google-services.json 있어야 함 (git 제외)
+  - 터미널에서 adb 가 되는지:  adb devices
+
+
+------------------------------------------------------------
+2. 빌드 (두 앱 한 번에)
+------------------------------------------------------------
+  ./gradlew :phone-app:assembleDebug :car-app:assembleDebug
+
+  만들어지는 파일
+    phone-app/build/outputs/apk/debug/phone-app-debug.apk
+    car-app/build/outputs/apk/debug/car-app-debug.apk
+
+
+------------------------------------------------------------
+3. 차 앱 — Pleos 에뮬레이터에서
+------------------------------------------------------------
+  (1) 에뮬레이터 켜기 — 반드시 Cold boot
+      ~/Library/Android/sdk/emulator/emulator -avd Pleos_Connect_v2_1_0 -no-snapshot-load &
+      → 30초~1분 기다린 뒤  adb devices  에 emulator-5554 device 가 보이면 됨
+
+  (2) 설치
+      adb -s emulator-5554 install -r -g car-app/build/outputs/apk/debug/car-app-debug.apk
+
+  (3) 실행
+      adb -s emulator-5554 shell am start -n com.htb.carplan.car/.MainActivity
+      (화면 아래 안드로이드 아이콘을 눌러도 됨)
+
+  (4) 처음 실행하면 차 화면에 6자리 숫자가 뜸 → 폰 앱 "차량" 탭에 입력하면 연결
+
+  (5) 기어·문·배터리 바꾸기 (Virtual Console)
+      adb forward tcp:8088 tcp:8088
+      브라우저로 http://127.0.0.1:8088 열기 → 기어 P/D, 운전석 문, 배터리 조작
+      (브라우저 탭을 열어 둬야 콘솔이 살아 있음)
+
+  (6) 시연 메뉴: 차 화면 [더보기] → [시연 메뉴]
+      연료 10/20/50/100%, 연료차/전기차, 가짜 주행, 반반 미리보기(내비 옆 화면 모양)
+
+  주의
+    - 에뮬레이터는 노트북이 많이 뜨거워짐. 안 쓸 땐 끄기
+    - 이미 떠 있는 앱을 앞으로 올릴 땐  am start --activity-single-top -n ...
+      (그냥 am start 하면 편집 중이던 화면이 사라짐)
+
+
+------------------------------------------------------------
+4. 폰 앱 — 실제 안드로이드 폰에서  ★
+------------------------------------------------------------
+  (1) 폰에서 개발자 옵션 켜기
+      설정 → 휴대전화 정보 → 소프트웨어 정보 → "빌드번호"를 7번 누름
+      → "개발자 모드가 켜졌습니다"
+
+  (2) USB 디버깅 켜기
+      설정 → 개발자 옵션 → "USB 디버깅" 켜기
+      (무선으로 하고 싶으면 "무선 디버깅" — 아래 (6) 참고)
+
+  (3) 폰을 맥에 USB로 연결 → 폰에 "USB 디버깅을 허용할까요?" → [허용]
+      (항상 허용 체크해 두면 다음부터 안 물어봄)
+
+  (4) 연결 확인
+      adb devices
+      → 에뮬레이터 말고 폰 번호(예: R3CN70XXXX  device)가 하나 더 보이면 성공
+         "unauthorized" 라고 뜨면 폰 화면의 허용 창을 누르기
+
+  (5) 설치 & 실행 (폰 번호를 -s 뒤에)
+      adb -s <폰번호> install -r -g phone-app/build/outputs/apk/debug/phone-app-debug.apk
+      adb -s <폰번호> shell am start -n com.htb.carplan.phone/.MainActivity
+      → 이후엔 폰 앱 서랍에서 "carplan" 아이콘으로 켜면 됨
+
+  (6) 무선으로 (케이블 없이, 같은 와이파이)
+      폰: 개발자 옵션 → 무선 디버깅 켜기 → "페어링 코드로 기기 페어링"
+      맥: adb pair <폰에 뜬 IP:포트>   → 폰에 뜬 6자리 코드 입력
+          adb connect <무선 디버깅 화면의 IP:포트>
+      그다음은 (5)와 같음
+
+  (7) Android Studio로 하고 싶으면
+      위 (1)~(3) 후 Android Studio 위쪽 실행 대상에서 폰 이름 고르고
+      실행 구성을 phone-app 으로 → ▶ 버튼
+
+  실제 폰에서만 되는 것 (에뮬레이터에선 안 됨)
+    - 구글 로그인 / 구글 캘린더 같이 보기 (폰에 구글 계정이 있어야 함)
+    - 푸시 알림, 사진 올리기, 일정 알림
+    - 초대 링크(carplan-htb.web.app/i/코드) 눌러서 앱 열기
+
+
+------------------------------------------------------------
+5. 폰 앱을 에뮬레이터에 같이 깔아서 볼 때
+------------------------------------------------------------
+  adb -s emulator-5554 install -r -g phone-app/build/outputs/apk/debug/phone-app-debug.apk
+  adb -s emulator-5554 shell am start -n com.htb.carplan.phone/.MainActivity
+  - 차 앱과 폰 앱은 계정이 따로 생김(익명) → 폰 앱이 "차주"가 되려면 차량 탭에서 6자리 코드 입력
+  - 에뮬레이터엔 구글 서비스가 없어서 첫 화면에서 [나중에 할게요]
+
+
+------------------------------------------------------------
+6. 기기가 여러 대일 때
+------------------------------------------------------------
+  adb devices 로 번호 확인 → 명령마다  adb -s <번호> ...
+  번호 없이 쓰면 "more than one device" 오류가 남
+
+
+------------------------------------------------------------
+7. 자주 막히는 것
+------------------------------------------------------------
+  - "INSTALL_FAILED_UPDATE_INCOMPATIBLE"
+      → 다른 컴퓨터에서 빌드한 앱이 깔려 있음. 지우고 다시:
+        adb -s <번호> uninstall com.htb.carplan.phone
+  - 앱이 켜지자마자 꺼짐(차 앱)
+      → 에뮬레이터를 Cold boot로 다시 켜기 (-no-snapshot-load)
+  - 지도가 회색/차단 그림
+      → 인터넷 연결 확인. 계속이면 앱 데이터 지우기(설정 → 앱 → carplan → 저장공간 → 캐시 삭제)
+  - 차와 폰이 안 이어짐
+      → 폰 앱 차량 탭에 차 화면 6자리 코드를 넣었는지. 같은 Firebase인지(google-services.json)
