@@ -103,7 +103,10 @@ class TripNavigator(
                 .flatMapLatest { groups -> calendar.observeEvents(groups.map { it.id }, today, today) }
                 .map { events ->
                     val tripsToday = events.filter { it.event.categoryId == BuiltInCategory.TRIP.id && !it.event.deleted }
-                    tripsToday.firstOrNull { it.event.id == car.activeEventId } ?: tripsToday.firstOrNull()
+                    // 7장 2: a trip that says "오늘 이 차로 가요" wins, then the one already active, then the first.
+                    tripsToday.firstOrNull { it.event.carId == car.id }
+                        ?: tripsToday.firstOrNull { it.event.id == car.activeEventId }
+                        ?: tripsToday.firstOrNull()
                 }
                 .flatMapLatest { ev ->
                     if (ev == null) flowOf(null)

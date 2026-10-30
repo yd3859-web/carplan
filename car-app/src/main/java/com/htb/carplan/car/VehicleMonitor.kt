@@ -1,6 +1,11 @@
 package com.htb.carplan.car
 
 import ai.pleos.playground.vehicle.Vehicle
+import ai.pleos.playground.vehicle.api.model.area.SeatArea
+import ai.pleos.playground.vehicle.constant.area.SeatValue
+import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import android.car.Car
 import android.car.VehicleGear
 import android.car.VehiclePropertyIds
@@ -25,6 +30,11 @@ class VehicleMonitor(private val context: Context) {
     private val _state = MutableStateFlow(CarState())
     val state: StateFlow<CarState> = _state.asStateFlow()
 
+    /** Fires once each time a passenger seat (not the driver's) becomes occupied (7장 4: "같이 타셨나요?"). */
+    private val _passengerSeated = MutableSharedFlow<SeatValue>(extraBufferCapacity = 4)
+    val passengerSeated: SharedFlow<SeatValue> = _passengerSeated
+    private val occupied = HashMap<SeatValue, Boolean>()
+
     private var car: Car? = null
     private var vehicle: Vehicle? = null
     private var fuelCapacity: Float? = null
@@ -48,6 +58,20 @@ class VehicleMonitor(private val context: Context) {
 
         vehicle = Vehicle(context).also { v ->
             v.initialize()
+            // Passenger seats only; the driver's seat never triggers the QR.
+            listOf(SeatValue.ROW_1_RIGHT, SeatValue.ROW_2_LEFT, SeatValue.ROW_2_CENTER, SeatValue.ROW_2_RIGHT).forEach { seat ->
+                runCatching {
+                    v.getSeat().registerSeatOccupancy(SeatArea(seat), object : SeatOccupancyListener {
+                        override fun onSeatOccupancyUpdated(value: Boolean?) {
+                            val now = value == true
+                            val was = occupied[seat] ?: false
+                            occupied[seat] = now
+                            if (now && !was) _passengerSeated.tryEmit(seat)
+                        }
+                        override fun onFailed(e: Exception) { Log.w(TAG, "seat $seat occupancy failed: ${e.message}") }
+                    })
+                }.onFailure { Log.w(TAG, "seat occupancy unavailable", it) }
+            }
             v.getOdometer().getRangeRemainingDistance(
                 // Pleos reports metres (500000 while the cluster shows 500 km).
                 { m -> m?.let { r -> _state.update { it.copy(rangeKm = r.toDouble() / 1000) } } },

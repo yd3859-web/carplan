@@ -96,6 +96,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val tripStops by vm.tripStops.collectAsStateWithLifecycle()
     val tripComments by vm.tripComments.collectAsStateWithLifecycle()
     val tripDays by vm.tripDays.collectAsStateWithLifecycle()
+    val groups by vm.groups.collectAsStateWithLifecycle()
+    val lastGroupId by vm.lastGroupId.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
     var openTrip by rememberSaveable(stateSaver = TripRefSaver) { mutableStateOf<TripRef?>(null) }
@@ -158,11 +160,14 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             initialDate = date,
             categories = categories,
             onAddCategory = vm::addCategory,
-            onSave = { e ->
+            groups = groups,
+            defaultGroupId = lastGroupId ?: groups.firstOrNull { it.solo }?.id,
+            onCreateGroup = vm::createGroup,
+            onSave = { e, gid ->
                 quickAddDate = null
-                vm.addEvent(e) { gid, eid ->
+                vm.addEvent(e, gid) { g, eid ->
                     // A new trip opens straight into its first day's stops (3장).
-                    if (e.categoryId == BuiltInCategory.TRIP.id) openTrip = TripRef(gid, eid, e.startDate)
+                    if (e.categoryId == BuiltInCategory.TRIP.id) openTrip = TripRef(g, eid, e.startDate)
                 }
             },
             onDismiss = { quickAddDate = null },

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.htb.carplan.shared.data.CalendarEvent
 import com.htb.carplan.shared.data.CalendarRepository
+import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.data.Session
 import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.data.TripRepository
@@ -45,9 +47,18 @@ class CalendarViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    private val groupIds = _session.filterNotNull()
+    /** Every group I belong to (solo last) — the 여행 추가 창 picks one (4장). */
+    val groups: StateFlow<List<Group>> = _session.filterNotNull()
         .flatMapLatest { calendar.observeGroups(it.uid) }
-        .map { groups -> groups.map { it.id } }
+        .map { list -> list.sortedWith(compareBy({ it.solo }, { it.name })) }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val groupIds = groups.map { list -> list.map { it.id } }
+
+    /** The group the last trip went to; a new trip defaults to it (falls back to the solo group). */
+    private val _lastGroupId = MutableStateFlow<String?>(null)
+    val lastGroupId: StateFlow<String?> = _lastGroupId.asStateFlow()
 
     /** Events overlapping the visible grid (it spills into neighbour months). */
     val events: StateFlow<List<CalendarEvent>> = combine(groupIds, _month) { ids, m -> ids to MonthGrid.of(m) }
@@ -127,12 +138,21 @@ class CalendarViewModel : ViewModel() {
      * Every event goes to the solo group for now (4장 adds picking a group for trips).
      * [onAdded] gets the group and event id so a trip can open its first day right away.
      */
-    fun addEvent(event: Event, onAdded: (groupId: String, eventId: String) -> Unit = { _, _ -> }) {
+    fun addEvent(event: Event, groupId: String? = null, onAdded: (groupId: String, eventId: String) -> Unit = { _, _ -> }) {
+        val s = _session.value ?: return
+        val gid = groupId ?: s.soloGroupId
+        if (event.categoryId == BuiltInCategory.TRIP.id) _lastGroupId.value = gid
+        viewModelScope.launch {
+            runCatching { calendar.addEvent(gid, event.copy(createdBy = s.uid)) }
+                .onSuccess { onAdded(gid, it) }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
+    fun createGroup(name: String, onCreated: (String) -> Unit) {
         val s = _session.value ?: return
         viewModelScope.launch {
-            runCatching { calendar.addEvent(s.soloGroupId, event.copy(createdBy = s.uid)) }
-                .onSuccess { onAdded(s.soloGroupId, it) }
-                .onFailure { _error.value = it.message }
+            runCatching { GroupRepository().createGroup(name, s.uid) }.onSuccess(onCreated).onFailure { _error.value = it.message }
         }
     }
 

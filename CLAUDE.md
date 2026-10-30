@@ -88,7 +88,8 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 3장 타임라인 완료: 레일 화면, 칸별 코멘트 글타래(`days/{date}/comments`), 예상 도착 시각(`shared/calendar/Schedule.kt`), 시간 그 자리에서 확정.
 - 9장 "다음 목적지로 갈까요?" 완료(차: `TripNavigator`·`VoicePrompt`, 앱 켤 때·P→D 때 묻기, 경유지 2+목적지 → 도착마다 채움, 시연용 도착 버튼). 10장(일정 변경 → 내비 갱신)은 `TripNavigator`가 `TripDay.version`을 보고 묻는 것부터.
 - 10장 완료(차 `TripNavigator`: version 변경 5초 모아 묻기, 바꾸기/그대로, `routeSyncedVersion`·`holdByDriver`·`etaNext`; 폰: 차주 폰 주행 중 편집 잠금, 상태 줄).
-- 다음: 4장 그룹·초대·QR → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
+- 4장·7장 완료(폰 `group/`: 그룹 탭·화면·초대 3종·딥링크/QR 참여·친구, 여행 그룹 칩, "오늘 이 차로 가요"; 차: 초대 QR·착석 자동 QR; `hosting/public` 초대 페이지 배포됨, `firebase deploy --only hosting`).
+- 다음: 13·14장 기록(P단 → 기록 칸, 사진, 타임라인 레일에 채우기) → 20장 디버그 메뉴 → 12장 주유 → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
 - Firestore 규칙은 아직 dev(로그인만 하면 읽기·쓰기). 1차 제출 전 18장 규칙으로 바꾼다.
 
 ## 에뮬레이터 테스트 요령

@@ -7,6 +7,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.htb.carplan.shared.data.CalendarEvent
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
+import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.model.Group
+import kotlinx.coroutines.flow.combine
 import com.htb.carplan.shared.data.ensureSignedIn
 import com.htb.carplan.shared.model.Car
 import com.htb.carplan.shared.model.CarState
@@ -37,6 +40,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     private val cars = CarRepository()
     private val router = CarRuntime.router(app)
     private val navigator = CarRuntime.navigator(app)
+    private val groups = GroupRepository()
 
     /** 9장: today's trip, the question on screen, and whether the navigation already has the route. */
     val trip: StateFlow<TodayTrip?> = navigator.trip
@@ -48,6 +52,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val error: StateFlow<String?> = _error.asStateFlow()
 
     val vehicle: StateFlow<CarState> = CarRuntime.monitor(app).state
+    /** 7장 4: a passenger sat down → the screen offers the QR by itself. */
+    val passengerSeated = CarRuntime.monitor(app).passengerSeated
 
     val car: StateFlow<Car?> = carId.filterNotNull()
         .flatMapLatest { calendar.observeCar(it) }
@@ -104,6 +110,25 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openNavigation() = router.openNavigation()
+
+    /** 7장 3: the group the QR invites to — today's trip's group, or the one made with [새 그룹] (Q16). */
+    private val qrGroupId = MutableStateFlow<String?>(null)
+    val qrGroup: StateFlow<Group?> = combine(qrGroupId, trip) { chosen, t -> chosen ?: t?.groupId }
+        .flatMapLatest { id -> id?.let { groups.observeGroup(it) } ?: flowOf(null) }
+        .map { g -> g?.takeIf { !it.solo } } // a solo "나만" group is not something to invite people into
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Q16: no trip today → make a group on the spot (owned by the car's host) and show its QR. */
+    fun newGroupForQr() {
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            runCatching { groups.createGroup("${today.monthValue}/${today.dayOfMonth} 같이 탄 사람들", u.uid) }
+                .onSuccess { qrGroupId.value = it }
+                .onFailure { _error.value = it.message }
+        }
+    }
 
     fun go() = navigator.go()
     fun later() = navigator.later()

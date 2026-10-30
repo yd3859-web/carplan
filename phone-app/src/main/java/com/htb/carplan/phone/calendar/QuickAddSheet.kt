@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePickerDialog
@@ -47,6 +48,7 @@ import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +57,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +74,7 @@ import com.htb.carplan.shared.model.BuiltInCategory
 import com.htb.carplan.shared.model.ChecklistItem
 import com.htb.carplan.shared.model.CustomCategory
 import com.htb.carplan.shared.model.Event
+import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.model.Place
 import java.time.Instant
 import java.time.LocalDate
@@ -95,8 +100,15 @@ fun QuickAddSheet(
     initialDate: LocalDate,
     categories: List<CustomCategory>,
     onAddCategory: (String, Long, (String) -> Unit) -> Unit,
-    onSave: (Event) -> Unit,
+    /** Saves the event; the second value is the group a trip goes to (null = solo / caller decides). */
+    onSave: (Event, String?) -> Unit,
     onDismiss: () -> Unit,
+    /** 4장: "새 여행" from a group screen fixes the category to 여행 and hides the category and group chips. */
+    fixedCategoryId: String? = null,
+    /** 4장: groups to pick from for a trip; empty hides the chip. */
+    groups: List<Group> = emptyList(),
+    defaultGroupId: String? = null,
+    onCreateGroup: (String, (String) -> Unit) -> Unit = { _, _ -> },
 ) {
     var title by remember { mutableStateOf("") }
     var start by remember { mutableStateOf(initialDate) }
@@ -106,9 +118,14 @@ fun QuickAddSheet(
     var reminder by remember { mutableStateOf<Int?>(null) }
     var memo by remember { mutableStateOf<String?>(null) }
     val checklist = remember { mutableStateListOf<String>() }
-    var categoryId by remember { mutableStateOf(BuiltInCategory.OTHER.id) }
+    var categoryId by remember { mutableStateOf(fixedCategoryId ?: BuiltInCategory.OTHER.id) }
     var place by remember { mutableStateOf<String?>(null) }
 
+    var groupId by remember { mutableStateOf(defaultGroupId) }
+    var groupMenu by remember { mutableStateOf(false) }
+    var newGroup by remember { mutableStateOf(false) }
+    val titleFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { titleFocus.requestFocus() } // the cursor is in the title the moment the dialog opens
     var dateMenu by remember { mutableStateOf(false) }
     var rangePicker by remember { mutableStateOf(false) }
     var timePicker by remember { mutableStateOf(false) }
@@ -121,7 +138,7 @@ fun QuickAddSheet(
         if (title.isBlank()) return
         if (isTrip) {
             // 3장: a trip is title + dates; its places live in day stops, edited on the next screen.
-            onSave(Event(categoryId = categoryId, title = title.trim(), startDate = start.toString(), endDate = end.toString(), allDay = true, memo = memo.orEmpty().trim()))
+            onSave(Event(categoryId = categoryId, title = title.trim(), startDate = start.toString(), endDate = end.toString(), allDay = true, memo = memo.orEmpty().trim()), groupId)
             return
         }
         onSave(
@@ -138,6 +155,7 @@ fun QuickAddSheet(
                 memo = memo.orEmpty().trim(),
                 checklist = checklist.filter { it.isNotBlank() }.map { ChecklistItem(it.trim()) },
             ),
+            null,
         )
     }
 
@@ -157,7 +175,7 @@ fun QuickAddSheet(
                         focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
                         focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     ),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).focusRequester(titleFocus),
                 )
                 IconButton(onClick = ::save, enabled = title.isNotBlank()) {
                     Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Navy else Palette.TextSoft)
@@ -188,7 +206,18 @@ fun QuickAddSheet(
                 }
                 Chip(Icons.Filled.Edit, null, active = memo != null) { memo = if (memo == null) "" else memo }
                 if (!isTrip) Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
-                CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
+                if (fixedCategoryId == null) CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
+                if (isTrip && fixedCategoryId == null && groups.isNotEmpty()) Box {
+                    val g = groups.firstOrNull { it.id == groupId }
+                    Chip(Icons.Filled.Person, g?.name ?: "그룹", active = g != null && !g.solo) { groupMenu = true }
+                    DropdownMenu(groupMenu, onDismissRequest = { groupMenu = false }) {
+                        groups.forEach { gr ->
+                            DropdownMenuItem({ Text(gr.name + if (gr.solo) " (혼자)" else "  · ${gr.memberIds.size}명", fontWeight = if (gr.id == groupId) FontWeight.Bold else FontWeight.Normal) }, onClick = { groupMenu = false; groupId = gr.id })
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem({ Text("새 그룹 만들기") }, onClick = { groupMenu = false; newGroup = true })
+                    }
+                }
             }
             if (isTrip) Text(
                 "여행은 날짜만 고르고 추가하면, 바로 날짜별 장소 칸을 짜는 화면으로 가요 (3장)",
@@ -239,6 +268,18 @@ fun QuickAddSheet(
             text = { TimeInput(state) },
             confirmButton = { TextButton(onClick = { time = "%02d:%02d".format(state.hour, state.minute); timePicker = false }) { Text("확인") } },
             dismissButton = { TextButton(onClick = { timePicker = false }) { Text("취소") } },
+        )
+    }
+
+    if (newGroup) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { newGroup = false },
+            shape = Corner, containerColor = Palette.Background,
+            title = { Text("새 그룹") },
+            text = { TextField(name, { name = it }, placeholder = { Text("예: 대학 동기, 우리 가족") }, singleLine = true) },
+            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { newGroup = false; onCreateGroup(name) { groupId = it } }) { Text("만들기") } },
+            dismissButton = { TextButton(onClick = { newGroup = false }) { Text("취소") } },
         )
     }
 

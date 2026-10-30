@@ -7,6 +7,8 @@ import com.htb.carplan.shared.calendar.RouteMath
 import com.htb.carplan.shared.calendar.Schedule
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
+import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.Comment
@@ -94,6 +96,25 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    private val groups = GroupRepository()
+
+    /** The group this trip belongs to (name in the header, 4장). */
+    val group: StateFlow<Group?> = groups.observeGroup(groupId)
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** My car id (users/{uid}.carId) — enables "오늘 이 차로 가요" (7장 2). */
+    val myCarId: StateFlow<String?> = uid.filterNotNull()
+        .flatMapLatest { calendar.observeUser(it) }
+        .map { it?.carId }
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** 7장 2: this trip goes with my car, me driving. Null car = clear. */
+    fun useMyCar(carId: String?) = write {
+        groups.setTripCar(groupId, eventId, carId, if (carId == null) null else me())
+    }
+
     /**
      * Q18: the driver's own phone is locked while the car drives this trip. For now the driver is the
      * car owner (7장 "오늘 이 차로 가요" will set Event.driverUid later).
@@ -102,6 +123,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         .flatMapLatest { calendar.observeUser(it) }
         .flatMapLatest { u -> u?.carId?.let { calendar.observeCar(it) } ?: flowOf(null) }
         .map { car -> car != null && car.activeEventId == eventId && car.state.drivingRestricted }
+        .combine(event) { lockedAsOwner, e -> lockedAsOwner && (e?.driverUid == null || e.driverUid == uid.value) }
         .catch { emit(false) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 

@@ -32,8 +32,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.htb.carplan.phone.calendar.CalendarScreen
 import com.htb.carplan.phone.car.CarTab
+import com.htb.carplan.phone.group.GroupTab
+import com.htb.carplan.phone.group.GroupViewModel
+import com.htb.carplan.phone.group.JoinDialog
 
 /** 하단 바 (2장): 캘린더 · 그룹 · 기록 · 차량 · 설정. */
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -47,16 +51,20 @@ enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 fun AppRoot() {
     var tab by rememberSaveable { mutableStateOf(Tab.CALENDAR) }
+    val groupVm: GroupViewModel = viewModel()
     Column(Modifier.fillMaxSize().background(Palette.Background)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 Tab.CALENDAR -> CalendarScreen()
+                Tab.GROUP -> GroupTab(groupVm)
                 Tab.CAR -> CarTab()
                 else -> ComingSoon(tab)
             }
         }
         TabBar(selected = tab, onSelect = { tab = it })
     }
+    // An invite (link, QR, code) can arrive on any tab (1장 4): ask, then land in the group.
+    JoinDialog(groupVm) { joined -> groupVm.open(joined); tab = Tab.GROUP }
 }
 
 /** Flat system-style bar: hairline on top, icon + label, selected in black. */

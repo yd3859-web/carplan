@@ -30,6 +30,14 @@ data class User(
     /** The automatic one-person group created at sign-up (Q01). */
     val soloGroupId: String = "",
     val carId: String? = null,
+    /** 6-character code friends type to add me (Q10). */
+    val friendCode: String = "",
+)
+
+/** users/{uid}/friends/{friendUid} — added by code; people from shared groups show up without this (Q10). */
+data class Friend(
+    @DocumentId val uid: String = "",
+    @ServerTimestamp val addedAt: Timestamp? = null,
 )
 
 /** Built-in categories; users can add their own (users/{uid}/categories). */
@@ -74,14 +82,16 @@ data class Car(
 
 // ---------- Groups & calendar events ----------
 
-/** groups/{gid} — a solo group or a shared one. */
+/** groups/{gid} — a solo group or a shared one. [ownerUid] is the 그룹장 (Q11): can remove members. */
 data class Group(
     @DocumentId val id: String = "",
     val name: String = "",
     val memberIds: List<String> = emptyList(),
     val ownerUid: String = "",
+    /** 6-character code for joining by code, link or QR (4장·7장). */
     val inviteCode: String = "",
     val solo: Boolean = false,
+    @ServerTimestamp val createdAt: Timestamp? = null,
 )
 
 enum class MaintenanceItem(val label: String) {

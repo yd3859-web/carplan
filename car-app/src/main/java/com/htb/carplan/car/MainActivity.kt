@@ -1,6 +1,14 @@
 package com.htb.carplan.car
 
 import android.Manifest
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.htb.carplan.shared.data.InviteLinks
+import com.htb.carplan.shared.model.Group
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,7 +109,13 @@ private fun CarHome(vm: CarHomeViewModel) {
     val trip by vm.trip.collectAsStateWithLifecycle()
     val prompt by vm.prompt.collectAsStateWithLifecycle()
     val guiding by vm.guiding.collectAsStateWithLifecycle()
+    val qrGroup by vm.qrGroup.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
+    var qr by remember { mutableStateOf(false) }
+    var seatedPrompt by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        vm.passengerSeated.collect { if (!vm.vehicle.value.drivingRestricted) { seatedPrompt = true; qr = true } }
+    }
 
     Column(Modifier.fillMaxSize()) {
         StatusBand(car, vehicle)
@@ -128,6 +143,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 BigButton("다음 목적지 묻기", enabled = tripNext != null && prompt == null) { vm.askNow() }
                 BigButton("내비 열기") { vm.openNavigation() }
                 if (guiding && tripNext != null) BigButton("${tripNext.place.name} 도착 처리 (시연용)") { vm.debugArrive() }
+                BigButton("같이 탄 사람 추가", enabled = !vehicle.drivingRestricted) { qr = true }
                 Spacer(Modifier.weight(1f))
                 BigButton(
                     if (vehicle.drivingRestricted) "주행 중엔 일정 추가 불가" else "일정 추가",
@@ -139,6 +155,9 @@ private fun CarHome(vm: CarHomeViewModel) {
 
     if (adding && !vehicle.drivingRestricted) {
         CarAddDialog(onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false })
+    }
+    if (qr && !vehicle.drivingRestricted) {
+        InviteQrDialog(qrGroup, seated = seatedPrompt, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
     }
 }
 
@@ -315,6 +334,47 @@ private fun BigButton(label: String, enabled: Boolean = true, primary: Boolean =
             disabledContentColor = Soft,
         ),
     ) { Text(label, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+}
+
+/**
+ * 7장 3: the invite QR for today's group. Passengers scan it with the phone app (or any camera:
+ * the link opens the Hosting page, which opens the app or explains how to install it).
+ * No trip today → [새 그룹] makes one on the spot (Q16).
+ */
+@Composable
+private fun InviteQrDialog(group: Group?, seated: Boolean, onNewGroup: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = Corner,
+        containerColor = Bg,
+        title = { Text(if (seated) "같이 타셨나요? QR 찍고 들어오세요" else if (group == null) "같이 탄 사람 추가" else "${group.name}에 들어오기", fontSize = 28.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (group == null) {
+                    Text("오늘 걸린 여행이 없어요. 새 그룹을 만들면 QR이 떠요.", fontSize = 20.sp, color = Soft)
+                } else {
+                    val link = InviteLinks.url(group.inviteCode)
+                    val bitmap = remember(link) { qrBitmap(link, 560) }
+                    Image(bitmap.asImageBitmap(), contentDescription = "초대 QR", modifier = Modifier.size(280.dp))
+                    Text("폰으로 QR을 찍으면 바로 그룹에 들어와요", fontSize = 20.sp, color = Ink)
+                    Text("코드  ${group.inviteCode}   ·   ${group.memberIds.size}명", fontSize = 20.sp, color = Soft)
+                }
+            }
+        },
+        confirmButton = {
+            if (group == null) TextButton(onClick = onNewGroup) { Text("새 그룹", fontSize = 22.sp, color = Ink, fontWeight = FontWeight.Bold) }
+            else TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) }
+        },
+        dismissButton = { if (group == null) TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Soft) } },
+    )
+}
+
+/** zxing core → black-on-white bitmap. */
+private fun qrBitmap(text: String, size: Int): Bitmap {
+    val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 1))
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    for (x in 0 until size) for (y in 0 until size) bmp.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+    return bmp
 }
 
 /** 차에서 일정 만들기 (Q19): big, few fields, preset days instead of a date picker. */

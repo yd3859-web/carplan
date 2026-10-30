@@ -69,5 +69,7 @@ dependencies {
     implementation(libs.pleos.navihelper)
     implementation(libs.pleos.texttospeech)
     implementation(libs.pleos.speechtotext)
+    // Invite QR on the car screen (7장)
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
 }

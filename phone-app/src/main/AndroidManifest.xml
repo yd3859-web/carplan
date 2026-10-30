@@ -5,6 +5,8 @@
     <!-- 근처 추천 (3장): asked only when the user taps a recommendation button (Q02). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- 7장: scanning the car's invite QR -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:allowBackup="false"
@@ -13,10 +15,25 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 4장 초대 링크: https://carplan-htb.web.app/i/CODE (App Links; assetlinks.json on Hosting) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="carplan-htb.web.app" android:pathPrefix="/i/" />
+            </intent-filter>
+            <!-- carplan://i/CODE — what the Hosting page's "앱에서 열기" button sends -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="carplan" android:host="i" />
             </intent-filter>
         </activity>
     </application>

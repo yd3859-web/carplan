@@ -120,6 +120,8 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     val me by vm.uid.collectAsStateWithLifecycle()
     val locked by vm.editLocked.collectAsStateWithLifecycle()
+    val group by vm.group.collectAsStateWithLifecycle()
+    val myCarId by vm.myCarId.collectAsStateWithLifecycle()
     vm.names.collectAsStateWithLifecycle().value // recompose when a name arrives
 
     var editing by remember { mutableStateOf<Stop?>(null) }
@@ -138,11 +140,19 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                 // 4장에서 그룹 고르기가 생기면 여기 그룹 이름이 들어간다.
                 Text(
-                    listOfNotNull("나만 그룹", "모두가 편집", dayLine(day)).joinToString(" · "),
+                    listOfNotNull(group?.name ?: "그룹", "모두가 편집", dayLine(day)).joinToString(" · "),
                     fontSize = 13.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft,
                 )
             }
             if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
+            // 7장 2: "오늘 이 차로 가요" — the trip gets my car and me as driver; the car app then shows it.
+            val e = event
+            when {
+                e?.carId != null -> TextButton(onClick = { if (e.driverUid == me) vm.useMyCar(null) }) {
+                    Text(if (e.driverUid == me) "내 차 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}", color = Palette.Teal, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+            }
         }
 
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

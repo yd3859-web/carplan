@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>carplan 초대</title>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;background:#fff;color:#111}
+  main{max-width:420px;margin:0 auto;padding:48px 24px}
+  h1{font-size:22px;margin:0 0 6px}
+  p{color:#4a5056;line-height:1.5;margin:0 0 20px}
+  .code{font-size:34px;font-weight:700;letter-spacing:6px;margin:8px 0 24px}
+  a.btn,button.btn{display:block;width:100%;box-sizing:border-box;padding:16px;border-radius:4px;border:1px solid #111;background:#111;color:#fff;font-size:17px;font-weight:600;text-align:center;text-decoration:none;margin-bottom:10px}
+  .ghost{background:#fff;color:#111}
+  hr{border:0;border-top:1px solid #e4e6e9;margin:24px 0}
+  small{color:#8a9096}
+</style>
+</head>
+<body>
+<main>
+  <h1>carplan 그룹 초대</h1>
+  <p>캘린더에 쓴 일정이 차를 움직여요. 아래 코드로 그룹에 들어오세요.</p>
+  <div class="code" id="code">······</div>
+  <a class="btn" id="open" href="#">앱에서 열기</a>
+  <button class="btn ghost" id="copy">코드 복사</button>
+  <hr>
+  <p><b>앱이 없다면</b><br>팀에서 받은 <code>carplan_phone.apk</code>를 설치한 뒤, 앱의 <b>그룹 → 코드로 참여</b>에 이 코드를 넣으세요.</p>
+  <small>현대자동차그룹 차량용 앱 공모전 출품작 · 안드로이드 전용</small>
+</main>
+<script>
+  var code = (location.pathname.match(/\/i\/([A-Za-z0-9]+)/) || [])[1] || "";
+  code = code.toUpperCase();
+  document.getElementById("code").textContent = code || "코드 없음";
+  // Android: intent:// opens the app when installed, otherwise falls back to this page.
+  document.getElementById("open").href =
+    "intent://i/" + code + "#Intent;scheme=carplan;package=com.htb.carplan.phone;S.browser_fallback_url=" + encodeURIComponent(location.href) + ";end";
+  document.getElementById("copy").onclick = function(){ navigator.clipboard && navigator.clipboard.writeText(code); this.textContent = "복사됨"; };
+</script>
+</body>
+</html>

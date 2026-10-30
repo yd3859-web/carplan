@@ -68,6 +68,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.core)
     implementation(libs.reorderable)
+    // QR: scanning the car's invite QR (7장) and drawing nothing on the phone; the car draws with zxing core.
+    implementation(libs.zxing.embedded)
+    implementation(libs.zxing.core)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)

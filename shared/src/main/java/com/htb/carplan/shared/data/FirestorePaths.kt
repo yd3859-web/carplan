@@ -12,6 +12,7 @@ object FirestorePaths {
 
     fun user(uid: String) = "$USERS/$uid"
     fun customCategories(uid: String) = "${user(uid)}/categories"
+    fun friends(uid: String) = "${user(uid)}/friends"
 
     fun car(carId: String) = "$CARS/$carId"
 
