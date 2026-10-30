@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.htb.carplan.shared.model.Car
 import com.htb.carplan.shared.model.CarState
+import com.htb.carplan.shared.model.MaintenanceItem
 import kotlinx.coroutines.tasks.await
 import kotlin.random.Random
 
@@ -42,6 +43,7 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
                 "state.fuelPercent" to state.fuelPercent,
                 "state.rangeKm" to state.rangeKm,
                 "state.isEv" to state.isEv,
+                "state.odometerKm" to state.odometerKm,
                 "state.lat" to state.lat,
                 "state.lng" to state.lng,
                 "state.updatedAt" to FieldValue.serverTimestamp(),
@@ -52,6 +54,12 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
     /** Which trip this car is driving today (9장); null clears it. */
     suspend fun setActiveTrip(carId: String, groupId: String?, eventId: String?) {
         db.document(FirestorePaths.car(carId)).update(mapOf("activeGroupId" to groupId, "activeEventId" to eventId)).await()
+    }
+
+    /** 15장 Q42: change one item's interval (null = back to default). */
+    suspend fun setInterval(carId: String, item: MaintenanceItem, km: Long?, days: Long?) {
+        val value: Any = if (km == null && days == null) FieldValue.delete() else mapOf("km" to (km ?: 0L), "days" to (days ?: 0L))
+        db.document(FirestorePaths.car(carId)).update("intervals.${item.name}", value).await()
     }
 
     private fun newCode() = (1..6).joinToString("") { Random.nextInt(10).toString() }

@@ -10,6 +10,8 @@ import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.data.MaintenanceRepository
+import com.htb.carplan.shared.model.MaintenanceItem
 import com.htb.carplan.shared.data.RecordRepository
 import com.htb.carplan.shared.calendar.RouteMath
 import com.htb.carplan.shared.model.CarState
@@ -52,7 +54,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     val version: Long get() = day?.version ?: 0
 }
 
-enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL }
+enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED }
 
 /**
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
@@ -80,6 +82,9 @@ class TripNavigator(
     private val records = RecordRepository()
     private val groups = GroupRepository()
     private val opinet = OpinetApi(BuildConfig.OPINET_KEY)
+    private val maintenance = MaintenanceRepository()
+    private var fuelAtPark: Double? = null
+    private var fueledAsked = false
 
     private val carId = MutableStateFlow<String?>(null)
     private val _prompt = MutableStateFlow<NextPrompt?>(null)
@@ -175,7 +180,7 @@ class TripNavigator(
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
-                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
+                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
         }
     }
@@ -190,6 +195,7 @@ class TripNavigator(
         if (prev == Gear.D && gear == Gear.P && pendingChange) { heldVersion = -1; scheduleChangeCheck(delayMs = 0) }
         // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
         if (gear == Gear.P && prev != Gear.P) {
+            fuelAtPark = carState.fuelPercent; fueledAsked = false
             router.requestCurrentLocation()
             parkTimer?.cancel()
             parkTimer = scope.launch { delay(PARK_CONFIRM_MS); confirmArrival(reason = "P 5분") }
@@ -255,6 +261,11 @@ class TripNavigator(
     fun onCarState(state: CarState) {
         carState = state
         val fuel = state.fuelPercent ?: return
+        // 15장 Q44: parked and the tank/battery went up ≥ 5 points → "주유했어요?" once per parking.
+        if (lastGear == Gear.P) {
+            val base = fuelAtPark ?: fuel.also { fuelAtPark = it }
+            if (!fueledAsked && fuel >= base + 5 && _prompt.value == null) { fueledAsked = true; askFueled(state.isEv == true) }
+        }
         val range = state.rangeKm
         val t = trip.value
         val today = LocalDate.now().toString()
@@ -286,6 +297,33 @@ class TripNavigator(
                 VoicePrompt.Answer.NO -> later()
                 VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
             }
+        }
+    }
+
+    private fun askFueled(ev: Boolean) {
+        val message = if (ev) "충전했어요? 충전 기록을 남길까요?" else "주유했어요? 주유 기록을 남길까요?"
+        askJob?.cancel()
+        _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUELED, message = message)
+        askJob = scope.launch {
+            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
+            when (answer) {
+                VoicePrompt.Answer.YES -> go()
+                VoicePrompt.Answer.NO -> later()
+                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
+            }
+        }
+    }
+
+    /** "네" to 주유했어요?: a 주유 record in the owner's solo group with today's odometer (15장). */
+    private fun logFuel() {
+        scope.launch {
+            runCatching {
+                val car = carId.value?.let { calendar.observeCar(it).first() } ?: return@launch
+                val owner = car.ownerUid ?: return@launch
+                val user = groups.user(owner) ?: return@launch
+                maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, byUid = owner, auto = true, intervals = car.intervals)
+                _notice.value = "주유 기록 남김 — 금액은 폰 차량 탭에서"
+            }.onFailure { _error.value = it.message }
         }
     }
 
@@ -373,6 +411,9 @@ class TripNavigator(
         if (_prompt.value?.reason == PromptReason.FUEL) {
             askJob?.cancel(); _prompt.value = null; findStation(); return
         }
+        if (_prompt.value?.reason == PromptReason.FUELED) {
+            askJob?.cancel(); _prompt.value = null; logFuel(); return
+        }
         val t = trip.value ?: return
         askJob?.cancel()
         val wasChange = _prompt.value?.reason == PromptReason.ROUTE_CHANGE
@@ -395,6 +436,7 @@ class TripNavigator(
     fun later() {
         askJob?.cancel()
         if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
+        if (_prompt.value?.reason == PromptReason.FUELED) { _prompt.value = null; return }
         val t = trip.value
         if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE && t != null) {
             pendingChange = true

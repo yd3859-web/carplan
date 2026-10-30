@@ -105,12 +105,27 @@ class VehicleMonitor(private val context: Context) {
                 { m -> m?.let { r -> _state.update { it.copy(rangeKm = r.toDouble() / 1000) } } },
                 { Log.w(TAG, "range read failed", it) },
             )
+            // 15장: odometer has no listener → poll once a minute (Virtual Console: /vehicle/odometer).
+            pollOdometer(v)
+            handler.postDelayed(object : Runnable { override fun run() { vehicle?.let(::pollOdometer); handler.postDelayed(this, 60_000) } }, 60_000)
         }
     }
 
     fun stop() {
+        handler.removeCallbacksAndMessages(null)
         vehicle?.release()
         car?.disconnect()
+    }
+
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun pollOdometer(v: Vehicle) {
+        runCatching {
+            v.getOdometer().getCurrentDistanceDriven(
+                { km -> km?.let { d -> _state.update { it.copy(odometerKm = d.toDouble()) } } },
+                { Log.w(TAG, "odometer read failed: ${it.message}") },
+            )
+        }.onFailure { Log.w(TAG, "odometer unavailable", it) }
     }
 
     private fun CarPropertyManager.readFloat(id: Int): Float? =

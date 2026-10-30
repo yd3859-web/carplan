@@ -1,26 +1,32 @@
 package com.htb.carplan.phone.car
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -29,12 +35,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
+import com.htb.carplan.shared.calendar.MaintenanceRules
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
+import com.htb.carplan.shared.data.MaintenanceRepository
+import com.htb.carplan.shared.data.Session
 import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.model.Car
+import com.htb.carplan.shared.model.Event
+import com.htb.carplan.shared.model.MaintenanceItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,60 +57,231 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 
-/** 7장 차 연결 (phone side): type the code on the car screen to become its owner/host (Q17). */
+/** 7장 차 연결 + 15장 차량 관리 (phone side). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CarTabViewModel : ViewModel() {
     private val calendar = CalendarRepository()
     private val cars = CarRepository()
-    private val uid = MutableStateFlow<String?>(null)
+    private val maintenance = MaintenanceRepository()
+    private val _session = MutableStateFlow<Session?>(null)
+    val session: StateFlow<Session?> = _session
     val message = MutableStateFlow<String?>(null)
 
-    val car: StateFlow<Car?> = uid.filterNotNull()
-        .flatMapLatest(calendar::observeUser)
+    val car: StateFlow<Car?> = _session.filterNotNull()
+        .flatMapLatest { calendar.observeUser(it.uid) }
         .flatMapLatest { u -> u?.carId?.let(calendar::observeCar) ?: flowOf(null) }
         .catch { message.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** 차량 관리 events of my solo group: records (past) and dues (`due-*`). */
+    val events: StateFlow<List<Event>> = _session.filterNotNull()
+        .flatMapLatest { maintenance.observe(it.soloGroupId) }
+        .catch { message.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
-        viewModelScope.launch { runCatching { SessionRepository().ensureSession() }.onSuccess { uid.value = it.uid } }
+        viewModelScope.launch { runCatching { SessionRepository().ensureSession() }.onSuccess { _session.value = it } }
     }
 
     fun link(code: String) {
-        val me = uid.value ?: return
+        val me = _session.value?.uid ?: return
         viewModelScope.launch {
             runCatching { cars.linkByCode(code, me) }
                 .onSuccess { message.value = if (it == null) "그 코드의 차를 찾지 못했어요" else "차와 연결됐어요. 이제 이 차의 호스트예요" }
                 .onFailure { message.value = it.message }
         }
     }
+
+    fun log(item: MaintenanceItem, date: LocalDate, odometerKm: Double?, amountWon: Long?, liters: Double?, memo: String) {
+        val s = _session.value ?: return
+        val c = car.value
+        viewModelScope.launch {
+            runCatching { maintenance.log(s.soloGroupId, c?.id.orEmpty(), item, date, odometerKm, amountWon, liters, memo, s.uid, intervals = c?.intervals.orEmpty()) }
+                .onFailure { message.value = it.message }
+        }
+    }
+
+    fun setInsuranceDate(date: LocalDate) {
+        val s = _session.value ?: return
+        viewModelScope.launch { runCatching { maintenance.setDueDate(s.soloGroupId, car.value?.id.orEmpty(), MaintenanceItem.INSURANCE, date, s.uid) }.onFailure { message.value = it.message } }
+    }
+
+    fun setInterval(item: MaintenanceItem, km: Long?, days: Long?) {
+        val c = car.value ?: run { message.value = "차를 먼저 연결해 주세요"; return }
+        viewModelScope.launch { runCatching { cars.setInterval(c.id, item, km, days) }.onFailure { message.value = it.message } }
+    }
+
+    fun deleteRecord(eventId: String) {
+        val s = _session.value ?: return
+        viewModelScope.launch { runCatching { maintenance.delete(s.soloGroupId, eventId) }.onFailure { message.value = it.message } }
+    }
 }
 
 @Composable
 fun CarTab(vm: CarTabViewModel = viewModel()) {
     val car by vm.car.collectAsStateWithLifecycle()
+    val events by vm.events.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var code by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("차량", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+    var logging by remember { mutableStateOf<MaintenanceItem?>(null) }
+    var intervalFor by remember { mutableStateOf<MaintenanceItem?>(null) }
+    var showRecords by remember { mutableStateOf<MaintenanceItem?>(null) }
+    val today = LocalDate.now()
+    val records = events.filterNot { it.id.startsWith("due-") }
+    val dues = events.filter { it.id.startsWith("due-") }.associateBy { it.maintenance?.item }
+    val monthFuel = records.filter { it.maintenance?.item == MaintenanceItem.FUEL && it.startDate.startsWith(YearMonth.now().toString()) }.sumOf { it.maintenance?.amountWon ?: 0L }
+
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
+        Text("차량", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+        message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.clickable { vm.message.value = null }) }
         if (car == null) {
-            Text("차 화면에 뜬 6자리 코드를 입력하면 이 차의 호스트가 돼요.", color = Palette.TextSoft)
+            Text("차 화면에 뜬 6자리 코드를 입력하면 이 차의 호스트가 돼요.", color = Palette.TextSoft, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
             OutlinedTextField(
-                code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("차 연결 코드") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = Corner,
+                code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("차 연결 코드") }, singleLine = true, shape = Corner,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
-            Button(onClick = { vm.link(code) }, enabled = code.length == 6, modifier = Modifier.fillMaxWidth().height(50.dp), shape = Corner) { Text("연결", fontWeight = FontWeight.SemiBold) }
+            Button(onClick = { vm.link(code) }, enabled = code.length == 6, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("연결", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(16.dp))
         } else {
             val s = car!!.state
-            HorizontalDivider(color = Palette.Line)
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("내 차 · 호스트", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("연료 " + (s.fuelPercent?.let { "${it.toInt()}%" } ?: "—") + "  ·  주행가능 " + (s.rangeKm?.let { "${it.toInt()}km" } ?: "—"))
-                Text("기어 ${s.gear.name}" + if (s.drivingRestricted) "  ·  주행 중" else "")
-            }
-            HorizontalDivider(color = Palette.Line)
-            Text("차량 관리 기록은 15장에서 여기에 붙어요.", color = Palette.TextSoft, fontSize = 13.sp)
+            Text(
+                listOfNotNull(
+                    s.odometerKm?.let { "주행거리 ${"%,d".format(it.toLong())}km" },
+                    s.fuelPercent?.let { (if (s.isEv == true) "배터리 " else "연료 ") + "${it.toInt()}%" },
+                    s.rangeKm?.let { "주행가능 ${it.toInt()}km" },
+                    "기어 ${s.gear.name}" + if (s.drivingRestricted) " · 주행 중" else "",
+                ).joinToString("  ·  "),
+                fontSize = 14.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
+            )
         }
-        message?.let { Text(it, color = Palette.Teal) }
+        HorizontalDivider(color = Palette.Line)
+        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("차량 관리", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+            Text("이번 달 주유비 ${"%,d".format(monthFuel)}원", fontSize = 14.sp, color = Palette.TextSoft)
+        }
+        LazyColumn(Modifier.weight(1f)) {
+            items(MaintenanceItem.entries, key = { it.name }) { item ->
+                val last = records.firstOrNull { it.maintenance?.item == item }
+                val due = dues[item]
+                val dueDays = due?.let { ChronoUnit.DAYS.between(today, LocalDate.parse(it.startDate)) }
+                val interval = MaintenanceRules.interval(item, car?.intervals.orEmpty())
+                Row(Modifier.fillMaxWidth().clickable { showRecords = item }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(item.label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+                        Text(
+                            last?.let { "마지막 ${it.startDate}" + (it.maintenance?.odometerKm?.let { km -> " · ${"%,d".format(km.toLong())}km" } ?: "") } ?: "기록 없음",
+                            fontSize = 13.sp, color = Palette.TextSoft,
+                        )
+                        val dueText = when {
+                            due == null && item == MaintenanceItem.INSURANCE -> "갱신일을 넣어 주세요"
+                            due == null -> listOfNotNull(interval.km?.let { "${"%,d".format(it)}km" }, interval.days?.let { "${it}일" }).joinToString(" 또는 ").ifEmpty { "" }.let { if (it.isEmpty()) "" else "주기 $it" }
+                            dueDays!! < 0 -> "예정 지남 (${-dueDays}일 전)"
+                            dueDays == 0L -> "오늘 예정"
+                            else -> "다음 ${due.startDate} · ${dueDays}일 남음" + (due.maintenance?.dueKm?.let { " · ${"%,d".format(it.toLong())}km" } ?: "")
+                        }
+                        if (dueText.isNotEmpty()) Text(dueText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (dueDays != null && dueDays <= 7) Palette.Sunday else Palette.Teal)
+                    }
+                    if (item != MaintenanceItem.FUEL && item != MaintenanceItem.INSURANCE) TextButton(onClick = { intervalFor = item }) { Text("주기", color = Palette.TextSoft, fontSize = 14.sp) }
+                    Button(onClick = { logging = item }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text(if (item == MaintenanceItem.INSURANCE) "갱신일" else "기록", fontSize = 14.sp) }
+                }
+                HorizontalDivider(color = Palette.Line)
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+
+    logging?.let { item ->
+        if (item == MaintenanceItem.INSURANCE) DateDialog(title = "보험 갱신일", onPick = { vm.setInsuranceDate(it); logging = null }, onDismiss = { logging = null })
+        else LogDialog(item, defaultKm = car?.state?.odometerKm, onSave = { d, km, won, l, memo -> vm.log(item, d, km, won, l, memo); logging = null }, onDismiss = { logging = null })
+    }
+    intervalFor?.let { item ->
+        val cur = MaintenanceRules.interval(item, car?.intervals.orEmpty())
+        IntervalDialog(item, cur.km, cur.days, onSave = { km, d -> vm.setInterval(item, km, d); intervalFor = null }, onDismiss = { intervalFor = null })
+    }
+    showRecords?.let { item ->
+        val list = records.filter { it.maintenance?.item == item }
+        CenterSheet(onDismiss = { showRecords = null }) {
+            Column {
+                Text("${item.label} 기록", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+                if (list.isEmpty()) Text("아직 없어요", color = Palette.TextSoft, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp))
+                list.take(20).forEach { e ->
+                    val m = e.maintenance
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(e.startDate, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.width(100.dp))
+                        Text(listOfNotNull(m?.odometerKm?.let { "${"%,d".format(it.toLong())}km" }, m?.amountWon?.let { "${"%,d".format(it)}원" }, m?.liters?.let { "${it}L" }, e.memo.takeIf { it.isNotBlank() }, if (m?.auto == true) "차가 기록" else null).joinToString(" · "), fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { vm.deleteRecord(e.id) }) { Text("삭제", color = Palette.TextSoft, fontSize = 13.sp) }
+                    }
+                    HorizontalDivider(color = Palette.Line)
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { TextButton(onClick = { showRecords = null }) { Text("닫기", color = Palette.Navy) } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogDialog(item: MaintenanceItem, defaultKm: Double?, onSave: (LocalDate, Double?, Long?, Double?, String) -> Unit, onDismiss: () -> Unit) {
+    var date by remember { mutableStateOf(LocalDate.now().toString()) }
+    var km by remember { mutableStateOf(defaultKm?.toLong()?.toString() ?: "") }
+    var won by remember { mutableStateOf("") }
+    var liters by remember { mutableStateOf("") }
+    var memo by remember { mutableStateOf("") }
+    val dateOk = runCatching { LocalDate.parse(date) }.isSuccess
+    CenterSheet(onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${item.label} 기록", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            OutlinedTextField(date, { date = it }, label = { Text("날짜 (yyyy-MM-dd)") }, singleLine = true, shape = Corner, isError = !dateOk, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(km, { km = it.filter(Char::isDigit) }, label = { Text("주행거리 km (차에서 읽은 값)") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+            if (item == MaintenanceItem.FUEL) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(won, { won = it.filter(Char::isDigit) }, label = { Text("금액 원 (선택)") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                OutlinedTextField(liters, { liters = it.filter { c -> c.isDigit() || c == '.' } }, label = { Text("리터 (선택)") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f))
+            }
+            OutlinedTextField(memo, { memo = it }, label = { Text("메모 (선택)") }, singleLine = true, shape = Corner, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft) }
+                Button(enabled = dateOk, onClick = { onSave(LocalDate.parse(date), km.toDoubleOrNull(), won.toLongOrNull(), liters.toDoubleOrNull(), memo) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DateDialog(title: String, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    var date by remember { mutableStateOf(LocalDate.now().plusYears(1).toString()) }
+    val ok = runCatching { LocalDate.parse(date) }.isSuccess
+    CenterSheet(onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            OutlinedTextField(date, { date = it }, label = { Text("yyyy-MM-dd") }, singleLine = true, shape = Corner, isError = !ok, modifier = Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft) }
+                Button(enabled = ok, onClick = { onPick(LocalDate.parse(date)) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntervalDialog(item: MaintenanceItem, km0: Long?, days0: Long?, onSave: (Long?, Long?) -> Unit, onDismiss: () -> Unit) {
+    var km by remember { mutableStateOf(km0?.toString() ?: "") }
+    var days by remember { mutableStateOf(days0?.toString() ?: "") }
+    CenterSheet(onDismiss = onDismiss) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${item.label} 주기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text("둘 다 넣으면 먼저 오는 쪽에 예정이 잡혀요. 비우면 그 규칙은 안 써요.", fontSize = 14.sp, color = Palette.TextSoft)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(km, { km = it.filter(Char::isDigit) }, label = { Text("km마다") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                OutlinedTextField(days, { days = it.filter(Char::isDigit) }, label = { Text("일마다") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { onSave(null, null) }) { Text("기본값으로", color = Palette.TextSoft) }
+                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft) }
+                Button(onClick = { onSave(km.toLongOrNull(), days.toLongOrNull()) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장") }
+            }
+        }
     }
 }

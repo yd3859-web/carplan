@@ -67,6 +67,8 @@ data class CarState(
     val rangeKm: Double? = null,
     /** true = electric (charging stations), false = fuel (gas stations), null = unknown (12장). */
     val isEv: Boolean? = null,
+    /** Odometer reading in km (15장), when the car exposes it. */
+    val odometerKm: Double? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 
@@ -80,6 +82,8 @@ data class Car(
     val activeGroupId: String? = null,
     val activeEventId: String? = null,
     val state: CarState = CarState(),
+    /** 15장 Q42: per-item overrides of the default service intervals, item name → {km, days}. */
+    val intervals: Map<String, Map<String, Long>> = emptyMap(),
 )
 
 // ---------- Groups & calendar events ----------
@@ -106,7 +110,10 @@ enum class MaintenanceItem(val label: String) {
     INSURANCE("보험 갱신"),
 }
 
-/** Extra fields of a 차량 관리 event. */
+/**
+ * Extra fields of a 차량 관리 event. A record (past, [auto] false unless the car made it) or the
+ * next due date (future, event id `due-{item}`, [auto] true, rewritten after every record).
+ */
 data class Maintenance(
     val item: MaintenanceItem = MaintenanceItem.FUEL,
     val carId: String = "",
@@ -114,6 +121,8 @@ data class Maintenance(
     val auto: Boolean = false,
     val amountWon: Long? = null,
     val liters: Double? = null,
+    /** For a due event: the km reading it is due at, when the rule is km-based. */
+    val dueKm: Double? = null,
 )
 
 /**

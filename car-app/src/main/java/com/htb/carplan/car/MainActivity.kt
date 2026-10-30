@@ -180,6 +180,7 @@ private fun StatusBand(car: Car?, v: CarState) {
         Stat("연료", v.fuelPercent?.let { "${it.toInt()}%" } ?: "—")
         Stat("주행가능", v.rangeKm?.let { "${it.toInt()} km" } ?: "—")
         Stat("기어", v.gear.name)
+        v.odometerKm?.let { Stat("주행거리", "${"%,d".format(it.toLong())} km") }
         if (v.drivingRestricted) Text("주행 중", color = Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
         Text(if (car?.ownerUid != null) "차주 연결됨" else "연결 전", color = Soft, fontSize = 16.sp)
@@ -215,7 +216,8 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val change = p.reason == PromptReason.ROUTE_CHANGE
-        val fuel = p.reason == PromptReason.FUEL
+        val fuel = p.reason == PromptReason.FUEL || p.reason == PromptReason.FUELED
+        val fueled = p.reason == PromptReason.FUELED
         Column(Modifier.weight(1f)) {
             Text(
                 when { fuel -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" },
@@ -231,7 +233,7 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
             )
         }
         Button(onClick = onGo, modifier = Modifier.height(80.dp).width(190.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink)) {
-            Text(when { fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(when { fueled -> "네"; fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         Button(onClick = onLater, modifier = Modifier.height(80.dp).width(190.dp).border(1.dp, Color(0xFF55595E), Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White)) {
             Text(when { fuel -> "아니요"; change -> "그대로"; else -> "나중에" }, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
