@@ -77,7 +77,12 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     /** The board needs the full 읍·면·동 list to frame the scope. */
     fun ensureRegions(context: Context) = loadRegionsOnce(context)
 
-    fun addDartAsStop(d: Dart) = addWinnerAsStop(Place(name = d.resultName, lat = d.resultLat, lng = d.resultLng))
+    fun addDartAsStop(d: Dart) = act {
+        val e = eventId ?: return@act
+        val parts = d.resultName.split(" ")
+        trips.addStop(groupId, e, date ?: java.time.LocalDate.now().toString(), Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName), null, "다트 · " + parts.dropLast(1).drop(1).joinToString(" "), uid.value.orEmpty())
+        message.value = "${parts.last()}을(를) 칸으로 넣었어요"
+    }
 
     private var regionsLoaded = false
     private fun loadRegionsOnce(context: Context) {

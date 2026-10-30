@@ -98,7 +98,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         val d = dart.value ?: return
         val u = owner.value ?: return
         viewModelScope.launch {
-            runCatching { TripRepository().addStop(t.groupId, t.eventId, t.date, Place(name = d.resultName, lat = d.resultLat, lng = d.resultLng), null, "다트로 정함", u.uid) }
+            runCatching { val parts = d.resultName.split(" "); TripRepository().addStop(t.groupId, t.eventId, t.date, Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName), null, "다트 · " + parts.dropLast(1).drop(1).joinToString(" "), u.uid) }
                 .onFailure { _error.value = it.message }
         }
     }
