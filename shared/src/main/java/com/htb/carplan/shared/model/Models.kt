@@ -150,6 +150,12 @@ data class TripDay(
     val currentStopIndex: Int = 0,
     val status: DayStatus = DayStatus.READY,
     val lastChangedBy: String? = null,
+    /** The [version] the car's navigation route reflects (10장). Phones show "경로 바뀜" when it catches up. */
+    val routeSyncedVersion: Long = 0,
+    /** The driver answered "그대로" to the last change (Q23): phones show "운전자가 보류함". */
+    val holdByDriver: Boolean = false,
+    /** "HH:mm" the navigation expects to reach the next stop; written by the car after routing. */
+    val etaNext: String? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 

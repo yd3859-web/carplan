@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -92,6 +93,17 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         .flatMapLatest { trips.observeDay(groupId, eventId, it) }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Q18: the driver's own phone is locked while the car drives this trip. For now the driver is the
+     * car owner (7장 "오늘 이 차로 가요" will set Event.driverUid later).
+     */
+    val editLocked: StateFlow<Boolean> = uid.filterNotNull()
+        .flatMapLatest { calendar.observeUser(it) }
+        .flatMapLatest { u -> u?.carId?.let { calendar.observeCar(it) } ?: flowOf(null) }
+        .map { car -> car != null && car.activeEventId == eventId && car.state.drivingRestricted }
+        .catch { emit(false) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val remoteComments: StateFlow<List<Comment>> = _date
         .flatMapLatest { trips.observeDayComments(groupId, eventId, it) }

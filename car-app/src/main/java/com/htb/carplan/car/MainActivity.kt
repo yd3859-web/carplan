@@ -187,8 +187,12 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        val change = p.reason == PromptReason.ROUTE_CHANGE
         Column(Modifier.weight(1f)) {
-            Text("다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (change) "${p.message}. 경로를 바꿀까요?" else "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?",
+                color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
+            )
             Text(
                 when {
                     p.listening -> "듣는 중 · \"응\" 또는 \"아니\"라고 말해 주세요"
@@ -199,10 +203,10 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
             )
         }
         Button(onClick = onGo, modifier = Modifier.height(80.dp).width(190.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink)) {
-            Text("가기", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(if (change) "바꾸기" else "가기", fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         Button(onClick = onLater, modifier = Modifier.height(80.dp).width(190.dp).border(1.dp, Color(0xFF55595E), Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White)) {
-            Text("나중에", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text(if (change) "그대로" else "나중에", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

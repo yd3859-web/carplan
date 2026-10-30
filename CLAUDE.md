@@ -87,12 +87,14 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 카카오 키는 아직 없음. `local.properties`에 `KAKAO_REST_KEY=`를 넣고 다시 빌드하면 장소 검색·근처 추천·길찾기가 카카오로 바뀐다(없으면 이름 직접 입력·직선거리).
 - 3장 타임라인 완료: 레일 화면, 칸별 코멘트 글타래(`days/{date}/comments`), 예상 도착 시각(`shared/calendar/Schedule.kt`), 시간 그 자리에서 확정.
 - 9장 "다음 목적지로 갈까요?" 완료(차: `TripNavigator`·`VoicePrompt`, 앱 켤 때·P→D 때 묻기, 경유지 2+목적지 → 도착마다 채움, 시연용 도착 버튼). 10장(일정 변경 → 내비 갱신)은 `TripNavigator`가 `TripDay.version`을 보고 묻는 것부터.
-- 다음: 10장 → 4장 그룹·초대·QR → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
+- 10장 완료(차 `TripNavigator`: version 변경 5초 모아 묻기, 바꾸기/그대로, `routeSyncedVersion`·`holdByDriver`·`etaNext`; 폰: 차주 폰 주행 중 편집 잠금, 상태 줄).
+- 다음: 4장 그룹·초대·QR → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
 - Firestore 규칙은 아직 dev(로그인만 하면 읽기·쓰기). 1차 제출 전 18장 규칙으로 바꾼다.
 
 ## 에뮬레이터 테스트 요령
 - AVD `Pleos_Connect_v2_1_0`, 반드시 Cold boot: `emulator -avd Pleos_Connect_v2_1_0 -no-snapshot-load`.
-- 터치 입력은 디스플레이 지정: `adb shell input -d 0 tap X Y`, 글자는 `input -d 0 text` (영어만 됨).
+- 터치 입력은 디스플레이 지정: `adb shell input -d 0 tap X Y`, 글자는 `input -d 0 text` (영어만 됨, 띄어쓰기는 `%s`).
+- 이미 떠 있는 앱을 앞으로 올릴 땐 `adb shell am start --activity-single-top -n …`. 옵션 없이 `am start`하면 새 화면이 열려 편집 상태가 사라진다. uiautomator dump는 무한 애니메이션(후광)이 있는 화면에서 실패하니 스크린샷 좌표로 탭한다.
 - `adb shell input keyevent 111`(ESC)은 Compose 대화창을 닫는다. 쓰지 말 것.
 - 좌표는 `uiautomator dump` 후 bounds로 찾는다. 스크린샷 `adb exec-out screencap -p`.
 - 폰 앱도 이 에뮬레이터에 깔아서 같이 시험할 수 있다(앱마다 익명 계정이 따로 생김).

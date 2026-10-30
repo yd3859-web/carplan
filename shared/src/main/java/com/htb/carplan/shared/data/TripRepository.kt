@@ -139,6 +139,12 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         }.await()
     }
 
+    /** Car side (10장): the route now matches [syncedVersion] (or the driver held the change), plus the next ETA. */
+    suspend fun setRouteSync(groupId: String, eventId: String, date: String, syncedVersion: Long, hold: Boolean, etaNext: String?) {
+        db.document(FirestorePaths.day(groupId, eventId, date))
+            .set(mapOf("routeSyncedVersion" to syncedVersion, "holdByDriver" to hold, "etaNext" to etaNext, "updatedAt" to FieldValue.serverTimestamp()), SetOptions.merge()).await()
+    }
+
     /** READY → DRIVING when the car starts guiding, → DONE after the last stop (9장). */
     suspend fun setDayStatus(groupId: String, eventId: String, date: String, status: DayStatus) {
         db.document(FirestorePaths.day(groupId, eventId, date))

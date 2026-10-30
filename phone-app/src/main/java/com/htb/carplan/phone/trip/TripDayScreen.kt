@@ -119,6 +119,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     val error by vm.error.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val me by vm.uid.collectAsStateWithLifecycle()
+    val locked by vm.editLocked.collectAsStateWithLifecycle()
     vm.names.collectAsStateWithLifecycle().value // recompose when a name arrives
 
     var editing by remember { mutableStateOf<Stop?>(null) }
@@ -137,8 +138,8 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                 // 4장에서 그룹 고르기가 생기면 여기 그룹 이름이 들어간다.
                 Text(
-                    listOf("나만 그룹", "모두가 편집", when (day?.status) { DayStatus.DRIVING -> "차가 가는 중"; DayStatus.DONE -> "다 다녀옴"; else -> "바로 저장" }).joinToString(" · "),
-                    fontSize = 13.sp, color = Palette.TextSoft,
+                    listOfNotNull("나만 그룹", "모두가 편집", dayLine(day)).joinToString(" · "),
+                    fontSize = 13.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft,
                 )
             }
             if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
@@ -149,6 +150,14 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
         }
         HorizontalDivider(color = Palette.Line)
 
+        if (locked) {
+            // Q18: the car is moving and this phone belongs to the driver.
+            Text(
+                "운전 중이라 편집이 잠겼어요. 동승자 폰에서 바꿀 수 있어요.",
+                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong,
+                modifier = Modifier.fillMaxWidth().background(Palette.Sheet).padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
         error?.let {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("오류: $it", color = Palette.Sunday, fontSize = 13.sp, modifier = Modifier.weight(1f))
@@ -184,16 +193,17 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                             railBelowPassed = nextStop?.visited == true,
                             isLast = i == stops.lastIndex,
                             dragging = dragging,
-                            modifier = Modifier.longPressDraggableHandle(onDragStopped = { vm.commitOrder() }),
-                            onOpen = { editing = stop },
+                            locked = locked,
+                            modifier = if (locked) Modifier else Modifier.longPressDraggableHandle(onDragStopped = { vm.commitOrder() }),
+                            onOpen = { if (!locked) editing = stop },
                             onRemove = { vm.remove(stop.id) },
-                            onTimeTap = { timeFor = stop },
+                            onTimeTap = { if (!locked) timeFor = stop },
                             onSendComment = { vm.addComment(stop.id, it) },
                         )
                     }
                 }
             }
-            item(key = "add") { AddNode(empty = stops.isEmpty()) { adding = true } }
+            if (!locked) item(key = "add") { AddNode(empty = stops.isEmpty()) { adding = true } }
             if (removed.isNotEmpty()) {
                 item { Text("뺀 칸", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)) }
                 items(removed, key = { "removed-" + it.id }) { stop ->
@@ -202,7 +212,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                             "${vm.whoDid(stop.updatedBy)} ${stop.place.name}를(을) 뺐어요",
                             fontSize = 15.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
+                        if (!locked) TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
                     }
                 }
             }
@@ -210,7 +220,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
         }
 
         HorizontalDivider(color = Palette.Line)
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!locked) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = vm::sortShortest,
                 enabled = stops.count { it.place.hasCoords() } >= 3,
@@ -272,6 +282,7 @@ private fun TimelineStop(
     railBelowPassed: Boolean,
     isLast: Boolean,
     dragging: Boolean,
+    locked: Boolean,
     modifier: Modifier,
     onOpen: () -> Unit,
     onRemove: () -> Unit,
@@ -288,9 +299,9 @@ private fun TimelineStop(
             drawAbove = index > 0,
         )
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
-            StopBox(stop, state, estimate, editedBy, dragging, onOpen, onRemove, onTimeTap)
+            StopBox(stop, state, estimate, editedBy, dragging, locked, onOpen, onRemove, onTimeTap)
             comments.forEach { c -> Bubble(c, nameOf) }
-            CommentComposer(onSend = onSendComment)
+            if (!locked) CommentComposer(onSend = onSendComment)
             if (!isLast) LegLabel(leg, driving = state == NodeState.NEXT && false)
         }
     }
@@ -307,7 +318,7 @@ private fun Rail(modifier: Modifier, state: NodeState, abovePassed: Boolean, bel
 
 @Composable
 private fun StopBox(
-    stop: Stop, state: NodeState, estimate: String?, editedBy: String?, dragging: Boolean,
+    stop: Stop, state: NodeState, estimate: String?, editedBy: String?, dragging: Boolean, locked: Boolean,
     onOpen: () -> Unit, onRemove: () -> Unit, onTimeTap: () -> Unit,
 ) {
     val next = state == NodeState.NEXT
@@ -344,7 +355,18 @@ private fun StopBox(
             if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft)
             if (stop.memo.isNotBlank()) Text(stop.memo, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
         }
-        IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) }
+        if (!locked) IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) } else Spacer(Modifier.width(12.dp))
+    }
+}
+
+/** 10장 8: what the car has done with the plan — "경로 바뀜 · 다음 도착 15:40", "운전자가 보류함", "차에 반영 대기 중". */
+private fun dayLine(day: com.htb.carplan.shared.model.TripDay?): String? = when (day?.status) {
+    null, DayStatus.READY -> "바로 저장"
+    DayStatus.DONE -> "다 다녀옴"
+    DayStatus.DRIVING -> when {
+        day.holdByDriver -> "운전자가 보류함"
+        day.routeSyncedVersion >= day.version -> "차에 반영됨" + (day.etaNext?.let { " · 다음 도착 $it" } ?: "")
+        else -> "차에 반영 대기 중"
     }
 }
 
