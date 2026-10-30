@@ -45,7 +45,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 ## 작업 방식
 - 지금은 정원 혼자 만든다: **`main`에 바로 커밋하고 push**. 커밋 메시지에 장 번호를 쓴다(예: `phone 2장: 캘린더 월 보기`).
 - 나중에 작업을 나눌 때부터는 기능 하나 = 브랜치 하나 = PR 하나(`car/09-next-destination`)로 바꾼다.
-- 로그인(구글·카카오)은 맨 뒤에 만든다. 그 전까지는 Firebase **익명 로그인**으로 uid를 얻고, 첫 실행 때 그 uid의 나만 그룹을 만든다. 나중에 구글 계정을 익명 계정에 연결하면 uid와 데이터가 그대로 유지된다.
+- 로그인(1장) 코드 완료(`phone/login/Login.kt`): 첫 실행은 익명 → 첫 화면에서 구글(Credential Manager, 익명 계정에 link → uid 유지)·카카오(SDK → Functions `kakaoLogin` 커스텀 토큰, `kakaoLinks/{id}`→uid)·나중에. 카카오는 `local.properties`의 `KAKAO_NATIVE_APP_KEY` + 카카오 콘솔 키 해시 등록 + Blaze(Functions) 뒤에 켜진다. 구글 SHA-1(debug·release)은 Firebase에 이미 등록됨. Pleos 에뮬레이터엔 구글 서비스가 없어 실제 폰에서 확인.
 - 사용자는 한국어, 쉬운 말과 표·단계로 설명받기를 원한다.
 - 빌드 확인: `./gradlew assembleDebug`. 제출 APK: `./gradlew assembleRelease`.
 
@@ -99,7 +99,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 폰 알림 탭 딥링크 `carplan://trip/{gid}/{eid}/{date}` 처리됨(`InviteInbox.offerTrip` → `AppRoot`가 그날 레일을 전체 화면으로). `hosting/public/.well-known/assetlinks.json`에 release·debug 키 SHA-256 들어감(release 키 `~/carplan-keys/carplan-release.jks`).
 - 설정 탭 완료(`phone/settings/SettingsTab.kt`: 이름·친구 코드·일정 알림 스위치·주유 알림 기준 `cars.fuelAlertPercent`·계정·버전). 일정 [알림] 칩은 `phone/push/Reminders.kt`(AlarmManager, 2주, 반복 포함)로 실제로 울림. 11장 픽업 순서(총 시간)·지도 경로선·ETA, 17장 "곧 도착"·"주차장" 푸시까지 코드 완료.
 - 18장 보안 규칙 = `firestore.rules`(= `firestore.prod.rules`, 에뮬레이터로 23개 경우 통과). **배포는 정원이 직접** `firebase deploy --only firestore:rules`(Claude는 배포 권한 없음). 문제 생기면 `firestore.dev.rules`를 `firestore.rules`로 복사해 다시 배포. 규칙 테스트는 `firebase emulators:exec --only firestore "python3 -I <스크립트>"`로 가짜 JWT(alg none) + REST. 주의: v2 규칙에서 `{doc=**}`는 0단계도 잡아 부모 문서 규칙을 덮는다.
-- 다음: 제출물(기획서 DOCX·시연 영상·release APK·Firestore/Storage 규칙 18장·assetlinks·README), 1장 로그인은 그 뒤 → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
+- 다음(순서): 정원이 규칙 배포(`firebase deploy --only firestore:rules`)·Blaze → Functions·Storage 배포 → 에뮬 테스트 F2~F10 → release APK(`apk/팀명_carplan_release.apk`)·심사용 README → 기획서 DOCX(접수양식 받으면) → 시연 영상 → 시간 남으면 구글 캘린더 불러오기(Q05).
 - Firestore 규칙 파일은 18장 규칙으로 바뀌었고, 배포만 남음(정원).
 
 ## 에뮬레이터 테스트 요령

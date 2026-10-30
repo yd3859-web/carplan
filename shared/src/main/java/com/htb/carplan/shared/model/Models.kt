@@ -32,6 +32,8 @@ data class User(
     val carId: String? = null,
     /** 6-character code friends type to add me (Q10). */
     val friendCode: String = "",
+    /** 1장: "google" / "kakao" once the anonymous account was linked; null while anonymous. */
+    val provider: String? = null,
 )
 
 /** users/{uid}/friends/{friendUid} — added by code; people from shared groups show up without this (Q10). */

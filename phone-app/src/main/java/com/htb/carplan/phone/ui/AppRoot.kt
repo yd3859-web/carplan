@@ -44,6 +44,8 @@ import com.htb.carplan.phone.trip.TripRef
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.htb.carplan.phone.record.RecordTab
 import com.htb.carplan.phone.settings.SettingsTab
+import com.htb.carplan.phone.login.LoginGate
+import com.htb.carplan.phone.login.LoginViewModel
 
 /** 하단 바 (2장): 캘린더 · 그룹 · 기록 · 차량 · 설정. */
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -57,6 +59,13 @@ enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 fun AppRoot() {
     var tab by rememberSaveable { mutableStateOf(Tab.CALENDAR) }
+    val loginVm: LoginViewModel = viewModel()
+    val showLogin by loginVm.show.collectAsStateWithLifecycle()
+    if (showLogin) {
+        // 1장: 구글 · 카카오 · 나중에. An invite that brought the user here waits (JoinDialog shows right after).
+        LoginGate(loginVm)
+        return
+    }
     val groupVm: GroupViewModel = viewModel()
     val pushTrip by InviteInbox.openTrip.collectAsStateWithLifecycle()
     pushTrip?.let { (g, e, d) ->

@@ -143,7 +143,9 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
         }
 
         Section("계정")
-        SettingRow("로그인", "익명 계정 · ${session?.uid?.takeLast(4) ?: "…"}", hint = "구글·카카오 로그인은 준비 중이에요. 연결하면 지금 데이터가 그대로 이어져요.")
+        val provider = me?.provider
+        if (provider == null) SettingRow("로그인", "아직 안 함 · 익명 ${session?.uid?.takeLast(4) ?: "…"}", hint = "구글·카카오로 연결하면 지금 데이터가 그대로 이어지고, 폰을 바꿔도 돼요.", action = "연결") { com.htb.carplan.phone.login.LoginGateBus.reopen.value = true }
+        else SettingRow("로그인", when (provider) { "google" -> "구글 계정"; "kakao" -> "카카오 계정"; else -> provider } + (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email?.let { " · $it" } ?: ""))
 
         Section("앱")
         SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
