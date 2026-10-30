@@ -36,6 +36,9 @@ class VehicleMonitor(private val context: Context) {
     /** Fires once each time a passenger seat (not the driver's) becomes occupied (7장 4: "같이 타셨나요?"). */
     private val _passengerSeated = MutableSharedFlow<SeatValue>(extraBufferCapacity = 4)
     val passengerSeated: SharedFlow<SeatValue> = _passengerSeated
+    /** 8장 status band: how many passenger seats (not the driver's) are occupied right now. */
+    private val _passengerCount = MutableStateFlow(0)
+    val passengerCount: StateFlow<Int> = _passengerCount.asStateFlow()
     private val occupied = HashMap<SeatValue, Boolean>()
 
     /** Fires when the driver's door goes from closed to open (13장: "사람이 내렸다"). */
@@ -94,6 +97,7 @@ class VehicleMonitor(private val context: Context) {
                             val now = value == true
                             val was = occupied[seat] ?: false
                             occupied[seat] = now
+                            _passengerCount.value = occupied.values.count { it }
                             if (now && !was) _passengerSeated.tryEmit(seat)
                         }
                         override fun onFailed(e: Exception) { Log.w(TAG, "seat $seat occupancy failed: ${e.message}") }

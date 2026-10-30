@@ -14,6 +14,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,8 +30,11 @@ import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.MapMarker
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.SimpleMap
+import com.htb.carplan.shared.calendar.RouteMath
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.model.PickupStatus
+import com.htb.carplan.shared.model.Place
+import com.htb.carplan.shared.net.Leg
 
 /**
  * 11장 픽업: my pickup place, everyone's order and status, and a map with the car coming
@@ -49,6 +53,20 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     val sharing = day?.pickupSharing == true
     val carPos = car?.state?.let { s -> if (sharing && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
 
+    // 11장 4: the road from the car to my pickup place (Kakao Mobility); refetched once the car moved ~150 m.
+    var path by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
+    var routeLeg by remember { mutableStateOf<Leg?>(null) }
+    var pathFrom by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    val target = mine?.place?.takeIf { it.hasCoords() && mine.status == PickupStatus.WAITING }
+    LaunchedEffect(carPos, target) {
+        val c = carPos; val tg = target
+        if (c == null || tg == null) { path = emptyList(); routeLeg = null; pathFrom = null; return@LaunchedEffect }
+        pathFrom?.let { if (RouteMath.metersBetween(it.first, it.second, c.first, c.second) < 150) return@LaunchedEffect }
+        runCatching { kakao.route(Place(name = "차", lat = c.first, lng = c.second), tg) }
+            .onSuccess { path = it.path; routeLeg = it.leg; pathFrom = c }
+            .onFailure { path = emptyList() }
+    }
+
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("픽업", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
@@ -66,8 +84,12 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                 stops.firstOrNull { it.place.hasCoords() }?.let { add(MapMarker(it.place.lat, it.place.lng, it.place.name, MapMarker.Kind.STOP)) }
             }
             val center = carPos ?: mine?.place?.takeIf { it.hasCoords() }?.let { it.lat to it.lng } ?: markers.firstOrNull()?.let { it.lat to it.lng }
-            if (center != null) SimpleMap(center.first, center.second, zoom = 13, markers = markers)
+            if (center != null) SimpleMap(center.first, center.second, zoom = 13, markers = markers, path = path)
             else Text("좌표가 있는 장소를 고르면 지도가 떠요 (카카오 키 없이는 이름만 저장됨)", fontSize = 13.sp, color = Palette.TextSoft)
+            // 11장 4: time and distance left — the phone's own route when it has one, else the car's ETA.
+            val etaText = routeLeg?.let { "차가 약 ${(it.seconds / 60).coerceAtLeast(1)}분 뒤 도착 · ${"%.1f".format(it.meters / 1000.0)} km" }
+                ?: mine?.etaSeconds?.takeIf { carPos != null && mine.status == PickupStatus.WAITING }?.let { "차가 약 ${(it / 60).coerceAtLeast(1)}분 뒤 도착" }
+            etaText?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 6.dp)) }
 
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

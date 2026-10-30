@@ -275,8 +275,8 @@
     <div class="step"><div class="step-n">·</div><div class="step-t">기본 캘린더 틀: <b>월 보기</b> + 날짜 누르면 <b>그날 일정 목록</b> <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">카테고리 기본 3개: <b>여행 · 차량 관리 · 다른 일정</b>. 사용자가 더 추가(출퇴근, 여가…) <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">일정은 <b>각 유저의 캘린더에 담긴다</b> — 그룹 일정도 멤버 각자 캘린더에 보임 <span class="decided">정함</span></div></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">하단 바: <b>캘린더 · 그룹 · 기록 · 차량 · 설정</b> (예시처럼 화면 아래 떠 있는 둥근 바) <span class="decided">정함</span></div></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">화면 = <b>A안 "오늘 카드 + 월 보기"</b> <span class="decided">정함</span> 2026-10-30: 맨 위 남색 <b>오늘 카드</b>(다음 목적지·시간, 🚗 연료·주행가능거리, 🔧 다가오는 차량 관리) → 아래 월 보기(하루 일정은 점, 장소 있는 일정은 청록 점, <b>여러 날 여행만 막대</b>, 차량 관리는 🔧) → 날짜를 누르면 <b>그날 동선</b>(시간순 세로선, 장소 사이 🚗 이동 구간; 넓은 화면은 오른쪽, 폰은 아래에서 올라옴). "캘린더 예시" 이미지는 입력 칸 참고용일 뿐 화면을 따라 하지 않음</div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">하단 바: <b>캘린더 · 그룹 · 기록 · 차량 · 설정</b> — 시스템식 평면 바(아이콘+글자, 위에 구분선). 떠 있는 둥근 바는 디자인 규칙(2026-10-30)으로 뺌 <span class="decided">정함</span></div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">화면 = <b>A안 "오늘 카드 + 월 보기"</b> <span class="decided">정함</span> 2026-10-30: 맨 위 <b>오늘 헤더</b>(흰 바탕 평면, 이모지 없음: 다음 목적지·시간, 연료·주행가능거리, 다가오는 차량 관리 "정비 ○○ n일 남음") → 아래 월 보기(하루 일정은 점, 장소 있는 일정은 청록 점, <b>여러 날 여행만 막대</b>, 차량 관리는 🔧) → 날짜를 누르면 <b>그날 동선</b>(레일 타임라인, 장소 사이 "이동 약 ○분"; 넓은 화면은 오른쪽, 폰은 가운데 대화창 — 바텀 시트 안 씀). "캘린더 예시" 이미지는 입력 칸 참고용일 뿐 화면을 따라 하지 않음</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">공휴일: 2026–2027 목록을 앱에 넣어 둠. 나중에 공공데이터 특일 API로 교체 <span class="suggest">Claude 제안</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t"><b>+ 버튼</b> → 일정 만들기(3장). 카테고리를 먼저 고름</div></div>
     <div class="sub-block">
@@ -413,8 +413,8 @@
   </div>
   <div class="sec-body">
     <div class="step"><div class="step-n">·</div><div class="step-t">왼쪽: <b>오늘 일정표</b>(순서·장소·시간, 지금 갈 곳 강조). 오른쪽: <b>캘린더</b>(이번 주) <span class="suggest">Claude 제안</span></div></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">큰 버튼: <b>▶ 다음 목적지로 안내</b> · <b>🎤 말하기</b> · <b>내비 열기</b></div></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">상태 띠: 연료/배터리, 주행가능거리, 그룹 이름, 동승자 수</div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">큰 버튼: <b>○○로 안내</b> · <b>다음 목적지 묻기</b>(음성 질문 다시) · <b>내비 열기</b> · 같이 탄 사람 추가 · 다트 · 일정 추가(주차 중). 이모지 없음, "말하기" 버튼은 "다음 목적지 묻기"로 합침 <span class="decided">정함</span> 2026-10-30</div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">상태 띠: 연료/배터리, 주행가능거리, 기어, 주행거리, 그룹 이름(오늘 여행 그룹), 동승자 수(조수석·뒷좌석 착석 신호) <span class="decided">정함</span> 2026-10-30</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t"><b>주행 중</b>(주행 제한 켜짐) → 화면은 보기만, 큰 버튼 2개만 남김. <b>P단</b>이면 전부 됨 (확인됨)</div></div>
     <div class="note-in">Pleos 가이드: 자주 쓰는 건 첫 화면에, 터치 줄이고 음성, 글자 입력 대신 정해진 항목. 차 화면이 "내비 + 일정표"로 가벼운 게 가이드와 맞음</div>
     <div class="step"><div class="step-n">·</div><div class="step-t">차 화면 역할 <span class="decided">정함</span>: 오늘 일정표 + 이번 주 + 큰 버튼 + 상태 띠에 더해 <b>차에서도 일정 만들기</b>(주차 중. 주행 중엔 보기만 — Pleos 주행 제한)</div></div>
@@ -496,7 +496,7 @@
     <div class="note-in">Q26 차 위치는 <b>픽업이 진행 중일 때만 5초마다</b> 올리고 평소엔 안 올림 <span class="decided">정함</span> 2026-10-30</div>
     <div class="note-in">Q27 픽업이 있으면 출발 때 차가 "일행 n명 태우러 가요. 위치를 일행에게 보여 줄까요?" 묻고 <b>운전자가 켬</b>(<code>days/{date}.pickupSharing</code>). 다 태우면 자동으로 끄고 차 위치를 지움, 이력 안 남김 <span class="decided">정함</span> 2026-10-30</div>
     <div class="note-in">Q28 시연은 <b>가짜 위치 재생</b>: 시연 메뉴의 가짜 주행이 칸 사이를 1초마다 보간한 좌표로 올려 폰 지도 위 차가 다가오게 함 <span class="decided">정함</span> 2026-10-30<br>폰 지도는 지금 <b>OSM 타일 + 차·픽업 점</b>(키 없이 동작), 카카오맵 SDK는 네이티브 앱 키가 오면 교체 <span class="decided">정함</span> 2026-10-30</div>
-    <div class="note-in">만든 것(2026-10-30, 에뮬 미확인): 여행 레일 [픽업] → 내 픽업 장소(검색/이름) 저장, 순서(위로), 상태(기다리는 중 / 차 도착 / 탔어요 / 끝), OSM 지도에 차(파랑)·픽업(검정)·나(테두리)·첫 칸. 차는 출발 질문 대신 "○○ 태우러 가요. 위치를 일행에게 보여 줄까요?" [네, 출발][공유 없이 출발] → 픽업 장소가 경유지 맨 앞(3곳 규칙 안에서), 공유 중엔 5초마다 위치를 차 문서에. 픽업 장소 도착 → 차 도착 시각, 동승자 [탔어요] 또는 10분 → 끝, 다 태우면 공유 끄고 위치 지움. 시연 메뉴 가짜 주행은 픽업부터 1초마다 좌표 보간 → 폰 지도 위 차가 다가옴. 픽업 순서 자동 계산(총시간 기준)은 카카오모빌리티 키 뒤.</div>
+    <div class="note-in">만든 것(2026-10-30, 에뮬 미확인): 여행 레일 [픽업] → 내 픽업 장소(검색/이름) 저장, 순서(위로), 상태(기다리는 중 / 차 도착 / 탔어요 / 끝), OSM 지도에 차(파랑)·픽업(검정)·나(테두리)·첫 칸. 차는 출발 질문 대신 "○○ 태우러 가요. 위치를 일행에게 보여 줄까요?" [네, 출발][공유 없이 출발] → 픽업 장소가 경유지 맨 앞(3곳 규칙 안에서), 공유 중엔 5초마다 위치를 차 문서에. 픽업 장소 도착 → 차 도착 시각, 동승자 [탔어요] 또는 10분 → 끝, 다 태우면 공유 끄고 위치 지움. 시연 메뉴 가짜 주행은 픽업부터 1초마다 좌표 보간 → 폰 지도 위 차가 다가옴. 픽업 순서 자동 계산: 2명 이상이면 차가 출발 때 카카오모빌리티 길찾기로 "차 → 픽업들 → 첫 칸" 총 시간이 가장 짧은 순서로 바꿔 저장(키 없으면 직선거리). 지도 위 경로선(카카오모빌리티 도로 좌표, 차가 150m 움직이면 다시) + "차가 약 n분 뒤 도착 · n.n km". 차는 안내 중 30초마다 첫 픽업까지 ETA를 <code>pickups/{uid}.etaSeconds</code>에 씀 (2026-10-30 키 받고 추가).</div>
   </div>
 </div>
 
@@ -513,7 +513,7 @@
     <div class="sub-block wide">
       <div class="sb-t">⛽ 주유 추천</div>
       <div class="sb-row">연료량(안드로이드 표준 FUEL_LEVEL) 또는 주행가능거리를 <b>남은 경로 거리</b>와 비교 → 부족해 보이면 TTS로 알림</div>
-      <div class="sb-row">가는 길 <b>최저가 주유소</b>: 오피넷(전국) + 한국도로공사(휴게소). 내비 검색엔 가격 없음</div>
+      <div class="sb-row">가는 길 <b>최저가 주유소</b>: 오피넷(전국, 고속도로 휴게소 주유소 포함). 한국도로공사 휴게소 API는 오피넷과 겹쳐 안 씀 <span class="decided">정함</span> 2026-10-30. 내비 검색엔 가격 없음</div>
       <div class="sb-row">"갈까요?" → "응" → 그 주유소를 경유지로 추가</div>
       <div class="sb-row">알림 기준은 설정에서 바꿈, 기본값은 우리가 정함 <span class="decided">정함</span></div>
       <div class="sb-row">전기차: 내비가 도착 시 예상 배터리(%)를 줌 → 같은 방식으로 충전소(내비 주변 충전소 화면)</div>
@@ -670,7 +670,7 @@
       <tr><td>차량 관리 시기</td><td>차 주인</td><td>폰 푸시 + 차 첫 화면</td></tr>
     </table></div>
     <div class="note-in wide">푸시는 서버에서 보내야 함 → Firebase Cloud Functions 사용(Blaze 요금제). 카카오 로그인(1장)도 Functions가 필요 <span class="suggest">Claude 제안</span></div>
-    <div class="note-in">만든 것(2026-10-30, 배포 전): <code>functions/index.js</code> — 칸 뺌(뺀 사람 빼고 그룹 전원), 투표 열림(만든 사람 빼고)·마감(전원), 기록 칸 생성(전원 "○○ 도착! 사진이랑 한 줄"), 픽업 차 도착(그 동승자), 매일 09:00 차량 관리 예정 7일 안(차 주인). 폰: 첫 실행 때 알림 권한, 토큰을 users/{uid}.fcmTokens에, 알림 누르면 그 여행 레일로. 차 음성 질문(일정 변경·주유)은 10·12장에서 이미. "주차장 찾아봐 주세요"·"곧 도착" ETA 푸시는 카카오모빌리티 키 뒤.</div>
+    <div class="note-in">만든 것(2026-10-30, 배포 전): <code>functions/index.js</code> — 칸 뺌(뺀 사람 빼고 그룹 전원), 투표 열림(만든 사람 빼고)·마감(전원), 기록 칸 생성(전원 "○○ 도착! 사진이랑 한 줄"), 픽업 차 도착(그 동승자), 매일 09:00 차량 관리 예정 7일 안(차 주인). 폰: 첫 실행 때 알림 권한, 토큰을 users/{uid}.fcmTokens에, 알림 누르면 그 여행 레일로. 차 음성 질문(일정 변경·주유)은 10·12장에서 이미. "곧 도착해요"(차 ETA 3분 안, 그 동승자)·"주차장 찾아봐 주세요"(다음 칸 5분 전 <code>days/{date}.parkingHintStopId</code>, 운전자 빼고 전원) 추가 — 차가 30초마다 카카오모빌리티로 ETA 계산 (2026-10-30 키 받고 추가). 시연 메뉴 가짜 주행도 두 푸시를 일으킴.</div>
     <div class="note-in">Q47 Blaze 예산 알림 1만 원. 정원이 콘솔에서 전환 → Storage 버킷 만들기 → <code>firebase deploy --only storage,functions</code> <span class="decided">정함</span> 2026-10-30</div>
   </div>
 </div>
@@ -696,11 +696,11 @@
       <div class="sb-t">👥 그룹 · 일정</div>
       <div class="sb-row"><code>groups/{gid}</code> 이름, memberIds[], ownerUid, inviteCode, solo(나만 그룹 여부)</div>
       <div class="sb-row"><code>groups/{gid}/events/{eid}</code> <b>캘린더의 모든 일정</b>: 카테고리, 제목, 시작·끝 날짜(시간), 하루종일?, 장소?, 반복?, 알림(몇 분 전)?, 메모, 체크리스트[{글, 완료}], 만든사람, deleted<br>· 여행: 사용자가 고른 날짜들(여러 날 가능), carId?, driverUid?<br>· 차량 관리: 항목(주유·점검…), 주행거리, 자동여부, 금액?·리터? — 차 주인의 나만 그룹에 들어감</div>
-      <div class="sb-row"><code>…/events/{eid}/days/{yyyy-MM-dd}</code> 여행의 <b>하루</b>: version, 지금 칸 번호, 상태(준비/이동중/끝), 마지막 수정자, <b>차가 반영한 version(routeSyncedVersion)·운전자 보류(holdByDriver)·다음 도착 예정(etaNext)</b>(10장)</div>
+      <div class="sb-row"><code>…/events/{eid}/days/{yyyy-MM-dd}</code> 여행의 <b>하루</b>: version, 지금 칸 번호, 상태(준비/이동중/끝), 마지막 수정자, <b>차가 반영한 version(routeSyncedVersion)·운전자 보류(holdByDriver)·다음 도착 예정(etaNext)</b>(10장), <code>parkingHintStopId</code>(차가 다음 칸 5분 전에 씀 → "주차장 찾아봐 주세요" 푸시, 12장)</div>
       <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 장소 칸: 순서, 장소{이름,좌표,주소,kakaoId}, 시간?(도착 시각), 메모, 만든사람, 마지막 수정자·시각(Q07), deleted, 다녀옴</div>
       <div class="sb-row"><code>cars/{carId}</code>에 추가: 주행거리(odometerKm, 차가 올림), 항목별 주기(intervals: 항목→{km, days}, 15장) / 차량 관리 예정 일정은 <code>events/due-{항목}</code>(auto=true, 기록할 때마다 다시 계산)</div>
       <div class="sb-row"><code>…/days/{date}/comments/{id}</code> 칸 아래 말풍선 코멘트(3장): stopId, uid, 글, 시각. 경로 version은 안 올림</div>
-      <div class="sb-row"><code>…/days/{date}/pickups/{uid}</code> 장소, 순서, 상태(대기/탔음/끝), 예상도착, 차 도착 시각(arrivedAt; 10분 뒤 끝). 그날 문서에 <code>pickupSharing</code>(운전자 동의, 끝나면 false), 차 위치는 <code>cars/{{id}}.state.lat/lng</code>(공유 중에만)</div>
+      <div class="sb-row"><code>…/days/{date}/pickups/{uid}</code> 장소, 순서(차가 출발 때 총 시간 기준으로 다시 매김), 상태(대기/탔음/끝), 예상도착(etaSeconds, 차가 30초마다 카카오모빌리티로; 3분 안이면 "곧 도착해요" 푸시), 차 도착 시각(arrivedAt; 10분 뒤 끝). 그날 문서에 <code>pickupSharing</code>(운전자 동의, 끝나면 false), 차 위치는 <code>cars/{{id}}.state.lat/lng</code>(공유 중에만)</div>
       <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[](최대 10), 한 줄 글(note), 만든 주체(차 id). 코멘트는 <code>days/{date}/comments</code>에 stopId = 연결 stopId 또는 record id</div>
       <div class="sb-row"><code>groups/{solo}/events/log-{date}</code> 여행 없는 날의 "일상 기록" 일정(자동, 카테고리 다른 일정) — 그 밑에 days/{date}/records</div>
       <div class="sb-row"><code>…/records/{id}/comments/{id}</code> uid, 글, 시각</div>

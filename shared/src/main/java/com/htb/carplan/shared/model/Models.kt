@@ -179,6 +179,8 @@ data class TripDay(
     val etaNext: String? = null,
     /** 11장 Q27: the driver agreed to share the car's position while picking people up. */
     val pickupSharing: Boolean = false,
+    /** 12장: the stop the car is about 5 minutes from; Functions push "주차장 찾아봐 주세요" to the passengers once per stop. */
+    val parkingHintStopId: String? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 

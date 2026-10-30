@@ -24,6 +24,9 @@ enum class KakaoCategory(val code: String, val label: String) {
 /** One leg between two places: how long the car drives, by road. */
 data class Leg(val seconds: Int, val meters: Int)
 
+/** A drivable route: its summary plus the road geometry as (lat, lng) points (11장 4: the line on the map). */
+data class Route(val leg: Leg, val path: List<Pair<Double, Double>>)
+
 /**
  * Kakao Local (place search) + Kakao Mobility (directions) over the REST API.
  * The key comes from each app's BuildConfig (read from local.properties); with an empty key
@@ -71,6 +74,27 @@ class KakaoApi(private val restKey: String) {
             .build()
         val summary = get(url.toString()).getJSONArray("routes").getJSONObject(0).getJSONObject("summary")
         return Leg(seconds = summary.getInt("duration"), meters = summary.getInt("distance"))
+    }
+
+    /** Like [directions] but also returns the road geometry (Kakao Mobility, summary=false). */
+    suspend fun route(from: Place, to: Place): Route {
+        val url = "https://apis-navi.kakaomobility.com/v1/directions".toHttpUrl().newBuilder()
+            .addQueryParameter("origin", "${from.lng},${from.lat}")
+            .addQueryParameter("destination", "${to.lng},${to.lat}")
+            .build()
+        val r = get(url.toString()).getJSONArray("routes").getJSONObject(0)
+        val summary = r.getJSONObject("summary")
+        val path = ArrayList<Pair<Double, Double>>()
+        val sections = r.optJSONArray("sections")
+        for (i in 0 until (sections?.length() ?: 0)) {
+            val roads = sections!!.getJSONObject(i).optJSONArray("roads") ?: continue
+            for (j in 0 until roads.length()) {
+                val v = roads.getJSONObject(j).getJSONArray("vertexes")
+                var k = 0
+                while (k + 1 < v.length()) { path += v.getDouble(k + 1) to v.getDouble(k); k += 2 } // x=lng, y=lat
+            }
+        }
+        return Route(Leg(seconds = summary.getInt("duration"), meters = summary.getInt("distance")), path)
     }
 
     private suspend fun get(url: String): JSONObject {

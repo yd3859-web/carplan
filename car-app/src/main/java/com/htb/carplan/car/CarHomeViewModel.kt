@@ -103,6 +103,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val vehicle: StateFlow<CarState> = CarRuntime.monitor(app).state
     /** 7장 4: a passenger sat down → the screen offers the QR by itself. */
     val passengerSeated = CarRuntime.monitor(app).passengerSeated
+    val passengerCount: StateFlow<Int> = CarRuntime.monitor(app).passengerCount
 
     val car: StateFlow<Car?> = carId.filterNotNull()
         .flatMapLatest { calendar.observeCar(it) }

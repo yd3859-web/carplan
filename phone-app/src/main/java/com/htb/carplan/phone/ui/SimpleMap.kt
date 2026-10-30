@@ -1,5 +1,6 @@
 package com.htb.carplan.phone.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -38,7 +43,7 @@ data class MapMarker(val lat: Double, val lng: Double, val label: String, val ki
  * Web-Mercator math. Good enough to watch the car approach; the Kakao Map SDK replaces it later.
  */
 @Composable
-fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: List<MapMarker>, height: Dp = 260.dp) {
+fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: List<MapMarker>, height: Dp = 260.dp, path: List<Pair<Double, Double>> = emptyList()) {
     val n = 2.0.pow(zoom)
     val cx = (centerLng + 180) / 360 * n
     val cy = (1 - ln(tan(Math.toRadians(centerLat)) + 1 / Math.cos(Math.toRadians(centerLat))) / PI) / 2 * n
@@ -59,6 +64,19 @@ fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: Lis
                 contentDescription = null, contentScale = ContentScale.FillBounds,
                 modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset((ox + (dx + 1) * tilePx).toInt(), (oy + (dy + 1) * tilePx).toInt()) }.size(tile),
             )
+        }
+        // 11장 4: the road the car will drive (Kakao Mobility geometry), in the one accent colour.
+        if (path.size >= 2) {
+            Canvas(Modifier.matchParentSize()) {
+                val p = Path()
+                path.forEachIndexed { i, (lat, lng) ->
+                    val mx = (lng + 180) / 360 * n
+                    val my = (1 - ln(tan(Math.toRadians(lat)) + 1 / Math.cos(Math.toRadians(lat))) / PI) / 2 * n
+                    val x = (ox + (mx - (tx - 1)) * tilePx).toFloat(); val y = (oy + (my - (ty - 1)) * tilePx).toFloat()
+                    if (i == 0) p.moveTo(x, y) else p.lineTo(x, y)
+                }
+                drawPath(p, Palette.Teal, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
         }
         markers.forEach { m ->
             val mx = (m.lng + 180) / 360 * n

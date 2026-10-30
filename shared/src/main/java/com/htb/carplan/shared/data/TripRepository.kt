@@ -145,6 +145,12 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
             .set(mapOf("routeSyncedVersion" to syncedVersion, "holdByDriver" to hold, "etaNext" to etaNext, "updatedAt" to FieldValue.serverTimestamp()), SetOptions.merge()).await()
     }
 
+    /** 12장: the car is ~5 minutes from [stopId] → passengers get "주차장 찾아봐 주세요" (Functions watch this field). */
+    suspend fun setParkingHint(groupId: String, eventId: String, date: String, stopId: String?) {
+        db.document(FirestorePaths.day(groupId, eventId, date))
+            .set(mapOf("parkingHintStopId" to stopId, "updatedAt" to FieldValue.serverTimestamp()), SetOptions.merge()).await()
+    }
+
     /** READY → DRIVING when the car starts guiding, → DONE after the last stop (9장). */
     suspend fun setDayStatus(groupId: String, eventId: String, date: String, status: DayStatus) {
         db.document(FirestorePaths.day(groupId, eventId, date))

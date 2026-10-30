@@ -22,6 +22,7 @@ import com.htb.carplan.shared.model.Event
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.net.GasStation
+import com.htb.carplan.shared.net.KakaoApi
 import com.htb.carplan.shared.net.OpinetApi
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.BuiltInCategory
@@ -90,6 +91,10 @@ class TripNavigator(
     private val opinet = OpinetApi(BuildConfig.OPINET_KEY)
     private val maintenance = MaintenanceRepository()
     private val pickupsRepo = PickupRepository()
+    private val kakao = KakaoApi(BuildConfig.KAKAO_REST_KEY)
+    /** Driving seconds between two rounded coordinates, so ordering and ETA don't re-ask Kakao for the same leg. */
+    private val legCache = HashMap<String, Int>()
+    private var etaJob: Job? = null
     private var shareJob: Job? = null
     private var commuteEvent: Event? = null
     private var commuteDeclinedDate: String? = null
@@ -187,6 +192,7 @@ class TripNavigator(
                 _guiding.value = false
             }
         })
+        scope.launch { guiding.collect { on -> if (on) startEtaLoop() else etaJob?.cancel() } }
         scope.launch {
             trip.filterNotNull().collect { t ->
                 // 9장 1: ask once when the app starts and today has stops left.
@@ -459,6 +465,9 @@ class TripNavigator(
                 val t = trip.value ?: break
                 val target = t.waitingPickups.firstOrNull()?.place ?: t.next?.place ?: break
                 val isPickup = t.waitingPickups.isNotEmpty()
+                // 17장 demo: the "곧 도착해요" / "주차장 찾아봐 주세요" pushes fire as the fake car closes in.
+                if (isPickup) runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, t.waitingPickups.first().uid, 120) }
+                else t.next?.let { n -> if (t.day?.parkingHintStopId != n.id) runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }
                 val from = lastLocation ?: (target.lat + 0.02 to target.lng - 0.02)
                 val steps = (stepMs / 1000).toInt().coerceAtLeast(3)
                 for (i in 1..steps) {
@@ -526,7 +535,7 @@ class TripNavigator(
         _prompt.value = null
         pendingChange = false
         heldVersion = -1
-        sendRoute(t)
+        routeWithPickups(t)
         scope.launch {
             runCatching {
                 if (!wasChange) {
@@ -547,7 +556,7 @@ class TripNavigator(
         if (_prompt.value?.reason == PromptReason.PICKUP) {
             // "아니": still drive to the pickups, just without sharing the position.
             _prompt.value = null
-            trip.value?.let { sendRoute(it); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
+            trip.value?.let { routeWithPickups(it); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
             return
         }
         val t = trip.value
@@ -621,8 +630,84 @@ class TripNavigator(
     private suspend fun nameOf(uid: String): String =
         withTimeoutOrNull(3_000) { calendar.observeUser(uid).first()?.name?.takeIf { it.isNotBlank() } } ?: "일행"
 
-    private fun sendRoute(t: TodayTrip) {
-        val pick = t.waitingPickups.take(MAX_PLACES)
+    /**
+     * 11장 2: with two or more people to collect, order them so the whole run (car → pickups → first stop)
+     * takes the least time, using Kakao Mobility legs (straight line when offline), then route.
+     */
+    private fun routeWithPickups(t: TodayTrip) {
+        val waiting = t.waitingPickups
+        if (waiting.size < 2 || waiting.size > 4) { sendRoute(t); return }
+        scope.launch {
+            val ordered = bestPickupOrder(t, waiting)
+            if (ordered.map { it.uid } != waiting.map { it.uid }) {
+                runCatching { pickupsRepo.setOrder(t.groupId, t.eventId, t.date, ordered.map { it.uid } + t.pickups.map { it.uid }.filterNot { u -> ordered.any { it.uid == u } }) }
+                _notice.value = "픽업 순서를 총 시간 기준으로 바꿨어요"
+            }
+            sendRoute(t, ordered)
+        }
+    }
+
+    private suspend fun bestPickupOrder(t: TodayTrip, waiting: List<Pickup>): List<Pickup> {
+        val here = lastLocation?.let { Place(name = "현재 위치", lat = it.first, lng = it.second) } ?: return waiting
+        val goal = t.next?.place?.takeIf { it.hasCoords() }
+        var best = waiting
+        var bestCost = Int.MAX_VALUE
+        for (p in permutations(waiting)) {
+            var cost = 0
+            var prev = here
+            for (x in p) { cost += legSeconds(prev, x.place); prev = x.place }
+            if (goal != null) cost += legSeconds(prev, goal)
+            if (cost < bestCost) { bestCost = cost; best = p }
+        }
+        return best
+    }
+
+    private fun <T> permutations(list: List<T>): List<List<T>> =
+        if (list.size <= 1) listOf(list) else list.indices.flatMap { i -> permutations(list.filterIndexed { j, _ -> j != i }).map { listOf(list[i]) + it } }
+
+    /** Kakao driving time, cached; straight-line estimate when there is no key or no network. */
+    private suspend fun legSeconds(a: Place, b: Place): Int {
+        val key = "%.4f,%.4f>%.4f,%.4f".format(a.lat, a.lng, b.lat, b.lng)
+        legCache[key]?.let { return it }
+        val s = runCatching { kakao.directions(a, b).seconds }.getOrElse { RouteMath.estimateSeconds(RouteMath.metersBetween(a.lat, a.lng, b.lat, b.lng)) }
+        legCache[key] = s
+        return s
+    }
+
+    /**
+     * While guiding, every 30 s: driving time from the car to the first pickup (→ pickups/{uid}.etaSeconds, phones
+     * show "약 n분", Functions push "곧 도착" under 3 min) or to the next stop (≤ 5 min → parkingHintStopId → 12장
+     * "주차장 찾아봐 주세요" push to the passengers).
+     */
+    private fun startEtaLoop() {
+        etaJob?.cancel()
+        etaJob = scope.launch {
+            while (true) {
+                router.requestCurrentLocation()
+                delay(2_000)
+                val t = trip.value
+                val here = lastLocation
+                if (t != null && here != null && fakeDrive?.isActive != true) {
+                    val from = Place(name = "차", lat = here.first, lng = here.second)
+                    val pickup = routedPickups.firstOrNull()?.let { uid -> t.pickups.firstOrNull { it.uid == uid && it.status == PickupStatus.WAITING && it.place.hasCoords() } }
+                    if (pickup != null) {
+                        val eta = runCatching { kakao.directions(from, pickup.place).seconds }.getOrNull()
+                        if (eta != null) runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, pickup.uid, eta.toLong()) }
+                    } else {
+                        val next = t.next?.takeIf { it.place.hasCoords() }
+                        if (next != null && t.day?.parkingHintStopId != next.id) {
+                            val eta = runCatching { kakao.directions(from, next.place).seconds }.getOrNull()
+                            if (eta != null && eta <= PARKING_HINT_S) runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, next.id) }
+                        }
+                    }
+                }
+                delay(ETA_INTERVAL_MS - 2_000)
+            }
+        }
+    }
+
+    private fun sendRoute(t: TodayTrip, pickups: List<Pickup> = t.waitingPickups) {
+        val pick = pickups.take(MAX_PLACES)
         val batch = t.remaining.take((MAX_PLACES - pick.size).coerceAtLeast(0))
         routedPlan = t.remaining
         routedVersion = t.version
@@ -711,6 +796,10 @@ class TripNavigator(
         private const val SHARE_INTERVAL_MS = 5_000L
         /** 11장 7 */
         private const val PICKUP_DONE_MS = 10 * 60_000L
+        /** ETA refresh while guiding (Kakao Mobility call each time). */
+        private const val ETA_INTERVAL_MS = 30_000L
+        /** 12장: "주차장 찾아봐 주세요" this many seconds before the next stop. */
+        private const val PARKING_HINT_S = 5 * 60
 
         /** "해운대로" / "광안리로" / "감천문화마을로" — picks 로/으로 by the last syllable's final consonant. */
         fun withRo(name: String): String {

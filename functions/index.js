@@ -79,12 +79,33 @@ exports.onRecordCreated = onDocumentCreated("groups/{gid}/events/{eid}/days/{dat
 });
 
 // 픽업: 차가 도착 → 그 동승자
-exports.onPickupArrived = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}/pickups/{uid}", async (event) => {
+exports.onPickupWritten = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}/pickups/{uid}", async (event) => {
   const before = event.data.before.data();
   const after = event.data.after.data();
-  if (!after || !after.arrivedAt || before?.arrivedAt) return;
-  const tokens = await userTokens([event.params.uid]);
-  await push(tokens, "차가 도착했어요", `${after.place?.name || "픽업 장소"}에서 기다려요. 타면 '탔어요'를 눌러 주세요`, { groupId: event.params.gid, eventId: event.params.eid, date: event.params.date });
+  if (!after) return;
+  const data = { groupId: event.params.gid, eventId: event.params.eid, date: event.params.date };
+  // 11장 6: "곧 도착해요" once, when the car's ETA (written by the car every 30 s) drops under 3 minutes.
+  const SOON = 180;
+  if (!after.arrivedAt && after.etaSeconds != null && after.etaSeconds <= SOON && !(before?.etaSeconds != null && before.etaSeconds <= SOON)) {
+    const tokens = await userTokens([event.params.uid]);
+    await push(tokens, "곧 도착해요", `차가 약 ${Math.max(1, Math.round(after.etaSeconds / 60))}분 뒤 ${after.place?.name || "픽업 장소"}에 와요`, data);
+  }
+  if (after.arrivedAt && !before?.arrivedAt) {
+    const tokens = await userTokens([event.params.uid]);
+    await push(tokens, "차가 도착했어요", `${after.place?.name || "픽업 장소"}에서 기다려요. 타면 '탔어요'를 눌러 주세요`, data);
+  }
+});
+
+// 12장: 다음 칸 5분 전 → 운전자 빼고 "주차장 찾아봐 주세요" (차가 days/{date}.parkingHintStopId를 씀)
+exports.onParkingHint = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  const stopId = after?.parkingHintStopId;
+  if (!stopId || before?.parkingHintStopId === stopId) return;
+  const { gid, eid, date } = event.params;
+  const [ev, stop] = await Promise.all([db.doc(`groups/${gid}/events/${eid}`).get(), db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${stopId}`).get()]);
+  const tokens = await groupTokens(gid, ev.get("driverUid"));
+  await push(tokens, "주차장 찾아봐 주세요", `${stop.get("place")?.name || "다음 장소"} 도착 5분 전이에요`, { groupId: gid, eventId: eid, date });
 });
 
 // 차량 관리 시기 → 차 주인 (매일 09:00 KST, 7일 안 예정)

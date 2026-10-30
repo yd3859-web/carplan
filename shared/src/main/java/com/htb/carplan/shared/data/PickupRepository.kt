@@ -45,6 +45,11 @@ class PickupRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         db.document("${FirestorePaths.pickups(groupId, eventId, date)}/$uid").update("arrivedAt", Timestamp.now()).await()
     }
 
+    /** The car's driving time to this pickup (seconds), refreshed every ~30 s while sharing; Functions push "곧 도착" under 3 minutes. */
+    suspend fun setEta(groupId: String, eventId: String, date: String, uid: String, seconds: Long?) {
+        db.document("${FirestorePaths.pickups(groupId, eventId, date)}/$uid").update("etaSeconds", seconds).await()
+    }
+
     suspend fun setOrder(groupId: String, eventId: String, date: String, orderedUids: List<String>) {
         db.runBatch { b -> orderedUids.forEachIndexed { i, uid -> b.update(db.document("${FirestorePaths.pickups(groupId, eventId, date)}/$uid"), "order", i) } }.await()
     }
