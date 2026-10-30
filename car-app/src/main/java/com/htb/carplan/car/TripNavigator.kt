@@ -418,7 +418,7 @@ class TripNavigator(
                 val owner = car.ownerUid ?: return@launch
                 val user = groups.user(owner) ?: return@launch
                 maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, byUid = owner, auto = true, intervals = car.intervals)
-                _notice.value = "주유 기록 남김 — 금액은 폰 차량 탭에서"
+                _notice.value = (if (carState.isEv == true) "충전" else "주유") + " 기록 남김 — 금액은 폰 차량 탭에서"
             }.onFailure { _error.value = it.message }
         }
     }

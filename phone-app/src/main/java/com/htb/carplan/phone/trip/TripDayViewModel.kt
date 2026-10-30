@@ -112,9 +112,21 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** The group this trip belongs to (name in the header, 4장). */
+    val group: StateFlow<Group?> = groups.observeGroup(groupId)
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     /** The trip's car (for the map dot while pickup sharing is on). */
-    val tripCar: StateFlow<com.htb.carplan.shared.model.Car?> = event
-        .flatMapLatest { e -> e?.carId?.let { calendar.observeCar(it) } ?: flowOf(null) }
+    val tripCar: StateFlow<com.htb.carplan.shared.model.Car?> = combine(event, group) { e, g -> e?.carId to g?.ownerUid }
+        .flatMapLatest { (carId, owner) ->
+            when {
+                carId != null -> calendar.observeCar(carId)
+                // No "오늘 이 차로 가요" yet: the host (group owner) drives — 7장 차주가 호스트.
+                owner != null -> calendar.observeUser(owner).flatMapLatest { u -> u?.carId?.let { calendar.observeCar(it) } ?: flowOf(null) }
+                else -> flowOf(null)
+            }
+        }
         .catch { emit(null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -159,11 +171,6 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     fun addManualRecord(name: String) = write {
         recordsRepo.addRecord(groupId, eventId, _date.value, Record(place = Place(name = name.trim()), unplanned = true, createdBy = me()))
     }
-
-    /** The group this trip belongs to (name in the header, 4장). */
-    val group: StateFlow<Group?> = groups.observeGroup(groupId)
-        .catch { emit(null) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** My car id (users/{uid}.carId) — enables "오늘 이 차로 가요" (7장 2). */
     val myCarId: StateFlow<String?> = uid.filterNotNull()

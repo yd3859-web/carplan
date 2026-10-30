@@ -122,7 +122,8 @@ private fun CarMap(live: NaviLive, trip: TodayTrip?, modifier: Modifier) {
         val tilePx = with(density) { 256.dp.toPx() }
         val wPx = with(density) { maxWidth.toPx() }; val hPx = with(density) { maxHeight.toPx() }
         val ox = wPx / 2 - (cx - (tx - 1)) * tilePx; val oy = hPx / 2 - (cy - (ty - 1)) * tilePx
-        for (dy in -1..1) for (dx in -1..1) {
+        val rx = kotlin.math.ceil(wPx / 2 / tilePx).toInt() + 1; val ry = kotlin.math.ceil(hPx / 2 / tilePx).toInt() + 1
+        for (dy in -ry..ry) for (dx in -rx..rx) {
             val y = ty + dy
             if (y < 0 || y >= n.toInt()) continue
             AsyncImage(

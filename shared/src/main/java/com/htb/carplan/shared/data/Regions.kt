@@ -34,6 +34,17 @@ object Regions {
 
     val sidoNames: List<String> get() = all.map { it.sido }.distinct()
 
+    /** Regions a throw may land on for this scope (the same pool [pick] draws from). */
+    fun pool(scope: DartScope, centerLat: Double? = null, centerLng: Double? = null, region: String? = null, radiusKm: Double = 100.0): List<Region> = when (scope) {
+        DartScope.NATIONAL -> all
+        DartScope.NEAR -> if (centerLat == null || centerLng == null) all else all.filter { RouteMath.metersBetween(centerLat, centerLng, it.lat, it.lng) <= radiusKm * 1000 }
+        DartScope.REGION -> all.filter { it.sido == region }
+    }
+
+    /** 6장 진짜 다트: the region whose centre is closest to where the dart landed. */
+    fun nearest(lat: Double, lng: Double, pool: List<Region>): Region? =
+        pool.minByOrNull { RouteMath.metersBetween(lat, lng, it.lat, it.lng) }
+
     /** Random pick inside the scope; NEAR = within [radiusKm] of the centre; REGION = one 시·도. */
     fun pick(scope: DartScope, centerLat: Double? = null, centerLng: Double? = null, region: String? = null, radiusKm: Double = 100.0, random: Random = Random.Default): Region? {
         val pool = when (scope) {

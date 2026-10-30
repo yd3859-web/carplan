@@ -28,7 +28,7 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     private val darts = DartRepository()
     private val groups = GroupRepository()
     private val trips = TripRepository()
-    private val uid = MutableStateFlow<String?>(null)
+    val uid = MutableStateFlow<String?>(null)
     val me: StateFlow<String?> = uid.asStateFlow()
     val message = MutableStateFlow<String?>(null)
 
@@ -64,6 +64,18 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
         val pick = Regions.pick(scope, centerLat, centerLng, region) ?: run { message.value = "그 범위엔 동네가 없어요"; return@act }
         darts.throwDart(groupId, if (sameRoom) current!!.id else null, scope, centerLat, centerLng, region, pick, if (sameRoom) current!!.throwCount + 1 else 1, uid.value.orEmpty(), eventId, date)
     }
+
+    /** 6장: the dart landed at (lat, lng) on the board → the nearest 동네 in the scope is the result. */
+    fun throwDartAt(context: Context, scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double) = act {
+        loadRegionsOnce(context)
+        val current = dart.value
+        val sameRoom = current != null && current.scope == scope && current.region == region && current.eventId == eventId
+        val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region)) ?: run { message.value = "그 범위엔 동네가 없어요"; return@act }
+        darts.throwDart(groupId, if (sameRoom) current!!.id else null, scope, centerLat, centerLng, region, pick, if (sameRoom) current!!.throwCount + 1 else 1, uid.value.orEmpty(), eventId, date)
+    }
+
+    /** The board needs the full 읍·면·동 list to frame the scope. */
+    fun ensureRegions(context: Context) = loadRegionsOnce(context)
 
     fun addDartAsStop(d: Dart) = addWinnerAsStop(Place(name = d.resultName, lat = d.resultLat, lng = d.resultLng))
 

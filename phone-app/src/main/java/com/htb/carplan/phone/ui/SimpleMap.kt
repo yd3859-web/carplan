@@ -57,7 +57,8 @@ fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: Lis
         // pixel of the centre inside the 3×3 mosaic, then shift so it sits mid-view
         val centerPx = ((cx - (tx - 1)) * tilePx) to ((cy - (ty - 1)) * tilePx)
         val ox = wPx / 2 - centerPx.first; val oy = hPx / 2 - centerPx.second
-        for (dy in -1..1) for (dx in -1..1) {
+        val rx = kotlin.math.ceil(wPx / 2 / tilePx).toInt() + 1; val ry = kotlin.math.ceil(hPx / 2 / tilePx).toInt() + 1
+        for (dy in -ry..ry) for (dx in -rx..rx) {
             val x = tx + dx; val y = ty + dy
             if (y < 0 || y >= n.toInt()) continue
             AsyncImage(

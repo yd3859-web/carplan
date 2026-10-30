@@ -33,6 +33,9 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -113,6 +116,8 @@ fun PlaceSearchSheet(
         pendingCategory = null
     }
 
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.imePadding().height(520.dp)) {
             Text("장소 고르기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(bottom = 12.dp))
@@ -126,7 +131,7 @@ fun PlaceSearchSheet(
                 keyboardActions = KeyboardActions(onSearch = { runSearch() }),
                 shape = Corner,
                 colors = TextFieldDefaults.colors(focusedContainerColor = Palette.Background, unfocusedContainerColor = Palette.Background, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Palette.SheetEdge),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("근처 추천", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp))

@@ -178,6 +178,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                     BigButton("내비 열기", primary = true) { vm.openNavigation() }
                     if (guiding && tripNext != null) BigButton("${tripNext.place.name} 도착 처리 (시연용)", enabled = !restricted) { vm.debugArrive() }
                     BigButton("일정표로", enabled = !restricted) { vm.homeWhileGuiding.value = true }
+                    if (!restricted) BigButton("시연 메뉴") { debug = true }
                 }
             })
         } else Row(Modifier.fillMaxSize()) {
@@ -338,7 +339,7 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
             Text(when { pickup -> "네, 출발"; fueled -> "네"; fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         Button(onClick = onLater, modifier = Modifier.height(80.dp).width(190.dp).border(1.dp, Color(0xFF55595E), Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White)) {
-            Text(when { pickup -> "공유 없이 출발"; fuel -> "아니요"; change -> "그대로"; else -> "나중에" }, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text(when { pickup -> "공유 없이"; fuel -> "아니요"; change -> "그대로"; else -> "나중에" }, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
@@ -360,7 +361,8 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Text(e.startTime ?: "종일", Modifier.width(88.dp).padding(top = 4.dp), color = if (hot) Accent else Soft, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Column {
-                    Text(e.title, color = Ink, fontSize = if (hot) 28.sp else 24.sp, fontWeight = if (hot) FontWeight.Bold else FontWeight.Normal)
+                    val care = e.categoryId == com.htb.carplan.shared.model.BuiltInCategory.CAR.id
+                    Text(if (care) "차량 관리 · ${e.title}" else e.title, color = if (care) Soft else Ink, fontSize = if (hot) 28.sp else if (care) 20.sp else 24.sp, fontWeight = if (hot) FontWeight.Bold else FontWeight.Normal)
                     if (isTrip) TripStops(trip!!) else e.place?.name?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = 19.sp) }
                 }
             }

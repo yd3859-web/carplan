@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -146,57 +147,13 @@ private fun VoteCard(v: Vote, me: String?, members: Int, isOwner: Boolean, nameO
     }
 }
 
-/** 6장: scope → throw → the group's shared result; retry as often as you like ("n번째 다트!"). */
+/** 6장: now a full-screen game (DartGame.kt); kept as the entry point the screens already call. */
 @Composable
-fun DartSheet(groupId: String, eventId: String?, date: String?, nameOf: (String) -> String, onDismiss: () -> Unit) {
-    val vm: VoteDartViewModel = viewModel(key = "dart-$groupId-$eventId", factory = voteVmFactory(groupId, eventId, date))
-    val dart by vm.dart.collectAsStateWithLifecycle()
-    val message by vm.message.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    var scope by remember { mutableStateOf(DartScope.NATIONAL) }
-    var region by remember { mutableStateOf(Regions.sidoNames.first()) }
-    var spinning by remember { mutableStateOf(false) }
-    val angle by animateFloatAsState(if (spinning) 1080f else 0f, tween(1200), label = "spin", finishedListener = { spinning = false })
-    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
-    fun throwNow() {
-        spinning = true
-        val here = if (scope == DartScope.NEAR) lastKnown(context) else null
-        if (scope == DartScope.NEAR && here == null && !hasLocation(context)) {
-            askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)); spinning = false; return
-        }
-        vm.throwDart(context, scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null)
-    }
-    CenterSheet(onDismiss = onDismiss) {
-        Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("다트 — 동네 뽑기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.fillMaxWidth())
-            Text("여행지가 미정일 때. 던지면 그룹 전원 화면에 같이 떠요.", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.fillMaxWidth())
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = scope == DartScope.NATIONAL, onClick = { scope = DartScope.NATIONAL }, shape = Corner, label = { Text("전국") })
-                FilterChip(selected = scope == DartScope.NEAR, onClick = { scope = DartScope.NEAR }, shape = Corner, label = { Text("내 위치 100km") })
-                FilterChip(selected = scope == DartScope.REGION, onClick = { scope = DartScope.REGION }, shape = Corner, label = { Text("지역") })
-            }
-            if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Regions.sidoNames.forEach { s -> FilterChip(selected = region == s, onClick = { region = s }, shape = Corner, label = { Text(s) }) }
-            }
-            // The board: a ring with a needle that spins on every throw.
-            Box(Modifier.padding(vertical = 18.dp).size(150.dp).clip(CircleShape).border(3.dp, Palette.Line, CircleShape), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(90.dp).clip(CircleShape).border(2.dp, Palette.SheetEdge, CircleShape))
-                Box(Modifier.size(14.dp).clip(CircleShape).background(Palette.Teal))
-                Box(Modifier.rotate(angle).width(4.dp).height(130.dp)) { Box(Modifier.fillMaxWidth().height(65.dp).background(Palette.Navy)) }
-            }
-            dart?.let { d ->
-                Text(d.resultName, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                Text("${d.throwCount}번째 다트! · ${nameOf(d.thrownBy)}", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
-                if (eventId != null) TextButton(onClick = { vm.addDartAsStop(d) }) { Text("이 동네를 여행 칸으로", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
-            }
-            message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp).clickable { vm.message.value = null }) }
-            Button(onClick = { throwNow() }, enabled = !spinning, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(52.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) {
-                Text(if (dart == null) "던지기" else "다시 던지기", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("닫기", color = Palette.TextSoft) } }
-        }
-    }
-}
+fun DartSheet(groupId: String, eventId: String?, date: String?, nameOf: (String) -> String, onDismiss: () -> Unit) =
+    DartGame(groupId, eventId, date, nameOf, onDismiss)
+
+internal fun hasLocationPermission(context: Context) = hasLocation(context)
+internal fun lastKnownLocation(context: Context) = lastKnown(context)
 
 private fun hasLocation(context: Context) =
     ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -208,3 +165,10 @@ private fun lastKnown(context: Context): Pair<Double, Double>? {
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     return listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }?.let { it.latitude to it.longitude }
 }
+
+/** Selected chips in ink (design rule: no Material purple). */
+@Composable
+private fun inkChip() = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+    containerColor = Palette.Background, labelColor = Palette.TextStrong,
+    selectedContainerColor = Palette.Navy, selectedLabelColor = androidx.compose.ui.graphics.Color.White,
+)
