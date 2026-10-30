@@ -1,0 +1,12 @@
+{
+  "name": "carplan-functions",
+  "description": "carplan 17장 알림: Firestore 변화 → FCM 푸시",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": { "deploy": "firebase deploy --only functions", "logs": "firebase functions:log" },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "private": true
+}

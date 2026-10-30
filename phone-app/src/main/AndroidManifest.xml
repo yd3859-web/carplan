@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- 7장: scanning the car's invite QR -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 17장: push (Q02: asked at first start) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -36,6 +38,12 @@
                 <data android:scheme="carplan" android:host="i" />
             </intent-filter>
         </activity>
+        <!-- 17장: FCM token + foreground notifications -->
+        <service android:name=".push.CarplanMessagingService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <!-- 14장: sharing the exported day image -->
         <provider
             android:name="androidx.core.content.FileProvider"

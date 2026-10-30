@@ -95,7 +95,9 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록은 `phone-app/src/main/assets/regions.csv`(시도,시군구,읍면동,lat,lng)로 넣으면 교체됨.
 - 11장 코드 완료(shared `PickupRepository`, 폰 `trip/PickupSheet`+`ui/SimpleMap`(OSM 타일), 차 픽업 동의 질문·픽업 우선 경로·5초 공유·가짜 주행 보간). 에뮬 확인은 체크리스트 F6.
 - 16장 코드 완료(shared `Repeat`·`Commute` + 테스트, 반복 일정 펼치기, 차 "회사로 갈까요?", 폰 학습 띠). 에뮬 확인은 체크리스트 F7.
-- 다음: 17장 알림(Cloud Functions + FCM, Blaze 뒤 배포) → 제출물(기획서·영상·release APK·규칙) → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
+- 17장 코드 완료(`functions/index.js` 5개 트리거, 폰 `push/CarplanMessagingService` + 토큰 등록). **Blaze 전환 뒤** `firebase deploy --only functions,storage`.
+- 폰 알림 탭 딥링크 `carplan://trip/{gid}/{eid}/{date}`는 아직 MainActivity에서 처리 안 함(InviteInbox는 /i/만) — 제출 전 연결.
+- 다음: 제출물(기획서 DOCX·시연 영상·release APK·Firestore/Storage 규칙 18장·assetlinks·README), 1장 로그인은 그 뒤 → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
 - Firestore 규칙은 아직 dev(로그인만 하면 읽기·쓰기). 1차 제출 전 18장 규칙으로 바꾼다.
 
 ## 에뮬레이터 테스트 요령

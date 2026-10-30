@@ -74,6 +74,8 @@ dependencies {
     // Record photos (14장)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)
+    // 17장 push
+    implementation(libs.firebase.messaging)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)

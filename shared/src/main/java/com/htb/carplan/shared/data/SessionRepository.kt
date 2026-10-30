@@ -61,4 +61,9 @@ class SessionRepository(
         cachedSession = session
         session
     }
+
+    /** 17장: keeps this device's push token on the user (arrayUnion, so several phones work). */
+    suspend fun registerFcmToken(uid: String, token: String) {
+        db.document(FirestorePaths.user(uid)).set(mapOf("fcmTokens" to com.google.firebase.firestore.FieldValue.arrayUnion(token)), com.google.firebase.firestore.SetOptions.merge()).await()
+    }
 }
