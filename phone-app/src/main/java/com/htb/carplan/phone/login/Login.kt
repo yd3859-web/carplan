@@ -120,16 +120,16 @@ fun LoginGate(vm: LoginViewModel) {
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.weight(1f))
         Text("carplan", fontSize = 34.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
-        Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+        Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 17.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.weight(1f))
         Button(
             onClick = { vm.google(context) }, enabled = !busy, shape = Corner,
             colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(if (busy) "로그인 중…" else "구글로 시작하기", fontSize = 17.sp) }
-        message?.let { Text(it, fontSize = 14.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 10.dp)) }
-        Text("로그인하면 그룹·일정·기록이 계정에 묶여 폰을 바꿔도 이어져요. 지금 둘러보다가 설정 탭에서 연결해도 돼요.", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 14.dp))
-        TextButton(onClick = vm::skip, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp)) { Text("나중에 할게요", color = Palette.TextSoft, fontSize = 15.sp) }
+        message?.let { Text(it, fontSize = 15.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 10.dp)) }
+        Text("로그인하면 그룹·일정·기록이 계정에 묶여 폰을 바꿔도 이어져요. 지금 둘러보다가 설정 탭에서 연결해도 돼요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 14.dp))
+        TextButton(onClick = vm::skip, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp)) { Text("나중에 할게요", color = Palette.TextSoft, fontSize = 16.sp) }
     }
 
     confirm?.let { (suggested, switched) ->
@@ -139,7 +139,7 @@ fun LoginGate(vm: LoginViewModel) {
         CenterSheet(onDismiss = {}) {
             Column {
                 Text("이름 확인", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                Text(if (switched) "이미 쓰던 계정으로 들어왔어요. 이름을 확인해 주세요" else "그룹 멤버와 차 화면에 이렇게 보여요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
+                Text(if (switched) "이미 쓰던 계정으로 들어왔어요. 이름을 확인해 주세요" else "그룹 멤버와 차 화면에 이렇게 보여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
                 OutlinedTextField(name, { name = it.take(20) }, singleLine = true, shape = Corner, modifier = Modifier.fillMaxWidth())
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
                     Button(

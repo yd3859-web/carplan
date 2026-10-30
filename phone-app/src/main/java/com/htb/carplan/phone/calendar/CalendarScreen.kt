@@ -125,14 +125,14 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "${sg.days.sortedBy { it.value }.joinToString("·") { it.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.KOREAN) }} ${sg.time}쯤 ${sg.place.name}에 ${sg.count}번 갔어요. 출근 일정으로 등록할까요?",
-                            fontSize = 14.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f),
+                            fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f),
                         )
                         androidx.compose.material3.TextButton(onClick = { vm.registerCommute(sg) }) { Text("등록", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                         androidx.compose.material3.TextButton(onClick = vm::dismissCommute) { Text("아니요", color = Palette.TextSoft) }
                     }
                     androidx.compose.material3.HorizontalDivider(color = Palette.Line)
                 }
-                error?.let { Text("오류: $it", color = Palette.Sunday, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
+                error?.let { Text("오류: $it", color = Palette.Sunday, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp)) }
                 Spacer(Modifier.height(4.dp))
                 MonthHeader(month, onPrev = { vm.showMonth(month.minusMonths(1)) }, onNext = { vm.showMonth(month.plusMonths(1)) })
                 MonthGridView(month, selected, events, categories, Modifier.weight(1f)) { date ->
@@ -216,7 +216,7 @@ private fun MonthGridView(
     val singleDay = events - multiDay.toSet()
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            WEEKDAYS.forEachIndexed { i, d -> Text(d, Modifier.weight(1f), textAlign = TextAlign.Start, color = when (i) { 0 -> Palette.Sunday; 6 -> Palette.Saturday; else -> Palette.TextSoft }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+            WEEKDAYS.forEachIndexed { i, d -> Text(d, Modifier.weight(1f), textAlign = TextAlign.Start, color = when (i) { 0 -> Palette.Sunday; 6 -> Palette.Saturday; else -> Palette.TextSoft }, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
         MonthGrid.weeks(month).forEach { weekStart ->
             HorizontalDivider(color = Palette.Line)
@@ -323,8 +323,8 @@ private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: Li
             Box(Modifier.size(7.dp).clip(CircleShape).background(c))
         }
         val more = marks.size - 3 + hiddenBars
-        if (more > 0) Text("+$more", fontSize = 11.sp, color = Palette.TextSoft)
-        if (marks.isEmpty() && hiddenBars == 0 && holiday != null) Text(holiday, fontSize = 11.sp, color = Palette.Sunday, maxLines = 1, overflow = TextOverflow.Clip)
+        if (more > 0) Text("+$more", fontSize = 13.sp, color = Palette.TextSoft)
+        if (marks.isEmpty() && hiddenBars == 0 && holiday != null) Text(holiday, fontSize = 13.sp, color = Palette.Sunday, maxLines = 1, overflow = TextOverflow.Clip)
     }
 }
 
@@ -332,6 +332,6 @@ private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: Li
 @Composable
 private fun TripBar(label: String, color: Color, modifier: Modifier = Modifier) {
     Box(modifier.clip(Corner).background(color.copy(alpha = 0.16f)).drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)) }, contentAlignment = Alignment.CenterStart) {
-        Text(label, Modifier.padding(start = 8.dp, end = 4.dp), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, Modifier.padding(start = 8.dp, end = 4.dp), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

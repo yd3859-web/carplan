@@ -104,7 +104,7 @@ private fun TabBar(selected: Tab, onSelect: (Tab) -> Unit) {
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(t.icon, contentDescription = t.label, tint = tint, modifier = Modifier.size(22.dp))
-                    Text(t.label, fontSize = 11.sp, color = tint, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
+                    Text(t.label, fontSize = 13.sp, color = tint, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
                 }
             }
         }

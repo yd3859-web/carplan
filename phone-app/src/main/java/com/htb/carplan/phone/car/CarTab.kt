@@ -137,9 +137,9 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Text("차량", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-        message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.clickable { vm.message.value = null }) }
+        message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
         if (car == null) {
-            Text("차 화면에 뜬 6자리 코드를 입력하면 이 차의 호스트가 돼요.", color = Palette.TextSoft, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+            Text("차 화면에 뜬 6자리 코드를 입력하면 이 차의 호스트가 돼요.", color = Palette.TextSoft, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
             OutlinedTextField(
                 code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("차 연결 코드") }, singleLine = true, shape = Corner,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -158,7 +158,7 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
         HorizontalDivider(color = Palette.Line)
         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("차량 관리", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            Text("항목을 누르면 기록·주기", fontSize = 13.sp, color = Palette.TextSoft)
+            Text("항목을 누르면 기록·주기", fontSize = 15.sp, color = Palette.TextSoft)
         }
         LazyColumn(Modifier.weight(1f)) {
             items(MaintenanceItem.entries, key = { it.name }) { item ->
@@ -171,7 +171,7 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                         Text(item.label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                         Text(
                             last?.let { "마지막 ${it.startDate}" + (it.maintenance?.odometerKm?.let { km -> " · ${"%,d".format(km.toLong())}km" } ?: "") } ?: "기록 없음",
-                            fontSize = 13.sp, color = Palette.TextSoft,
+                            fontSize = 15.sp, color = Palette.TextSoft,
                         )
                         val dueText = when {
                             due == null && item == MaintenanceItem.INSURANCE -> "갱신일을 넣어 주세요"
@@ -180,16 +180,16 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                             dueDays == 0L -> "오늘 예정"
                             else -> "다음 ${due.startDate} · ${dueDays}일 남음" + (due.maintenance?.dueKm?.let { " · ${"%,d".format(it.toLong())}km" } ?: "")
                         }
-                        if (dueText.isNotEmpty() && dueDays == null) Text(dueText, fontSize = 13.sp, color = Palette.TextSoft)
+                        if (dueText.isNotEmpty() && dueDays == null) Text(dueText, fontSize = 15.sp, color = Palette.TextSoft)
                     }
                     // Right side: how soon, in one word — the thing you actually want to know.
                     when {
-                        dueDays == null -> Text(if (item == MaintenanceItem.INSURANCE) "갱신일 없음" else "—", fontSize = 15.sp, color = Palette.TextSoft)
+                        dueDays == null -> Text(if (item == MaintenanceItem.INSURANCE) "갱신일 없음" else "—", fontSize = 16.sp, color = Palette.TextSoft)
                         dueDays < 0 -> Text("${-dueDays}일 지남", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Sunday)
                         dueDays == 0L -> Text("오늘", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Sunday)
                         else -> Column(horizontalAlignment = Alignment.End) {
                             Text("${dueDays}일 남음", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (dueDays <= 7) Palette.Sunday else Palette.Teal)
-                            Text(due!!.startDate.substring(5).replace('-', '/') + (due.maintenance?.dueKm?.let { " · ${"%,d".format(it.toLong())}km" } ?: ""), fontSize = 13.sp, color = Palette.TextSoft)
+                            Text(due!!.startDate.substring(5).replace('-', '/') + (due.maintenance?.dueKm?.let { " · ${"%,d".format(it.toLong())}km" } ?: ""), fontSize = 15.sp, color = Palette.TextSoft)
                         }
                     }
                     Text("  ›", fontSize = 22.sp, color = Palette.TextSoft)
@@ -215,21 +215,21 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                 Text(item.label, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                 val cur = MaintenanceRules.interval(item, car?.intervals.orEmpty())
                 if (item != MaintenanceItem.FUEL && item != MaintenanceItem.INSURANCE) Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("주기  " + (listOfNotNull(cur.km?.let { "${"%,d".format(it)}km" }, cur.days?.let { "${it}일" }).joinToString(" 또는 ").ifEmpty { "없음" }), fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { showRecords = null; intervalFor = item }) { Text("주기 바꾸기", color = Palette.Navy, fontSize = 14.sp) }
+                    Text("주기  " + (listOfNotNull(cur.km?.let { "${"%,d".format(it)}km" }, cur.days?.let { "${it}일" }).joinToString(" 또는 ").ifEmpty { "없음" }), fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showRecords = null; intervalFor = item }) { Text("주기 바꾸기", color = Palette.Navy, fontSize = 15.sp) }
                 }
                 Button(
                     onClick = { showRecords = null; logging = item }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp).height(52.dp), shape = Corner,
                     colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-                ) { Text(if (item == MaintenanceItem.INSURANCE) "갱신일 넣기" else "${item.label} 했어요 · 기록", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
-                Text("기록", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
-                if (list.isEmpty()) Text("아직 없어요", color = Palette.TextSoft, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp))
+                ) { Text(if (item == MaintenanceItem.INSURANCE) "갱신일 넣기" else "${item.label} 했어요 · 기록", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                Text("기록", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+                if (list.isEmpty()) Text("아직 없어요", color = Palette.TextSoft, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp))
                 list.take(20).forEach { e ->
                     val m = e.maintenance
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(e.startDate, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.width(100.dp))
-                        Text(listOfNotNull(m?.odometerKm?.let { "${"%,d".format(it.toLong())}km" }, m?.amountWon?.let { "${"%,d".format(it)}원" }, m?.liters?.let { "${it}L" }, e.memo.takeIf { it.isNotBlank() }, if (m?.auto == true) "차가 기록" else null).joinToString(" · "), fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { vm.deleteRecord(e.id) }) { Text("삭제", color = Palette.TextSoft, fontSize = 13.sp) }
+                        Text(e.startDate, fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.width(100.dp))
+                        Text(listOfNotNull(m?.odometerKm?.let { "${"%,d".format(it.toLong())}km" }, m?.amountWon?.let { "${"%,d".format(it)}원" }, m?.liters?.let { "${it}L" }, e.memo.takeIf { it.isNotBlank() }, if (m?.auto == true) "차가 기록" else null).joinToString(" · "), fontSize = 16.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { vm.deleteRecord(e.id) }) { Text("삭제", color = Palette.TextSoft, fontSize = 15.sp) }
                     }
                     HorizontalDivider(color = Palette.Line)
                 }
@@ -288,7 +288,7 @@ private fun IntervalDialog(item: MaintenanceItem, km0: Long?, days0: Long?, onSa
     CenterSheet(onDismiss = onDismiss) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${item.label} 주기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            Text("둘 다 넣으면 먼저 오는 쪽에 예정이 잡혀요. 비우면 그 규칙은 안 써요.", fontSize = 14.sp, color = Palette.TextSoft)
+            Text("둘 다 넣으면 먼저 오는 쪽에 예정이 잡혀요. 비우면 그 규칙은 안 써요.", fontSize = 15.sp, color = Palette.TextSoft)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(km, { km = it.filter(Char::isDigit) }, label = { Text("km마다") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
                 OutlinedTextField(days, { days = it.filter(Char::isDigit) }, label = { Text("일마다") }, singleLine = true, shape = Corner, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
@@ -305,10 +305,10 @@ private fun IntervalDialog(item: MaintenanceItem, km0: Long?, days0: Long?, onSa
 @Composable
 private fun BigStat(label: String, value: String, unit: String) {
     Column {
-        Text(label, fontSize = 13.sp, color = Palette.TextSoft)
+        Text(label, fontSize = 15.sp, color = Palette.TextSoft)
         Row(verticalAlignment = Alignment.Bottom) {
             Text(value, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            Text(" $unit", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 4.dp))
+            Text(" $unit", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 4.dp))
         }
     }
 }

@@ -92,10 +92,10 @@ fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: Lis
                         when (m.kind) { MapMarker.Kind.CAR -> Palette.Teal; MapMarker.Kind.ME -> Palette.Background; MapMarker.Kind.PICKUP -> Palette.TextStrong; MapMarker.Kind.STOP -> Palette.TextSoft },
                     ).border(2.dp, if (m.kind == MapMarker.Kind.ME) Palette.TextStrong else Palette.Background, CircleShape),
                 )
-                Text(m.label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.offset(x = size + 2.dp, y = (-2).dp).background(Color(0xCCFFFFFF)))
+                Text(m.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.offset(x = size + 2.dp, y = (-2).dp).background(Color(0xCCFFFFFF)))
             }
         }
-        Text(TILE_ATTRIBUTION, fontSize = 9.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xAAFFFFFF)))
+        Text(TILE_ATTRIBUTION, fontSize = 10.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xAAFFFFFF)))
     }
 }
 

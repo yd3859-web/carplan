@@ -76,7 +76,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                     sharing -> "차가 오는 중 · 위치를 5초마다 보여 줘요"
                     else -> "차가 출발하면 운전자에게 위치 공유를 물어봐요"
                 },
-                fontSize = 14.sp, color = if (sharing) Palette.Teal else Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
+                fontSize = 15.sp, color = if (sharing) Palette.Teal else Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )
             val markers = buildList {
                 carPos?.let { add(MapMarker(it.first, it.second, "차", MapMarker.Kind.CAR)) }
@@ -85,17 +85,17 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             }
             val center = carPos ?: mine?.place?.takeIf { it.hasCoords() }?.let { it.lat to it.lng } ?: markers.firstOrNull()?.let { it.lat to it.lng }
             if (center != null) SimpleMap(center.first, center.second, zoom = 13, markers = markers, path = path)
-            else Text("좌표가 있는 장소를 고르면 지도가 떠요 (카카오 키 없이는 이름만 저장됨)", fontSize = 13.sp, color = Palette.TextSoft)
+            else Text("좌표가 있는 장소를 고르면 지도가 떠요 (카카오 키 없이는 이름만 저장됨)", fontSize = 15.sp, color = Palette.TextSoft)
             // 11장 4: time and distance left — the phone's own route when it has one, else the car's ETA.
             val etaText = routeLeg?.let { "차가 약 ${(it.seconds / 60).coerceAtLeast(1)}분 뒤 도착 · ${"%.1f".format(it.meters / 1000.0)} km" }
                 ?: mine?.etaSeconds?.takeIf { carPos != null && mine.status == PickupStatus.WAITING }?.let { "차가 약 ${(it / 60).coerceAtLeast(1)}분 뒤 도착" }
-            etaText?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 6.dp)) }
+            etaText?.let { Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 6.dp)) }
 
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("내 픽업 장소", fontSize = 13.sp, color = Palette.TextSoft)
+                    Text("내 픽업 장소", fontSize = 15.sp, color = Palette.TextSoft)
                     Text(mine?.place?.name ?: "아직 없음", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                    mine?.let { Text(statusText(it.status, it.arrivedAt != null), fontSize = 13.sp, color = Palette.Teal) }
+                    mine?.let { Text(statusText(it.status, it.arrivedAt != null), fontSize = 15.sp, color = Palette.Teal) }
                 }
                 if (mine == null) Button(onClick = { searching = true }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("장소 고르기") }
                 else {
@@ -105,15 +105,15 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                 }
             }
             HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(vertical = 10.dp))
-            Text("픽업 순서", fontSize = 13.sp, color = Palette.TextSoft)
+            Text("픽업 순서", fontSize = 15.sp, color = Palette.TextSoft)
             pickups.forEachIndexed { i, p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${i + 1}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(end = 10.dp))
+                    Text("${i + 1}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(end = 10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("${p.name.ifBlank { "일행" }} · ${p.place.name}", fontSize = 16.sp, color = Palette.TextStrong)
-                        Text(statusText(p.status, p.arrivedAt != null), fontSize = 13.sp, color = Palette.TextSoft)
+                        Text("${p.name.ifBlank { "일행" }} · ${p.place.name}", fontSize = 17.sp, color = Palette.TextStrong)
+                        Text(statusText(p.status, p.arrivedAt != null), fontSize = 15.sp, color = Palette.TextSoft)
                     }
-                    if (i > 0) TextButton(onClick = { vm.setPickupOrder(pickups.map { it.uid }.toMutableList().also { l -> l.add(i - 1, l.removeAt(i)) }) }) { Text("위로", color = Palette.TextSoft, fontSize = 13.sp) }
+                    if (i > 0) TextButton(onClick = { vm.setPickupOrder(pickups.map { it.uid }.toMutableList().also { l -> l.add(i - 1, l.removeAt(i)) }) }) { Text("위로", color = Palette.TextSoft, fontSize = 15.sp) }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("닫기", color = Palette.TextSoft) } }

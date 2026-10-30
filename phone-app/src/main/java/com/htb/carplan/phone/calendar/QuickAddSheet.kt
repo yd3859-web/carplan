@@ -221,7 +221,7 @@ fun QuickAddSheet(
             }
             if (isTrip) Text(
                 "여행은 날짜만 고르고 추가하면, 바로 날짜별 장소 칸을 짜는 화면으로 가요 (3장)",
-                fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp),
+                fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp),
             )
 
             memo?.let { m ->

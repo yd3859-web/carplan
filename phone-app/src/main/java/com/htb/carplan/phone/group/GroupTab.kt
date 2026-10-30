@@ -114,7 +114,7 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
                 }
             }
         }
-        message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
+        message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
         val shared = groups.filterNot { it.solo }
         LazyColumn(Modifier.weight(1f).padding(top = 10.dp)) {
             items(shared, key = { it.id }) { g ->
@@ -134,13 +134,13 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
             item {
                 if (shared.isEmpty()) Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("아직 그룹이 없어요", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-                    Text("오른쪽 위 [+]에서 만들거나 초대 코드로 들어와요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+                    Text("오른쪽 위 [+]에서 만들거나 초대 코드로 들어와요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
                 }
                 groups.firstOrNull { it.solo }?.let { solo ->
                     Spacer(Modifier.height(16.dp))
                     GroupRow(solo, "혼자 쓰는 일정 · 차량 관리", null) { vm.open(solo.id) }
                 }
-                Text("내 친구 코드  ${me?.friendCode ?: "…"}  ·  친구 ${friends.size}명", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 22.dp, bottom = 24.dp))
+                Text("내 친구 코드  ${me?.friendCode ?: "…"}  ·  친구 ${friends.size}명", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 22.dp, bottom = 24.dp))
             }
         }
     }
@@ -160,7 +160,7 @@ private fun CodeDialog(title: String, hint: String, action: String, note: String
     com.htb.carplan.phone.ui.CenterSheet(onDismiss = onDismiss) {
         Column {
             Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            note?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp)) }
+            note?.let { Text(it, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp)) }
             Spacer(Modifier.height(12.dp))
             CodeRow(code, { code = it }, hint, action) { onConfirm(code) }
         }
@@ -168,7 +168,7 @@ private fun CodeDialog(title: String, hint: String, action: String, note: String
 }
 
 @Composable
-private fun SectionTitle(text: String) = Text(text, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 22.dp, bottom = 6.dp))
+private fun SectionTitle(text: String) = Text(text, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 22.dp, bottom = 6.dp))
 
 @Composable
 private fun CodeRow(value: String, onChange: (String) -> Unit, hint: String, action: String, onAction: () -> Unit) {
@@ -186,8 +186,8 @@ private fun GroupRow(g: Group, who: String, tripLine: String?, onClick: () -> Un
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(g.name, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            Text(who, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
-            tripLine?.let { Text(it, fontSize = 15.sp, color = if (it.startsWith("다음")) Palette.Teal else Palette.TextSoft, fontWeight = if (it.startsWith("다음")) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 4.dp)) }
+            Text(who, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
+            tripLine?.let { Text(it, fontSize = 16.sp, color = if (it.startsWith("다음")) Palette.Teal else Palette.TextSoft, fontWeight = if (it.startsWith("다음")) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 4.dp)) }
         }
         Text("›", fontSize = 22.sp, color = Palette.TextSoft)
     }
@@ -217,7 +217,7 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
             Column(Modifier.weight(1f).clickable(enabled = isOwner) { renaming = true }) {
                 Text(g.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                Text("${g.memberIds.size}명 · 그룹장 ${vm.nameOf(g.ownerUid)}" + if (isOwner) " · 이름 바꾸려면 누르기" else "", fontSize = 13.sp, color = Palette.TextSoft)
+                Text("${g.memberIds.size}명 · 그룹장 ${vm.nameOf(g.ownerUid)}" + if (isOwner) " · 이름 바꾸려면 누르기" else "", fontSize = 15.sp, color = Palette.TextSoft)
             }
             TextButton(onClick = { vm.leave(g.id); onBack() }) { Text("나가기", color = Palette.TextSoft) }
         }
@@ -233,18 +233,18 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
                             context.startActivity(Intent.createChooser(send, "초대 링크 보내기"))
                         },
                         modifier = Modifier.weight(1f).height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-                    ) { Text("초대 링크 보내기", fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
+                    ) { Text("초대 링크 보내기", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) {
-                        Text("코드  ${g.inviteCode}", color = Palette.TextStrong, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("코드  ${g.inviteCode}", color = Palette.TextStrong, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     }
                 }
-                Text("차 안에서는 차 화면의 QR로 들어와요", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+                Text("차 안에서는 차 화면의 QR로 들어와요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
                 val invitable = friends.filterNot { it in g.memberIds }
                 if (invitable.isNotEmpty()) {
-                    Text("친구 초대", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    Text("친구 초대", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
                     invitable.forEach { uid ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(vm.nameOf(uid), fontSize = 16.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                            Text(vm.nameOf(uid), fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
                             TextButton(onClick = { vm.inviteFriend(g.id, uid) }) { Text("초대", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                         }
                     }
@@ -254,7 +254,7 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             }
             items(g.memberIds, key = { it }) { uid ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(vm.nameOf(uid) + if (uid == g.ownerUid) "  · 그룹장" else "", fontSize = 16.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                    Text(vm.nameOf(uid) + if (uid == g.ownerUid) "  · 그룹장" else "", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
                     if (isOwner && uid != g.ownerUid) TextButton(onClick = { vm.removeMember(g.id, uid) }) { Text("내보내기", color = Palette.TextSoft) }
                 }
                 HorizontalDivider(color = Palette.Line)
@@ -262,12 +262,12 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             item {
                 SectionTitle("같이 정하기")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { voteOpen = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("투표", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-                    OutlinedButton(onClick = { dartOpen = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("다트 (동네 뽑기)", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                    OutlinedButton(onClick = { voteOpen = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("투표", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
+                    OutlinedButton(onClick = { dartOpen = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("다트 (동네 뽑기)", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
                 }
                 SectionTitle("여행")
-                Button(onClick = { newTrip = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("새 여행 만들기", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-                if (trips.isEmpty()) Text("아직 여행이 없어요 — 빈 도화지에서 시작해요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
+                Button(onClick = { newTrip = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("새 여행 만들기", fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
+                if (trips.isEmpty()) Text("아직 여행이 없어요 — 빈 도화지에서 시작해요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
             }
             items(trips, key = { it.event.id }) { t -> TripRow(t) { onOpenTrip(g.id, t.event.id, t.event.startDate) } }
             item { Spacer(Modifier.height(24.dp)) }
@@ -303,7 +303,7 @@ private fun TripRow(t: CalendarEvent, onClick: () -> Unit) {
     val past = LocalDate.parse(e.endDate.ifEmpty { e.startDate }) < LocalDate.now()
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp)) {
         Text(e.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (past) Palette.TextSoft else Palette.TextStrong)
-        Text((if (e.startDate == e.endDate || e.endDate.isEmpty()) e.startDate else "${e.startDate} – ${e.endDate}") + if (past) "  · 지난 여행" else "", fontSize = 13.sp, color = Palette.TextSoft)
+        Text((if (e.startDate == e.endDate || e.endDate.isEmpty()) e.startDate else "${e.startDate} – ${e.endDate}") + if (past) "  · 지난 여행" else "", fontSize = 15.sp, color = Palette.TextSoft)
     }
     HorizontalDivider(color = Palette.Line)
 }
@@ -316,8 +316,8 @@ private fun NameDialog(title: String, hint: String, confirm: String, onDismiss: 
             Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             OutlinedTextField(name, { name = it }, placeholder = { Text(hint, fontSize = 17.sp) }, singleLine = true, shape = Corner, modifier = Modifier.fillMaxWidth().padding(top = 14.dp))
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft, fontSize = 16.sp) }
-                Button(onClick = { onConfirm(name) }, enabled = name.isNotBlank(), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text(confirm, fontSize = 16.sp) }
+                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft, fontSize = 17.sp) }
+                Button(onClick = { onConfirm(name) }, enabled = name.isNotBlank(), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text(confirm, fontSize = 17.sp) }
             }
         }
     }
@@ -346,8 +346,8 @@ fun JoinDialog(vm: GroupViewModel, onJoined: (String) -> Unit) {
                 fontSize = 17.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 10.dp),
             )
             Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { InviteInbox.clear() }) { Text("닫기", color = Palette.TextSoft, fontSize = 16.sp) }
-                if (group != null) Button(onClick = { vm.joinByCode(c) { InviteInbox.clear(); onJoined(it) } }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("참여하기", fontSize = 16.sp) }
+                TextButton(onClick = { InviteInbox.clear() }) { Text("닫기", color = Palette.TextSoft, fontSize = 17.sp) }
+                if (group != null) Button(onClick = { vm.joinByCode(c) { InviteInbox.clear(); onJoined(it) } }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("참여하기", fontSize = 17.sp) }
             }
         }
     }

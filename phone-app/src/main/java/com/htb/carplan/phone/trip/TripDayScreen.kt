@@ -190,10 +190,10 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 // 4장에서 그룹 고르기가 생기면 여기 그룹 이름이 들어간다.
                 Text(
                     listOfNotNull(group?.name ?: "그룹", "모두가 편집", dayLine(day)).joinToString(" · "),
-                    fontSize = 13.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft,
+                    fontSize = 15.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft,
                 )
             }
-            if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
+            if (busy) Text("저장 중", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
             // 14장 내보내기: 이미지 1장(Q39) 또는 짧은 영상(사진 슬라이드 + 장소·시간 자막)
             var exportMenu by remember { mutableStateOf(false) }
             var exporting by remember { mutableStateOf<String?>(null) }
@@ -209,14 +209,14 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             val e = event
             when {
                 e?.carId != null -> TextButton(onClick = { if (e.driverUid == me) vm.useMyCar(null) }) {
-                    Text(if (e.driverUid == me) "내 차 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}", color = Palette.Teal, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (e.driverUid == me) "내 차 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}", color = Palette.Teal, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
-                myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             }
             // Everything else (픽업·투표·다트·내보내기) behind one menu — the header stays calm.
             Box {
                 IconButton(onClick = { exportMenu = true }, enabled = exporting == null) { Icon(Icons.Filled.MoreVert, "더보기", tint = Palette.TextStrong) }
-                exporting?.let { Text(it, fontSize = 11.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomCenter)) }
+                exporting?.let { Text(it, fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomCenter)) }
                 androidx.compose.material3.DropdownMenu(exportMenu, onDismissRequest = { exportMenu = false }) {
                     if (!locked) {
                         androidx.compose.material3.DropdownMenuItem({ Text(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") }, onClick = { exportMenu = false; pickupOpen = true })
@@ -250,13 +250,13 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             // Q18: the car is moving and this phone belongs to the driver.
             Text(
                 "운전 중이라 편집이 잠겼어요. 동승자 폰에서 바꿀 수 있어요.",
-                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong,
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong,
                 modifier = Modifier.fillMaxWidth().background(Palette.Sheet).padding(horizontal = 16.dp, vertical = 10.dp),
             )
         }
         error?.let {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("오류: $it", color = Palette.Sunday, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                Text("오류: $it", color = Palette.Sunday, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 IconButton(onClick = vm::clearError) { Icon(Icons.Filled.Close, "닫기", tint = Palette.TextSoft) }
             }
         }
@@ -324,18 +324,18 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             if (!locked) item(key = "add") {
                 Column {
                     AddNode(empty = stops.isEmpty()) { adding = true }
-                    TextButton(onClick = { manualRecord = true }, modifier = Modifier.padding(start = RAIL_W)) { Text("기록 칸 직접 추가 (차 없이 세운 곳)", color = Palette.TextSoft, fontSize = 13.sp) }
+                    TextButton(onClick = { manualRecord = true }, modifier = Modifier.padding(start = RAIL_W)) { Text("기록 칸 직접 추가 (차 없이 세운 곳)", color = Palette.TextSoft, fontSize = 15.sp) }
                 }
             }
             if (removed.isNotEmpty()) {
-                item { Text("뺀 칸", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)) }
+                item { Text("뺀 칸", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)) }
                 items(removed, key = { "removed-" + it.id }) { stop ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "${vm.whoDid(stop.updatedBy)} ${stop.place.name}를(을) 뺐어요",
-                            fontSize = 15.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
+                            fontSize = 16.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
                         )
-                        if (!locked) TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
+                        if (!locked) TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
                     }
                 }
             }
@@ -350,13 +350,13 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = Corner,
                 border = BorderStroke(1.dp, Palette.Line),
-            ) { Text(if (vm.kakaoAvailable) "동선 최소로 정렬" else "동선 정렬 (직선)", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+            ) { Text(if (vm.kakaoAvailable) "동선 최소로 정렬" else "동선 정렬 (직선)", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
             Button(
                 onClick = { adding = true },
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-            ) { Text("장소 추가", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+            ) { Text("장소 추가", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
 
@@ -450,15 +450,15 @@ private fun TimelineStop(
             if (!open) {
                 val hidden = comments.size - shownComments.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!locked) Text("코멘트 남기기", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
-                    if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 13.sp, color = Palette.TextSoft) }
+                    if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
+                    if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 15.sp, color = Palette.TextSoft) }
                     else if (locked && record != null) Spacer(Modifier.height(8.dp))
                 }
             } else {
                 if (!locked) CommentComposer(onSend = onSendComment, startOpen = true)
                 Row {
-                    if (!locked) TextButton(onClick = onOpen) { Text("장소·시간·메모 고치기", fontSize = 13.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
-                    TextButton(onClick = { open = false }) { Text("접기", fontSize = 13.sp, color = Palette.TextSoft) }
+                    if (!locked) TextButton(onClick = onOpen) { Text("장소·시간·메모 고치기", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                    TextButton(onClick = { open = false }) { Text("접기", fontSize = 15.sp, color = Palette.TextSoft) }
                 }
             }
             if (!isLast) LegLabel(leg, driving = state == NodeState.NEXT && false)
@@ -498,28 +498,28 @@ private fun StopBox(
         Column(Modifier.width(68.dp).clickable(onClick = onTimeTap)) {
             when {
                 // 13장: the car was here — real arrival on top, the plan small underneath.
-                arrived != null -> { Text(arrived, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong); stop.time?.let { Text("예정 $it", fontSize = 11.sp, color = Palette.TextSoft) } }
+                arrived != null -> { Text(arrived, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong); stop.time?.let { Text("예정 $it", fontSize = 13.sp, color = Palette.TextSoft) } }
                 stop.time != null -> Text(stop.time!!, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (visited) Palette.TextSoft else Palette.TextStrong)
-                estimate != null -> { Text("예상", fontSize = 11.sp, color = Palette.TextSoft); Text(estimate, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextSoft) }
-                else -> Text("시간", fontSize = 15.sp, color = Palette.SheetEdge)
+                estimate != null -> { Text("예상", fontSize = 13.sp, color = Palette.TextSoft); Text(estimate, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextSoft) }
+                else -> Text("시간", fontSize = 16.sp, color = Palette.SheetEdge)
             }
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stop.place.name, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = if (visited) Palette.TextSoft else Palette.TextStrong, modifier = Modifier.weight(1f, fill = false))
-                if (next) Text("  다음", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
+                if (next) Text("  다음", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
             }
             val sub = listOfNotNull(
                 stop.place.address.takeIf { it.isNotBlank() },
                 if (!stop.place.hasCoords()) "좌표 없음" else null,
                 editedBy,
             ).joinToString("  ·  ")
-            if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft)
+            if (sub.isNotEmpty()) Text(sub, fontSize = 15.sp, color = Palette.TextSoft)
             if (stop.memo.isNotBlank()) {
                 val (tag, rest) = com.htb.carplan.shared.calendar.StopMemo.split(stop.memo)
                 Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    tag?.let { Text(it, fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
-                    if (rest.isNotBlank()) Text(rest, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(start = if (tag != null) 6.dp else 0.dp))
+                    tag?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
+                    if (rest.isNotBlank()) Text(rest, fontSize = 16.sp, color = Palette.ChipText, modifier = Modifier.padding(start = if (tag != null) 6.dp else 0.dp))
                 }
             }
         }
@@ -544,10 +544,10 @@ private fun Bubble(c: Comment, nameOf: (String?) -> String) {
     val shown = remember { MutableTransitionState(false).apply { targetState = true } }
     AnimatedVisibility(visibleState = shown, enter = fadeIn(tween(200)) + slideInHorizontally(tween(240)) { -it / 4 }) {
         Column(Modifier.padding(top = 8.dp, start = 10.dp, end = 24.dp).speechBubble().padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text(c.text, fontSize = 16.sp, color = Palette.TextStrong)
+            Text(c.text, fontSize = 17.sp, color = Palette.TextStrong)
             Text(
                 nameOf(c.uid) + (c.createdAt?.toDate()?.let { " · " + android.text.format.DateFormat.format("HH:mm", it) } ?: ""),
-                fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp),
+                fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
@@ -566,14 +566,14 @@ private fun CommentComposer(onSend: (String) -> Unit, startOpen: Boolean = false
     if (!open) {
         Text(
             "코멘트 남기기",
-            fontSize = 14.sp, color = Palette.TextSoft,
+            fontSize = 15.sp, color = Palette.TextSoft,
             modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp),
         )
     } else {
         Row(Modifier.padding(top = 8.dp, start = 10.dp, end = 24.dp).speechBubble(), verticalAlignment = Alignment.CenterVertically) {
             TextField(
-                text, { text = it }, placeholder = { Text("여기서 뭐 먹을까?", fontSize = 16.sp) }, singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp),
+                text, { text = it }, placeholder = { Text("여기서 뭐 먹을까?", fontSize = 17.sp) }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
                 colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                 modifier = Modifier.weight(1f).focusRequester(focus),
@@ -599,12 +599,12 @@ private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, on
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (r.note.isNotBlank()) Text(r.note, fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
+            if (r.note.isNotBlank()) Text(r.note, fontSize = 16.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
             if (!locked && editable) {
-                TextButton(onClick = onAddPhoto, enabled = r.photoUrls.size < 10) { Text(if (r.photoUrls.isEmpty()) "사진" else "사진 ${r.photoUrls.size}/10", fontSize = 13.sp, color = Palette.Navy) }
-                TextButton(onClick = onNote) { Text(if (r.note.isBlank()) "한 줄" else "한 줄 고치기", fontSize = 13.sp, color = Palette.Navy) }
+                TextButton(onClick = onAddPhoto, enabled = r.photoUrls.size < 10) { Text(if (r.photoUrls.isEmpty()) "사진" else "사진 ${r.photoUrls.size}/10", fontSize = 15.sp, color = Palette.Navy) }
+                TextButton(onClick = onNote) { Text(if (r.note.isBlank()) "한 줄" else "한 줄 고치기", fontSize = 15.sp, color = Palette.Navy) }
             }
-            r.leftAt?.let { Text("떠남 ${hhmm(it)}", fontSize = 12.sp, color = Palette.TextSoft) }
+            r.leftAt?.let { Text("떠남 ${hhmm(it)}", fontSize = 14.sp, color = Palette.TextSoft) }
         }
     }
 }
@@ -626,21 +626,21 @@ private fun UnplannedRow(
             ) {
                 Column(Modifier.width(68.dp)) {
                     Text(record.arrivedAt?.let { hhmm(it) } ?: "—", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                    Text("계획 밖", fontSize = 11.sp, color = Palette.TextSoft)
+                    Text("계획 밖", fontSize = 13.sp, color = Palette.TextSoft)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(record.place.name.ifBlank { "이름 없는 곳" }, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                    Text(listOfNotNull(record.place.address.takeIf { it.isNotBlank() && it != record.place.name }, if (!locked) "눌러서 장소 바꾸기" else null).joinToString("  ·  "), fontSize = 13.sp, color = Palette.TextSoft)
+                    Text(listOfNotNull(record.place.address.takeIf { it.isNotBlank() && it != record.place.name }, if (!locked) "눌러서 장소 바꾸기" else null).joinToString("  ·  "), fontSize = 15.sp, color = Palette.TextSoft)
                 }
             }
             var open by rememberSaveable(record.id) { mutableStateOf(false) }
             RecordStrip(record, locked, editable = open, onAddPhoto = onAddPhoto, onRemovePhoto = onRemovePhoto, onNote = onNote)
             (if (open) comments else comments.takeLast(1)).forEach { c -> Bubble(c, nameOf) }
             if (!open) {
-                if (!locked) Text("코멘트 남기기", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
+                if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
             } else {
                 if (!locked) CommentComposer(onSend = onSendComment, startOpen = true)
-                TextButton(onClick = { open = false }, modifier = Modifier.padding(start = 4.dp)) { Text("접기", fontSize = 13.sp, color = Palette.TextSoft) }
+                TextButton(onClick = { open = false }, modifier = Modifier.padding(start = 4.dp)) { Text("접기", fontSize = 15.sp, color = Palette.TextSoft) }
             }
             Spacer(Modifier.height(10.dp))
         }
@@ -655,8 +655,8 @@ private fun NoteDialog(title: String = "한 줄", hint: String = "짧게 한 줄
             Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             TextField(text, { text = it }, placeholder = { Text(hint, fontSize = 17.sp) }, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft, fontSize = 16.sp) }
-                Button(onClick = { onSave(text) }, enabled = text.isNotBlank() || initial.isNotBlank(), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장", fontSize = 16.sp) }
+                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft, fontSize = 17.sp) }
+                Button(onClick = { onSave(text) }, enabled = text.isNotBlank() || initial.isNotBlank(), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장", fontSize = 17.sp) }
             }
         }
     }
@@ -673,7 +673,7 @@ private fun LegLabel(leg: LegInfo?, driving: Boolean) {
             leg.exact -> "이동 ${minutes(leg.seconds)} · ${km(leg.meters)}"
             else -> "이동 약 ${minutes(leg.seconds)} · ${km(leg.meters)} (직선)"
         },
-        fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 4.dp),
+        fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 4.dp),
     )
 }
 
@@ -712,8 +712,8 @@ private fun DateTab(date: String, dayNo: Int, selected: Boolean, onClick: () -> 
     val d = LocalDate.parse(date)
     // Underline tabs like the system settings pages: text only, a 2dp bar under the selected one.
     Column(Modifier.clickable(onClick = onClick).padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("${dayNo}일차", fontSize = 11.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
-        Text("${d.monthValue}/${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (selected) Palette.TextStrong else Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
+        Text("${dayNo}일차", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+        Text("${d.monthValue}/${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = if (selected) Palette.TextStrong else Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
         Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) Palette.TextStrong else Color.Transparent))
     }
 }

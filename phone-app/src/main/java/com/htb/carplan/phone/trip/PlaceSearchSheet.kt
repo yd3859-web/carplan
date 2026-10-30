@@ -134,7 +134,7 @@ fun PlaceSearchSheet(
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("근처 추천", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp))
+                Text("근처 추천", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp))
                 RECOMMEND.forEach { c ->
                     FilterChip(
                         selected = activeCategory == c,
@@ -148,7 +148,7 @@ fun PlaceSearchSheet(
                                 askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                             }
                         },
-                        label = { Text(c.label, fontSize = 16.sp) },
+                        label = { Text(c.label, fontSize = 17.sp) },
                         shape = Corner, colors = com.htb.carplan.phone.ui.inkChipColors(),
                     )
                 }
@@ -156,11 +156,11 @@ fun PlaceSearchSheet(
             if (!hasKey) {
                 Text(
                     "카카오 REST 키가 없어서 검색이 꺼져 있어요. 이름을 쓰고 아래 버튼을 누르면 이름만 저장돼요(좌표는 나중에 검색으로 채움).",
-                    fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp),
                 )
             }
-            message?.let { Text(it, fontSize = 13.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 8.dp)) }
-            if (loading) Text("찾는 중…", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+            message?.let { Text(it, fontSize = 15.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 8.dp)) }
+            if (loading) Text("찾는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
 
             LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
                 items(results, key = { it.kakaoId ?: it.name + it.lat }) { p -> PlaceRow(p) { onPick(p) } }
@@ -181,7 +181,7 @@ private fun PlaceRow(p: Place, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
     ) {
         Text(p.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-        if (p.address.isNotBlank()) Text(p.address, fontSize = 14.sp, color = Palette.TextSoft)
+        if (p.address.isNotBlank()) Text(p.address, fontSize = 15.sp, color = Palette.TextSoft)
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))
     }
 }

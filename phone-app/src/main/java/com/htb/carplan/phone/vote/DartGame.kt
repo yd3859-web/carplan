@@ -117,7 +117,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                     IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "닫기", tint = Palette.TextStrong) }
                     Column(Modifier.weight(1f)) {
                         Text("다트 — 동네 뽑기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                        Text("다트를 아래로 당겼다 놓으세요. 꽂힌 곳에서 가장 가까운 동네가 뽑혀요", fontSize = 14.sp, color = Palette.TextSoft)
+                        Text("다트를 아래로 당겼다 놓으세요. 꽂힌 곳에서 가장 가까운 동네가 뽑혀요", fontSize = 15.sp, color = Palette.TextSoft)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
@@ -132,7 +132,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                 if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Regions.sidoNames.forEach { s -> ScopeChip(s.removeSuffix("특별자치도").removeSuffix("특별자치시").removeSuffix("광역시").removeSuffix("특별시").removeSuffix("도").ifBlank { s }, region == s) { region = s } }
                 }
-                if (scope == DartScope.NEAR && here == null) Text("위치를 아직 몰라서 전국으로 보여 줘요", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(horizontal = 20.dp))
+                if (scope == DartScope.NEAR && here == null) Text("위치를 아직 몰라서 전국으로 보여 줘요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(horizontal = 20.dp))
                 HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 6.dp))
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -153,17 +153,17 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                             Modifier.widthIn(max = 420.dp).background(Palette.Background, Corner).border(1.dp, Palette.SheetEdge, Corner).padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(d.resultName.split(" ").first(), fontSize = 15.sp, color = Palette.TextSoft)
+                            Text(d.resultName.split(" ").first(), fontSize = 16.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
-                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == me) "내가 던짐" else "${nameOf(d.thrownBy)}님이 던짐"}", fontSize = 15.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
+                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == me) "내가 던짐" else "${nameOf(d.thrownBy)}님이 던짐"}", fontSize = 16.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
                             if (eventId != null) Button(
                                 onClick = { vm.addDartAsStop(d) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
                                 modifier = Modifier.padding(top = 12.dp).fillMaxWidth().height(50.dp),
                             ) { Text("이 동네를 여행 칸으로", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
-                            Text("마음에 안 들면 다시 당겨서 던지세요", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+                            Text("마음에 안 들면 다시 당겨서 던지세요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
                         }
                     }
-                    message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
+                    message?.let { Text(it, color = Palette.Teal, fontSize = 16.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
                 }
             }
         }
@@ -172,7 +172,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
 
 @Composable
 private fun ScopeChip(label: String, selected: Boolean, onClick: () -> Unit) = FilterChip(
-    selected = selected, onClick = onClick, shape = Corner, label = { Text(label, fontSize = 15.sp) },
+    selected = selected, onClick = onClick, shape = Corner, label = { Text(label, fontSize = 16.sp) },
     colors = com.htb.carplan.phone.ui.inkChipColors(),
 )
 
@@ -323,7 +323,7 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             }
             // NEAR scope: the 100 km circle
             // names
-            val big = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Palette.TextSoft)
+            val big = androidx.compose.ui.text.TextStyle(fontSize = 16.sp, color = Palette.TextSoft)
             if (detail < 1f) sidoLabels.forEach { l ->
                 val p = toScreen(l.lat, l.lng)
                 if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
@@ -336,7 +336,7 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                 sggLabels.forEach { l ->
                     val p = toScreen(l.lat, l.lng)
                     if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
-                    val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.ChipText.copy(alpha = detail)))
+                    val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.ChipText.copy(alpha = detail)))
                     drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
                 }
                 val st = stuck

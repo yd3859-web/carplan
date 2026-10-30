@@ -75,7 +75,7 @@ fun StopEditSheet(
                             !p.hasCoords() -> "좌표 없음 · 카카오 검색으로 바꾸면 내비에 바로 들어가요"
                             else -> null
                         }
-                        sub?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft) }
+                        sub?.let { Text(it, fontSize = 15.sp, color = Palette.TextSoft) }
                     }
                 }
             }
@@ -83,7 +83,7 @@ fun StopEditSheet(
             Field(label = "도착 시각 (선택)", modifier = Modifier.padding(top = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { timePicker = true }) { Text(time ?: "시간 정하기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
-                    if (time != null) TextButton(onClick = { time = null }) { Text("지우기", color = Palette.TextSoft, fontSize = 16.sp) }
+                    if (time != null) TextButton(onClick = { time = null }) { Text("지우기", color = Palette.TextSoft, fontSize = 17.sp) }
                 }
             }
 
@@ -106,7 +106,7 @@ fun StopEditSheet(
             ) { Text(if (existing == null) "칸 추가" else "저장", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
             if (onVote != null && existing != null && place != null) {
                 TextButton(onClick = { onVote(place!!) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                    Text("이 장소로 투표 열기", color = Palette.TextSoft, fontSize = 16.sp)
+                    Text("이 장소로 투표 열기", color = Palette.TextSoft, fontSize = 17.sp)
                 }
             }
         }
@@ -139,7 +139,7 @@ fun StopEditSheet(
 @Composable
 private fun Field(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(modifier) {
-        Text(label, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 6.dp))
+        Text(label, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 6.dp))
         content()
     }
 }

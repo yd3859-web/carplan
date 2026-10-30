@@ -50,8 +50,8 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-private val RAIL_W = 40.dp
-private val NODE = 22.dp
+private val RAIL_W = 48.dp
+private val NODE = 26.dp
 
 /**
  * 그날 동선: the day on one rail (same drawing as the trip editor). A trip shows its stops as
@@ -77,10 +77,10 @@ fun DayRoutePanel(
     Column(modifier.padding(20.dp)) {
         Text(dayTitle(date), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
         val sub = listOfNotNull(if (date == LocalDate.now()) "오늘" else null, KoreanHolidays.nameOf(date)).joinToString(" · ")
-        if (sub.isNotEmpty()) Text(sub, fontSize = 15.sp, color = Palette.TextSoft)
+        if (sub.isNotEmpty()) Text(sub, fontSize = 16.sp, color = Palette.TextSoft)
 
         LazyColumn(Modifier.weight(1f).padding(top = 16.dp)) {
-            if (events.isEmpty()) item { Text("이날은 일정이 없어요", color = Palette.TextSoft, fontSize = 16.sp) }
+            if (events.isEmpty()) item { Text("이날은 일정이 없어요", color = Palette.TextSoft, fontSize = 17.sp) }
             items(trips, key = { "trip-" + it.groupId + it.event.id }) { trip ->
                 TripRail(
                     trip = trip,
@@ -121,11 +121,11 @@ private fun TripRail(trip: CalendarEvent, stops: List<Stop>, comments: List<Comm
             Text(trip.event.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             Text(
                 when (day?.status) { DayStatus.DRIVING -> "가는 중 · 편집"; DayStatus.DONE -> "다녀옴 · 편집"; else -> "편집" },
-                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal,
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal,
             )
         }
         if (stops.isEmpty()) {
-            Text("이날 장소 칸이 아직 없어요 · 눌러서 짜기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 11.dp))
+            Text("이날 장소 칸이 아직 없어요 · 눌러서 짜기", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 11.dp))
         }
         stops.forEachIndexed { i, s ->
             val next = stops.getOrNull(i + 1)
@@ -137,16 +137,16 @@ private fun TripRail(trip: CalendarEvent, stops: List<Stop>, comments: List<Comm
                 ) { RailNode(nodeState(s.visited, s.id == nextId), NODE, Modifier.padding(top = 2.dp)) }
                 Column(Modifier.weight(1f).padding(bottom = if (i < stops.lastIndex) 10.dp else 0.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        s.time?.let { Text(it, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (s.visited) Palette.TextSoft else Palette.ChipText, modifier = Modifier.width(52.dp)) }
-                        Text(s.place.name, fontSize = 17.sp, fontWeight = if (s.id == nextId) FontWeight.Bold else FontWeight.Normal, color = if (s.visited) Palette.TextSoft else Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                        if (s.id == nextId) Text("  다음", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
+                        s.time?.let { Text(it, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = if (s.visited) Palette.TextSoft else Palette.ChipText, modifier = Modifier.width(60.dp)) }
+                        Text(s.place.name, fontSize = 19.sp, fontWeight = if (s.id == nextId) FontWeight.Bold else FontWeight.Normal, color = if (s.visited) Palette.TextSoft else Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        if (s.id == nextId) Text("  다음", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
                     }
                     if (s.memo.isNotBlank()) {
                         val (tag, rest) = com.htb.carplan.shared.calendar.StopMemo.split(s.memo)
-                        Text(listOfNotNull(tag, rest.ifBlank { null }).joinToString("  "), fontSize = 14.sp, color = if (tag != null && rest.isBlank()) Palette.TextSoft else Palette.ChipText, modifier = Modifier.padding(start = if (s.time != null) 52.dp else 0.dp))
+                        Text(listOfNotNull(tag, rest.ifBlank { null }).joinToString("  "), fontSize = 15.sp, color = if (tag != null && rest.isBlank()) Palette.TextSoft else Palette.ChipText, modifier = Modifier.padding(start = if (s.time != null) 52.dp else 0.dp))
                     }
                     comments.lastOrNull { it.stopId == s.id }?.let { c ->
-                        Text(c.text, fontSize = 14.sp, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, end = 12.dp).speechBubble().padding(horizontal = 10.dp, vertical = 6.dp))
+                        Text(c.text, fontSize = 15.sp, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, end = 12.dp).speechBubble().padding(horizontal = 10.dp, vertical = 6.dp))
                     }
                 }
             }
@@ -161,7 +161,7 @@ private fun AllDayRow(item: CalendarEvent, categories: List<CustomCategory>) {
         Box(Modifier.width(3.dp).height(16.dp).background(color))
         Spacer(Modifier.width(8.dp))
         Text(item.event.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-        Text("하루 종일", fontSize = 14.sp, color = Palette.TextSoft)
+        Text("하루 종일", fontSize = 15.sp, color = Palette.TextSoft)
     }
 }
 
@@ -176,7 +176,7 @@ private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isF
         ) { RailNode(NodeState.PLANNED, NODE, Modifier.padding(top = 2.dp), halo = false) }
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 0.dp else 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(e.startTime ?: "종일", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.ChipText, modifier = Modifier.width(52.dp))
+                Text(e.startTime ?: "종일", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.ChipText, modifier = Modifier.width(52.dp))
                 Text(e.place?.name?.takeIf { it.isNotBlank() } ?: e.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             }
             val meta = listOfNotNull(
@@ -185,9 +185,9 @@ private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isF
                 e.reminderMinutes?.let { "알림 ${reminderLabel(it)}" },
                 if (drive) "차로 이동" else null,
             ).joinToString("  ·  ")
-            Text(meta, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 52.dp))
-            if (e.memo.isNotBlank()) Text(e.memo, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(start = 52.dp, top = 2.dp))
-            e.checklist.forEach { c -> Text((if (c.done) "✓ " else "– ") + c.text, fontSize = 15.sp, color = if (c.done) Palette.TextSoft else Palette.ChipText, modifier = Modifier.padding(start = 52.dp)) }
+            Text(meta, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 52.dp))
+            if (e.memo.isNotBlank()) Text(e.memo, fontSize = 16.sp, color = Palette.ChipText, modifier = Modifier.padding(start = 52.dp, top = 2.dp))
+            e.checklist.forEach { c -> Text((if (c.done) "✓ " else "– ") + c.text, fontSize = 16.sp, color = if (c.done) Palette.TextSoft else Palette.ChipText, modifier = Modifier.padding(start = 52.dp)) }
         }
     }
 }

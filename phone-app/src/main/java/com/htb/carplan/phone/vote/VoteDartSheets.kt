@@ -87,10 +87,10 @@ fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String)
                 Text("투표", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
                 TextButton(onClick = { creating = !creating }) { Text(if (creating) "목록" else "새 투표", color = Palette.Navy) }
             }
-            message?.let { Text(it, color = Palette.Teal, fontSize = 14.sp, modifier = Modifier.clickable { vm.message.value = null }) }
+            message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
             if (creating) NewVote(onPickPlace = onPickPlace, seed = seed) { q, opts, places -> vm.create(q, opts, places); creating = false }
             else {
-                if (votes.isEmpty()) Text("아직 투표가 없어요", color = Palette.TextSoft, fontSize = 15.sp, modifier = Modifier.padding(vertical = 10.dp))
+                if (votes.isEmpty()) Text("아직 투표가 없어요", color = Palette.TextSoft, fontSize = 16.sp, modifier = Modifier.padding(vertical = 10.dp))
                 votes.forEach { v -> VoteCard(v, me, group?.memberIds?.size ?: 1, isOwner = group?.ownerUid == me || v.createdBy == me, nameOf, onCast = { vm.cast(v.id, it) }, onClose = { vm.close(v.id) }, onAddStop = { vm.addWinnerAsStop(it) }, canAddStop = eventId != null) }
             }
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("닫기", color = Palette.TextSoft) } }
@@ -109,7 +109,7 @@ private fun NewVote(onPickPlace: ((Place) -> Unit) -> Unit, seed: Place? = null,
         options.forEachIndexed { i, o ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(o, { options[i] = it }, placeholder = { Text("후보 ${i + 1}") }, singleLine = true, shape = Corner, modifier = Modifier.weight(1f))
-                OutlinedButton(onClick = { onPickPlace { p -> places[i] = p; options[i] = p.name } }, shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text(if (places[i] != null) "장소 ✓" else "장소", color = Palette.Navy, fontSize = 13.sp) }
+                OutlinedButton(onClick = { onPickPlace { p -> places[i] = p; options[i] = p.name } }, shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text(if (places[i] != null) "장소 ✓" else "장소", color = Palette.Navy, fontSize = 15.sp) }
             }
         }
         Row {
@@ -117,7 +117,7 @@ private fun NewVote(onPickPlace: ((Place) -> Unit) -> Unit, seed: Place? = null,
             Spacer(Modifier.weight(1f))
             Button(onClick = { onCreate(question, options.filter { it.isNotBlank() }, places.filterIndexed { i, _ -> options[i].isNotBlank() }) }, enabled = options.count { it.isNotBlank() } >= 2, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("투표 열기") }
         }
-        Text("과반이 나오면 바로 마감, 다 찍으면 최다 득표로 마감(동점은 둘 다). 후보가 장소면 이긴 곳을 칸으로 넣을 수 있어요.", fontSize = 13.sp, color = Palette.TextSoft)
+        Text("과반이 나오면 바로 마감, 다 찍으면 최다 득표로 마감(동점은 둘 다). 후보가 장소면 이긴 곳을 칸으로 넣을 수 있어요.", fontSize = 15.sp, color = Palette.TextSoft)
     }
 }
 
@@ -129,7 +129,7 @@ private fun VoteCard(v: Vote, me: String?, members: Int, isOwner: Boolean, nameO
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(v.question, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            Text(if (open) "${v.ballots.size}/$members 투표" else "마감", fontSize = 13.sp, color = if (open) Palette.Teal else Palette.TextSoft)
+            Text(if (open) "${v.ballots.size}/$members 투표" else "마감", fontSize = 15.sp, color = if (open) Palette.Teal else Palette.TextSoft)
         }
         v.options.forEachIndexed { i, o ->
             val won = i in v.winners
@@ -138,13 +138,13 @@ private fun VoteCard(v: Vote, me: String?, members: Int, isOwner: Boolean, nameO
                     .clickable(enabled = open) { onCast(i) }.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(o + if (won) "  · 당선" else "", fontSize = 16.sp, fontWeight = if (won || mine == i) FontWeight.Bold else FontWeight.Normal, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-                Text("${counts[i]}표", fontSize = 14.sp, color = Palette.TextSoft)
-                if (won && canAddStop && v.places.getOrNull(i) != null) TextButton(onClick = { onAddStop(v.places[i]!!) }) { Text("칸으로", color = Palette.Navy, fontSize = 13.sp) }
+                Text(o + if (won) "  · 당선" else "", fontSize = 17.sp, fontWeight = if (won || mine == i) FontWeight.Bold else FontWeight.Normal, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                Text("${counts[i]}표", fontSize = 15.sp, color = Palette.TextSoft)
+                if (won && canAddStop && v.places.getOrNull(i) != null) TextButton(onClick = { onAddStop(v.places[i]!!) }) { Text("칸으로", color = Palette.Navy, fontSize = 15.sp) }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            if (open && isOwner) TextButton(onClick = onClose) { Text("지금 마감", color = Palette.TextSoft, fontSize = 13.sp) }
+            if (open && isOwner) TextButton(onClick = onClose) { Text("지금 마감", color = Palette.TextSoft, fontSize = 15.sp) }
         }
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 6.dp))
     }

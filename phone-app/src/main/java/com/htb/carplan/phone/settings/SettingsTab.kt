@@ -129,7 +129,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 18.dp, bottom = 12.dp))
-        message?.let { Text(it, color = Palette.Sunday, fontSize = 13.sp) }
+        message?.let { Text(it, color = Palette.Sunday, fontSize = 15.sp) }
 
         Section("내 정보")
         SettingRow("이름", me?.name ?: "…", action = "바꾸기") { renaming = true }
@@ -139,19 +139,19 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("일정 알림", fontSize = 17.sp, color = Palette.TextStrong)
-                Text("일정에 [알림]을 넣으면 그 시간에 폰이 알려 줘요 (2주 안의 일정)", fontSize = 13.sp, color = Palette.TextSoft)
+                Text("일정에 [알림]을 넣으면 그 시간에 폰이 알려 줘요 (2주 안의 일정)", fontSize = 15.sp, color = Palette.TextSoft)
             }
             Switch(reminders, onCheckedChange = { on -> reminders = on; Reminders.setEnabled(context, on, upcoming) },
                 colors = SwitchDefaults.colors(checkedTrackColor = Palette.Navy, checkedThumbColor = Palette.Background))
         }
-        Text("그룹 알림(칸 뺌·투표·도착·픽업)은 서버에서 보내요. 폰의 알림 권한이 꺼져 있으면 시스템 설정에서 켜 주세요.", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
+        Text("그룹 알림(칸 뺌·투표·도착·픽업)은 서버에서 보내요. 폰의 알림 권한이 꺼져 있으면 시스템 설정에서 켜 주세요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
 
         Section("캘린더")
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("구글 캘린더 같이 보기", fontSize = 17.sp, color = Palette.TextStrong)
-                Text("구글 일정이 \"구글\" 카테고리로 같이 보여요. 읽기만 하고, 우리 일정을 구글로 보내진 않아요.", fontSize = 13.sp, color = Palette.TextSoft)
-                googleStatus?.let { Text(it, fontSize = 13.sp, color = Palette.Sunday) }
+                Text("구글 일정이 \"구글\" 카테고리로 같이 보여요. 읽기만 하고, 우리 일정을 구글로 보내진 않아요.", fontSize = 15.sp, color = Palette.TextSoft)
+                googleStatus?.let { Text(it, fontSize = 15.sp, color = Palette.Sunday) }
             }
             Switch(googleCal, onCheckedChange = { on -> if (on) turnOnGoogle() else { googleCal = false; GoogleCalendar.setEnabled(context, false) } },
                 colors = SwitchDefaults.colors(checkedTrackColor = Palette.Navy, checkedThumbColor = Palette.Background))
@@ -159,16 +159,16 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("차")
         val c = car
-        if (c == null) Text("아직 연결된 차가 없어요. 차량 탭에서 차 화면의 6자리 코드를 넣으면 연결돼요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(vertical = 8.dp))
+        if (c == null) Text("아직 연결된 차가 없어요. 차량 탭에서 차 화면의 6자리 코드를 넣으면 연결돼요.", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(vertical = 8.dp))
         else {
             SettingRow("연결된 차", if (c.ownerUid == session?.uid) "내 차 (차주)" else "다른 사람 차")
             Text("주유·충전 알림 기준", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 8.dp))
-            Text("연료(배터리)가 이 아래로 내려가면 차가 \"주유소 들를까요?\" 하고 물어요. 안내 중엔 남은 경로 + 30km 기준이 먼저.", fontSize = 13.sp, color = Palette.TextSoft)
+            Text("연료(배터리)가 이 아래로 내려가면 차가 \"주유소 들를까요?\" 하고 물어요. 안내 중엔 남은 경로 + 30km 기준이 먼저.", fontSize = 15.sp, color = Palette.TextSoft)
             Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(10, 15, 20, 30).forEach { p ->
                     val on = c.fuelAlertPercent == p
                     Text(
-                        "$p%", fontSize = 15.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                        "$p%", fontSize = 16.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
                         color = if (on) Palette.Background else Palette.TextStrong,
                         modifier = Modifier.border(1.dp, if (on) Palette.Navy else Palette.Line, Corner)
                             .then(if (on) Modifier.background(Palette.Navy, Corner) else Modifier)
@@ -185,7 +185,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("앱")
         SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
-        Text("캘린더에 쓴 일정이 차를 움직인다 · Pleos Connect 공모전", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp, bottom = 32.dp))
+        Text("캘린더에 쓴 일정이 차를 움직인다 · Pleos Connect 공모전", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp, bottom = 32.dp))
     }
 
     if (renaming) RenameSheet(me?.name.orEmpty(), onDone = { vm.rename(it); renaming = false }, onDismiss = { renaming = false })
@@ -194,16 +194,16 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 @Composable
 private fun Section(title: String) {
     HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))
-    Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+    Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
 }
 
 @Composable
 private fun SettingRow(label: String, value: String, hint: String? = null, action: String? = null, onAction: () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(label, fontSize = 13.sp, color = Palette.TextSoft)
+            Text(label, fontSize = 15.sp, color = Palette.TextSoft)
             Text(value, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-            hint?.let { Text(it, fontSize = 13.sp, color = Palette.TextSoft) }
+            hint?.let { Text(it, fontSize = 15.sp, color = Palette.TextSoft) }
         }
         action?.let { TextButton(onClick = onAction) { Text(it, color = Palette.TextStrong) } }
     }
@@ -215,7 +215,7 @@ private fun RenameSheet(current: String, onDone: (String) -> Unit, onDismiss: ()
     CenterSheet(onDismiss = onDismiss) {
         Column {
             Text("이름 바꾸기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            Text("그룹 멤버와 차 화면에 이렇게 보여요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
+            Text("그룹 멤버와 차 화면에 이렇게 보여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
             OutlinedTextField(name, { name = it.take(20) }, singleLine = true, shape = Corner, modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft) }

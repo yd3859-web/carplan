@@ -36,21 +36,21 @@ fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Mod
         .minByOrNull { it.event.startDate }
 
     Column(modifier.fillMaxWidth().padding(top = 8.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("오늘  ${dayTitle(today)}", color = Palette.TextSoft, fontSize = 15.sp)
+        Text("오늘  ${dayTitle(today)}", color = Palette.TextSoft, fontSize = 16.sp)
         if (next != null) {
             val e = next.event
             Row(verticalAlignment = Alignment.Bottom) {
-                Text("다음", color = Palette.Teal, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp, bottom = 5.dp))
+                Text("다음", color = Palette.Teal, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp, bottom = 5.dp))
                 Text(e.place?.name?.takeIf { it.isNotBlank() } ?: e.title, color = Palette.TextStrong, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
                 e.startTime?.let { Text("  $it", color = Palette.TextStrong, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 3.dp)) }
             }
-            if (e.place != null && e.title != e.place?.name) Text(e.title, color = Palette.TextSoft, fontSize = 15.sp)
+            if (e.place != null && e.title != e.place?.name) Text(e.title, color = Palette.TextSoft, fontSize = 16.sp)
         } else {
             Text("오늘은 차로 갈 일정이 없어요", color = Palette.TextStrong, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
         }
         Text(
             listOfNotNull(carLine(car), care?.let { careLine(it, today) }).joinToString("    ·    "),
-            color = Palette.ChipText, fontSize = 15.sp,
+            color = Palette.ChipText, fontSize = 16.sp,
         )
     }
     HorizontalDivider(color = Palette.Line)
