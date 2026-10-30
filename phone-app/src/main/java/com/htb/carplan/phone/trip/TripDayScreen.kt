@@ -443,7 +443,7 @@ private fun TimelineStop(
             drawAbove = index > 0,
         )
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
-            StopBox(stop, state, estimate, editedBy, dragging, locked, onOpen, onRemove, onTimeTap, record)
+            StopBox(stop, state, estimate, editedBy, dragging, locked, { open = !open }, onRemove, onTimeTap, record)
             record?.let { r -> RecordStrip(r, locked, editable = open, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }) }
             val shownComments = if (open) comments else comments.takeLast(1)
             shownComments.forEach { c -> Bubble(c, nameOf) }
@@ -456,7 +456,10 @@ private fun TimelineStop(
                 }
             } else {
                 if (!locked) CommentComposer(onSend = onSendComment, startOpen = true)
-                TextButton(onClick = { open = false }, modifier = Modifier.padding(start = 4.dp)) { Text("접기", fontSize = 13.sp, color = Palette.TextSoft) }
+                Row {
+                    if (!locked) TextButton(onClick = onOpen) { Text("장소·시간·메모 고치기", fontSize = 13.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                    TextButton(onClick = { open = false }) { Text("접기", fontSize = 13.sp, color = Palette.TextSoft) }
+                }
             }
             if (!isLast) LegLabel(leg, driving = state == NodeState.NEXT && false)
         }

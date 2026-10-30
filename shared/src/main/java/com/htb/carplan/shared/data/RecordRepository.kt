@@ -47,6 +47,11 @@ class RecordRepository(
             .firstOrNull { com.htb.carplan.shared.calendar.RouteMath.metersBetween(lat, lng, it.place.lat, it.place.lng) <= meters }
     }
 
+    /** 기록 탭 일기장 카드: one read of a day's records (places, first photo, first note). */
+    suspend fun daySummary(groupId: String, eventId: String, date: String): List<Record> =
+        db.collection(FirestorePaths.records(groupId, eventId, date)).get().await().toObjects(Record::class.java)
+            .sortedBy { it.arrivedAt?.toDate()?.time ?: 0L }
+
     /** The car pulled away (P → D): close the newest open record (13장 9). */
     suspend fun markLeft(groupId: String, eventId: String, date: String, recordId: String) {
         db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("leftAt", Timestamp.now()).await()

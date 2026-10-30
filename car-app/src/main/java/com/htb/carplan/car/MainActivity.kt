@@ -166,6 +166,7 @@ private fun CarHome(vm: CarHomeViewModel) {
             HorizontalDivider(color = Line)
         }
         val forceSplit by vm.previewSplit.collectAsStateWithLifecycle()
+        val nextComment by vm.nextComment.collectAsStateWithLifecycle()
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // Two shapes (정원 2026-10-30): alone → wide; next to the navigation (half the app area) → the day's timeline, big.
             val wide = maxWidth >= 1100.dp
@@ -178,7 +179,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
                     if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
-                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted,
+                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment,
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
                         onNavi = { vm.openNavigation() },
                         onMore = { more = true },
@@ -264,7 +265,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
  * thing to do next — where, when, one huge button. Everything else lives behind [더보기] (parked only).
  */
 @Composable
-private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
+private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
     val todayEvents = vm.eventsOn(today, week)
     val others = todayEvents.filter { it.event.id != trip?.eventId }
     val nextName = trip?.next?.place?.name ?: next?.event?.place?.name
@@ -302,6 +303,16 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             Text(nextName ?: "갈 곳이 없어요", color = if (nextName != null) Accent else Soft, fontSize = 44.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
             listOfNotNull(nextTime?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+            trip?.next?.memo?.let { com.htb.carplan.shared.calendar.StopMemo.split(it).second }?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp), maxLines = 2)
+            }
+            // What the group said about this place — the thing the driver can't look up while driving.
+            comment?.let { (who, text) ->
+                Column(Modifier.padding(top = 18.dp).fillMaxWidth().border(1.dp, Line, Corner).padding(16.dp)) {
+                    Text("“$text”", color = Ink, fontSize = 24.sp, maxLines = 3)
+                    Text(who, color = Soft, fontSize = 17.sp, modifier = Modifier.padding(top = 4.dp))
+                }
             }
             Spacer(Modifier.weight(1f))
             later?.let { (d, item) ->

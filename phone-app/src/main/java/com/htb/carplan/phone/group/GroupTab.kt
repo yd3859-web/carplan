@@ -187,8 +187,9 @@ private fun GroupRow(g: Group, who: String, tripLine: String?, onClick: () -> Un
         Column(Modifier.weight(1f)) {
             Text(g.name, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             Text(who, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
+            tripLine?.let { Text(it, fontSize = 15.sp, color = if (it.startsWith("다음")) Palette.Teal else Palette.TextSoft, fontWeight = if (it.startsWith("다음")) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(top = 4.dp)) }
         }
-        tripLine?.let { Text(it, fontSize = 14.sp, color = if (it.startsWith("다음")) Palette.Teal else Palette.TextSoft, fontWeight = if (it.startsWith("다음")) FontWeight.SemiBold else FontWeight.Normal) }
+        Text("›", fontSize = 22.sp, color = Palette.TextSoft)
     }
     HorizontalDivider(color = Palette.Line)
 }

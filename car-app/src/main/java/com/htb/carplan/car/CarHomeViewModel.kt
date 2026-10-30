@@ -57,6 +57,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val notice: StateFlow<String?> = navigator.notice
     /** 주행 화면 data (next turn, remaining, position). */
     val live: StateFlow<NaviLive> = navigator.live
+    /** The newest comment on the next stop ("여기 주차 어렵대") — shown under "다음" on the car. */
+    val nextComment: StateFlow<Pair<String, String>?> = trip.flatMapLatest { t ->
+        if (t == null) flowOf(null)
+        else com.htb.carplan.shared.data.TripRepository().observeDayComments(t.groupId, t.eventId, t.date)
+            .map { list -> t.next?.id?.let { id -> list.filter { it.stopId == id }.maxByOrNull { it.createdAt?.toDate()?.time ?: 0L } } }
+            .map { c -> c?.let { (commenterNames[it.uid] ?: loadName(it.uid)) to it.text } }
+    }.catch { emit(null) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    private val commenterNames = HashMap<String, String>()
+    private suspend fun loadName(uid: String): String =
+        runCatching { GroupRepository().user(uid)?.name }.getOrNull()?.ifBlank { null }?.also { commenterNames[uid] = it } ?: "일행"
+
     /** 시연 메뉴: draw the half-width (next to the navigation) layout even on the full app area. */
     val previewSplit = MutableStateFlow(false)
     val stations = navigator.stations

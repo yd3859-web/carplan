@@ -119,7 +119,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             // The month fills the height: week rows share the space left under the header (like the system calendar).
             Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 16.dp)) {
                 Spacer(Modifier.height(12.dp))
-                TodayCard(upcoming, car)
+                TodayCard(upcoming, car, todayStops = if (selected == java.time.LocalDate.now()) tripStops else emptyMap())
                 commute?.let { sg ->
                     // 16장 Q45: the records found a routine — one tap makes it a repeating 출퇴근 event.
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
