@@ -85,6 +85,7 @@
 <tr><td>그날 동선 (<code>DayRoutePanel</code>)</td><td>그날 일정을 <b>레일</b>로. 여행이면 장소 칸들이 노드로, 코멘트는 최근 1개</td></tr>
 <tr><td>빠른 입력 (<code>QuickAddSheet</code>)</td><td>가운데 대화창. "무슨 일정이에요?" + 칩: [장소] [날짜/반복] [알림] [메모] [체크리스트] [카테고리] [그룹]. 여행 카테고리면 날짜 범위 → 여행 하나가 생기고 날짜별 칸은 레일에서</td></tr>
 <tr><td>카테고리 (<code>CategorySheet</code>)</td><td>기본 3개(여행·차량 관리·다른 일정) 고정 색 + 사용자 추가는 8색. <code>users/{uid}/categories</code></td></tr>
+<tr><td>구글 캘린더 (<code>GoogleCalendar.kt</code>)</td><td>설정 탭에서 켜면 구글 일정이 "구글" 카테고리로 같이 보임(읽기만, 폰 메모리에만, 차는 못 봄)</td></tr>
 <tr><td>일정 알림 (<code>push/Reminders.kt</code>)</td><td>[알림] 칩 "n분 전" → 폰 로컬 알람(AlarmManager)으로 실제 울림. 캘린더가 열릴 때마다 2주 안의 일정(반복 포함)을 다시 예약. 하루 종일 일정은 09:00 기준</td></tr>
 </table>
 <p><b>디자인 규칙</b>: 흰 바탕·검정 글자, 둥근 카드 대신 얇은 구분선, 모서리 4dp, 강조색은 파랑 하나(차가 가는 곳), 이모지 없음, 입력 창은 전부 화면 가운데(바텀 시트 금지 — 차에서 손이 안 닿음).</p>
@@ -246,7 +247,6 @@ groups/{gid}                     이름, memberIds[], ownerUid(그룹장), invit
 <tr><td>release APK</td><td>Claude (팀명 필요)</td><td><code>apk/팀명_carplan_release.apk</code>, 심사용 README</td></tr>
 <tr><td>기획서 DOCX</td><td>Claude 초안 → 정원 검토</td><td>접수양식 파일 필요</td></tr>
 <tr><td>시연 영상</td><td>정원 (순서 Q52)</td><td>폰 일정 짜기 → 차 질문 → 동승자 변경·경로 바뀜 → P단 기록·사진 → 주유 추천 → 타임라인 이미지</td></tr>
-<tr><td>구글 캘린더 불러오기(읽기만)</td><td>시간 남으면</td><td>구글 로그인 뒤에 가능</td></tr>
 <tr><td>실차에서만 볼 수 있는 것</td><td>—</td><td>TTS 소리·STT 인식, 진짜 도착 신호, 좌석 착석 QR, 경유지 최대 개수</td></tr>
 </table>
 

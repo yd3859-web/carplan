@@ -28,6 +28,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
+import com.htb.carplan.phone.calendar.GoogleCalendar
+import com.htb.carplan.phone.calendar.MonthGrid
+import java.time.YearMonth
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,6 +109,23 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
     val context = LocalContext.current
     var renaming by remember { mutableStateOf(false) }
     var reminders by remember { mutableStateOf(Reminders.enabled(context)) }
+    var googleCal by remember { mutableStateOf(GoogleCalendar.enabled(context)) }
+    val googleStatus by GoogleCalendar.status.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val grid = MonthGrid.of(YearMonth.now())
+    val consent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        if (GoogleCalendar.finishAuthorization(context, r.data)) { googleCal = true; GoogleCalendar.setEnabled(context, true); scope.launch { GoogleCalendar.refresh(context, grid.start, grid.endInclusive) } }
+        else { googleCal = false; GoogleCalendar.setEnabled(context, false) }
+    }
+    fun turnOnGoogle() = scope.launch {
+        GoogleCalendar.setEnabled(context, true)
+        runCatching { GoogleCalendar.authorize(context) }
+            .onSuccess { googleCal = true; GoogleCalendar.refresh(context, grid.start, grid.endInclusive) }
+            .onFailure { e ->
+                if (e is GoogleCalendar.ConsentNeeded) consent.launch(IntentSenderRequest.Builder(e.pendingIntent.intentSender).build())
+                else { googleCal = false; GoogleCalendar.setEnabled(context, false); vm.message.value = "구글 캘린더 연결 실패: ${e.message?.take(80)}" }
+            }
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 18.dp, bottom = 12.dp))
@@ -120,6 +145,17 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
                 colors = SwitchDefaults.colors(checkedTrackColor = Palette.Navy, checkedThumbColor = Palette.Background))
         }
         Text("그룹 알림(칸 뺌·투표·도착·픽업)은 서버에서 보내요. 폰의 알림 권한이 꺼져 있으면 시스템 설정에서 켜 주세요.", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
+
+        Section("캘린더")
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("구글 캘린더 같이 보기", fontSize = 17.sp, color = Palette.TextStrong)
+                Text("구글 일정이 \"구글\" 카테고리로 같이 보여요. 읽기만 하고, 우리 일정을 구글로 보내진 않아요.", fontSize = 13.sp, color = Palette.TextSoft)
+                googleStatus?.let { Text(it, fontSize = 13.sp, color = Palette.Sunday) }
+            }
+            Switch(googleCal, onCheckedChange = { on -> if (on) turnOnGoogle() else { googleCal = false; GoogleCalendar.setEnabled(context, false) } },
+                colors = SwitchDefaults.colors(checkedTrackColor = Palette.Navy, checkedThumbColor = Palette.Background))
+        }
 
         Section("차")
         val c = car

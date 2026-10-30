@@ -80,6 +80,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play)
     implementation(libs.googleid)
+    // 2장 Q05: 구글 캘린더 읽기 (AuthorizationClient → access token)
+    implementation(libs.play.services.auth)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)

@@ -66,12 +66,13 @@ class CalendarViewModel : ViewModel() {
     private val _lastGroupId = MutableStateFlow<String?>(null)
     val lastGroupId: StateFlow<String?> = _lastGroupId.asStateFlow()
 
-    /** Events overlapping the visible grid (it spills into neighbour months). */
+    /** Events overlapping the visible grid (it spills into neighbour months), plus Google Calendar's (Q05, read-only). */
     val events: StateFlow<List<CalendarEvent>> = combine(groupIds, _month) { ids, m -> ids to MonthGrid.of(m) }
         .flatMapLatest { (ids, grid) ->
             calendar.observeEvents(ids, grid.start.toString(), grid.endInclusive.toString())
         }
         .catch { _error.value = it.message }
+        .combine(GoogleCalendar.events) { ours, google -> ours + google }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Today and the next 60 days, independent of the month being browsed (오늘 카드). */

@@ -93,6 +93,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     // 2장 [알림] 칩: keep the phone's local reminders in step with the upcoming events.
     val context = androidx.compose.ui.platform.LocalContext.current
     androidx.compose.runtime.LaunchedEffect(upcoming) { com.htb.carplan.phone.push.Reminders.schedule(context, upcoming) }
+    // 2장 Q05: Google Calendar events for the visible grid (only when turned on in 설정).
+    androidx.compose.runtime.LaunchedEffect(month) { val g = MonthGrid.of(month); GoogleCalendar.refresh(context, g.start, g.endInclusive) }
     val car by vm.car.collectAsStateWithLifecycle()
     val categories by vm.customCategories.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
