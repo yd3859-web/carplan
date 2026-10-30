@@ -4,6 +4,10 @@ import java.util.Properties
 val keystoreProps = Properties().apply {
     rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
+// API keys live in local.properties (never in git). Empty key = fallback to the navigation's own search.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -24,6 +28,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        buildConfigField("String", "OPINET_KEY", "\"${localProps.getProperty("OPINET_KEY", "")}\"")
     }
 
     signingConfigs {
@@ -49,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

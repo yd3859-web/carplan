@@ -47,6 +47,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val prompt: StateFlow<NextPrompt?> = navigator.prompt
     val guiding: StateFlow<Boolean> = navigator.guiding
     val notice: StateFlow<String?> = navigator.notice
+    val stations = navigator.stations
+    private val monitor = CarRuntime.monitor(app)
+
+    fun goViaStation(st: com.htb.carplan.shared.net.GasStation) = navigator.goViaStation(st)
+    fun dismissStations() = navigator.dismissStations()
+
+    // 20장 디버그 메뉴
+    fun setFuelOverride(percent: Double?) { monitor.fuelOverride = percent }
+    fun setEvOverride(ev: Boolean?) { monitor.evOverride = ev }
+    fun playFakeDrive() = navigator.playFakeDrive()
+    fun stopFakeDrive() = navigator.stopFakeDrive()
 
     private val carId = MutableStateFlow<String?>(null)
     private val _error = MutableStateFlow<String?>(null)

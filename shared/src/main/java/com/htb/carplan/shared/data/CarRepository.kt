@@ -41,6 +41,7 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
                 "state.drivingRestricted" to state.drivingRestricted,
                 "state.fuelPercent" to state.fuelPercent,
                 "state.rangeKm" to state.rangeKm,
+                "state.isEv" to state.isEv,
                 "state.lat" to state.lat,
                 "state.lng" to state.lng,
                 "state.updatedAt" to FieldValue.serverTimestamp(),

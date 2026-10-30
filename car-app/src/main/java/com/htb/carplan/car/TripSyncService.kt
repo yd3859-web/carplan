@@ -41,6 +41,7 @@ class TripSyncService : LifecycleService() {
             CarRuntime.navigator(this@TripSyncService).bind(carId)
             monitor.state.debounce(1_000).collect { state ->
                 runCatching { cars.updateState(carId, state) }.onFailure { Log.w(TAG, "state upload failed", it) }
+                CarRuntime.navigator(this@TripSyncService).onCarState(state) // 12장 fuel check
             }
         }
         // 9장: P → D asks "다음 목적지로 갈까요?" even while the navigation is in front.

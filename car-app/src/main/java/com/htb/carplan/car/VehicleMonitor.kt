@@ -48,6 +48,14 @@ class VehicleMonitor(private val context: Context) {
     private var fuelCapacity: Float? = null
     private var evCapacity: Float? = null
 
+    /** 20장 디버그: forced fuel % / car type for the demo; null = real value. */
+    @Volatile var fuelOverride: Double? = null
+        set(v) { field = v; _state.update { it.copy(fuelPercent = v ?: realFuel) } }
+    @Volatile var evOverride: Boolean? = null
+        set(v) { field = v; _state.update { it.copy(isEv = v ?: realEv) } }
+    private var realFuel: Double? = null
+    private var realEv: Boolean? = null
+
     fun start() {
         val c = runCatching { Car.createCar(context) }.onFailure { Log.e(TAG, "Car connect failed", it) }.getOrNull() ?: return
         car = c
@@ -55,8 +63,10 @@ class VehicleMonitor(private val context: Context) {
         fuelCapacity = pm.readFloat(VehiclePropertyIds.INFO_FUEL_CAPACITY)
         evCapacity = pm.readFloat(VehiclePropertyIds.INFO_EV_BATTERY_CAPACITY)
         pm.listen(VehiclePropertyIds.GEAR_SELECTION) { v -> _state.update { it.copy(gear = (v as? Int).toGear()) } }
-        pm.listen(VehiclePropertyIds.FUEL_LEVEL) { v -> percentOf(v, fuelCapacity)?.let { p -> _state.update { it.copy(fuelPercent = p) } } }
-        pm.listen(VehiclePropertyIds.EV_BATTERY_LEVEL) { v -> percentOf(v, evCapacity)?.let { p -> _state.update { it.copy(fuelPercent = p) } } }
+        realEv = when { (evCapacity ?: 0f) > 0f -> true; (fuelCapacity ?: 0f) > 0f -> false; else -> null }
+        _state.update { it.copy(isEv = evOverride ?: realEv) }
+        pm.listen(VehiclePropertyIds.FUEL_LEVEL) { v -> percentOf(v, fuelCapacity)?.let { p -> realFuel = p; _state.update { it.copy(fuelPercent = fuelOverride ?: p) } } }
+        pm.listen(VehiclePropertyIds.EV_BATTERY_LEVEL) { v -> percentOf(v, evCapacity)?.let { p -> realFuel = p; _state.update { it.copy(fuelPercent = fuelOverride ?: p) } } }
 
         runCatching {
             val ux = c.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as CarUxRestrictionsManager

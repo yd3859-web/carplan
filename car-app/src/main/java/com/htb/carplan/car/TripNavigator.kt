@@ -12,8 +12,11 @@ import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.GroupRepository
 import com.htb.carplan.shared.data.RecordRepository
 import com.htb.carplan.shared.calendar.RouteMath
+import com.htb.carplan.shared.model.CarState
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Record
+import com.htb.carplan.shared.net.GasStation
+import com.htb.carplan.shared.net.OpinetApi
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.BuiltInCategory
 import com.htb.carplan.shared.model.DayStatus
@@ -49,7 +52,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     val version: Long get() = day?.version ?: 0
 }
 
-enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE }
+enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL }
 
 /**
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
@@ -76,6 +79,7 @@ class TripNavigator(
     private val cars = CarRepository()
     private val records = RecordRepository()
     private val groups = GroupRepository()
+    private val opinet = OpinetApi(BuildConfig.OPINET_KEY)
 
     private val carId = MutableStateFlow<String?>(null)
     private val _prompt = MutableStateFlow<NextPrompt?>(null)
@@ -108,6 +112,15 @@ class TripNavigator(
     private var parkedDate: String = ""
     private var lastLocation: Pair<Double, Double>? = null
     private var lastAddress: String = ""
+    // ---- 12장 fuel
+    private var carState = CarState()
+    private var fuelAskedPercent: Double? = null   // fuel % when we last asked (Q33: ask again 10 points lower)
+    private var fuelDeclinedForRoute = false
+    private var fuelAskedToday: String? = null      // date of the last "not guiding" ask
+    private val _stations = MutableStateFlow<List<GasStation>>(emptyList())
+    /** Cheapest stations near the car after "응" (12장); the screen lists the top 3. */
+    val stations: StateFlow<List<GasStation>> = _stations.asStateFlow()
+    private var fakeDrive: Job? = null
     private val _notice = MutableStateFlow<String?>(null)
     /** Short status for the screen ("기록 칸: 서현역 12:40"). */
     val notice: StateFlow<String?> = _notice.asStateFlow()
@@ -162,7 +175,7 @@ class TripNavigator(
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
-                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
+                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
         }
     }
@@ -236,6 +249,109 @@ class TripNavigator(
     /** The 🎤 button: ask again now. */
     fun askNow() = ask(PromptReason.MANUAL)
 
+    // ---------- 12장: fuel / charge ----------
+
+    /** Latest car state from the service (fuel %, range, EV?). Decides whether to ask about a station. */
+    fun onCarState(state: CarState) {
+        carState = state
+        val fuel = state.fuelPercent ?: return
+        val range = state.rangeKm
+        val t = trip.value
+        val today = LocalDate.now().toString()
+        val remainingKm = t?.remaining?.let { remainingKm(it) }
+        val need = when {
+            _guiding.value && range != null && remainingKm != null -> range < remainingKm + ROUTE_MARGIN_KM
+            else -> fuel <= LOW_FUEL_PERCENT || (range != null && range < LOW_RANGE_KM)
+        }
+        if (!need) return
+        if (_prompt.value != null) return
+        fuelAskedPercent?.let { asked -> if (fuel > asked - 10) return } // Q33
+        if (!_guiding.value && fuelAskedToday == today && fuelAskedPercent != null && fuel > fuelAskedPercent!! - 10) return
+        if (_guiding.value && fuelDeclinedForRoute && fuel > (fuelAskedPercent ?: 101.0) - 10) return
+        fuelAskedPercent = fuel
+        fuelAskedToday = today
+        askFuel(state.isEv == true, fuel, range, remainingKm)
+    }
+
+    private fun askFuel(ev: Boolean, fuel: Double, range: Double?, remainingKm: Double?) {
+        val what = if (ev) "충전소" else "주유소"
+        val why = if (remainingKm != null && range != null && _guiding.value) "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요" else "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
+        val message = "$why. ${what} 들를까요?"
+        askJob?.cancel()
+        _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message)
+        askJob = scope.launch {
+            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
+            when (answer) {
+                VoicePrompt.Answer.YES -> go()
+                VoicePrompt.Answer.NO -> later()
+                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
+            }
+        }
+    }
+
+    /** "응" to the station question: Opinet cheapest list (fuel car + key), else the navigation's own search. */
+    private fun findStation() {
+        val ev = carState.isEv == true
+        router.requestCurrentLocation()
+        scope.launch {
+            delay(600) // let the location answer arrive
+            val loc = lastLocation
+            if (!ev && opinet.available && loc != null) {
+                runCatching { opinet.around(loc.first, loc.second) }
+                    .onSuccess { list ->
+                        // Q30: cheapest first, but only ones reasonably close (within 3 km of the car)
+                        val near = list.filter { it.meters <= 3_000 }.ifEmpty { list }
+                        _stations.value = near.take(3)
+                        if (near.isEmpty()) router.search("주유소")
+                    }
+                    .onFailure { _error.value = it.message; router.search("주유소") }
+            } else {
+                router.search(if (ev) "충전소" else "주유소")
+            }
+        }
+    }
+
+    /** Driver picked a station from the list: it becomes the next waypoint, the plan follows. */
+    fun goViaStation(st: GasStation) {
+        _stations.value = emptyList()
+        val rest = trip.value?.remaining?.map { it.place }.orEmpty().take(MAX_PLACES - 1)
+        router.route(listOf(st.place) + rest)
+        router.openNavigation()
+        lastRouteSentAt = System.currentTimeMillis()
+        _notice.value = "${st.name} (${st.price}원) 들렀다 가요"
+        fuelDeclinedForRoute = false
+    }
+
+    fun dismissStations() { _stations.value = emptyList() }
+
+    private fun remainingKm(stops: List<Stop>): Double? {
+        val withCoords = stops.filter { it.place.hasCoords() }
+        if (withCoords.isEmpty()) return null
+        var km = 0.0
+        lastLocation?.let { (la, lo) -> km += RouteMath.metersBetween(la, lo, withCoords.first().place.lat, withCoords.first().place.lng) / 1000 }
+        withCoords.zipWithNext().forEach { (a, b) -> km += (RouteMath.meters(a.place, b.place) ?: 0.0) / 1000 }
+        return km * 1.3
+    }
+
+    // ---------- 20장: fake drive for the demo ----------
+
+    /** Plays the day: every few seconds the car "arrives" at the next stop (records included). */
+    fun playFakeDrive(stepMs: Long = 6_000) {
+        fakeDrive?.cancel()
+        fakeDrive = scope.launch {
+            while (trip.value?.next != null) {
+                delay(stepMs)
+                val next = trip.value?.next ?: break
+                if (next.place.hasCoords()) lastLocation = next.place.lat to next.place.lng
+                parkedRecord = null
+                confirmArrival(reason = "가짜 주행", assumeAtNext = true)
+            }
+            _notice.value = "가짜 주행 끝"
+        }
+    }
+
+    fun stopFakeDrive() { fakeDrive?.cancel(); fakeDrive = null }
+
     private fun ask(reason: PromptReason) {
         val next = trip.value?.next ?: return
         askJob?.cancel()
@@ -254,6 +370,9 @@ class TripNavigator(
 
     /** "응" / [가기] (9장) or [바꾸기] (10장): route the remaining stops and open the navigation. */
     fun go() {
+        if (_prompt.value?.reason == PromptReason.FUEL) {
+            askJob?.cancel(); _prompt.value = null; findStation(); return
+        }
         val t = trip.value ?: return
         askJob?.cancel()
         val wasChange = _prompt.value?.reason == PromptReason.ROUTE_CHANGE
@@ -275,6 +394,7 @@ class TripNavigator(
     /** "아니" / [나중에] (9장): keep today's plan. [그대로] (10장): hold the change, phones show "운전자가 보류함". */
     fun later() {
         askJob?.cancel()
+        if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
         val t = trip.value
         if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE && t != null) {
             pendingChange = true
@@ -416,6 +536,10 @@ class TripNavigator(
         private const val PARK_CONFIRM_MS = 5 * 60_000L
         /** 13장 4: within this of the next planned stop = that stop. */
         private const val NEAR_METERS = 300.0
+        /** Q29: range must cover the rest of the route plus this. */
+        private const val ROUTE_MARGIN_KM = 30.0
+        private const val LOW_FUEL_PERCENT = 20.0
+        private const val LOW_RANGE_KM = 50.0
 
         /** "해운대로" / "광안리로" / "감천문화마을로" — picks 로/으로 by the last syllable's final consonant. */
         fun withRo(name: String): String {

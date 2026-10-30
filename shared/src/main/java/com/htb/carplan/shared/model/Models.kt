@@ -65,6 +65,8 @@ data class CarState(
     /** 0–100, from android.car FUEL_LEVEL or EV battery. */
     val fuelPercent: Double? = null,
     val rangeKm: Double? = null,
+    /** true = electric (charging stations), false = fuel (gas stations), null = unknown (12장). */
+    val isEv: Boolean? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 

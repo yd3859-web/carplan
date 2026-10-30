@@ -516,9 +516,9 @@
       <div class="sb-row">전기차: 내비가 도착 시 예상 배터리(%)를 줌 → 같은 방식으로 충전소(내비 주변 충전소 화면)</div>
     </div>
     <div class="warn-in wide"><b>에뮬 제약</b>: 에뮬레이터는 전기차 설정, 연료량은 고정값 → 주유 장면은 앱에서 연료 값을 임시로 넣거나 충전 장면으로 <span class="cant">에뮬 제약</span></div>
-    <div class="ask wide"><span class="qid">Q29</span><b>주유 알림 기본값</b> (2판 C10 답이 불분명했음)<span class="rec">추천: "지금 연료로 오늘 마지막 목적지까지 + 여유 30km를 못 가면" 알림.</span></div>
-    <div class="ask wide"><span class="qid">Q30</span><b>최저가 주유소 찾는 범위</b> — 경로 위(정원) vs 반경 5→10→20km(팀원)<span class="rec">추천: 경로 위 우선(경로에서 2km 안), 없으면 반경으로 넓히기. 둘 다.</span></div>
-    <div class="ask wide"><span class="qid">Q31</span><b>시연할 차 연료 종류</b> — 전기차 충전 장면 vs 연료 임시값 주유 장면<span class="rec">추천: 주유 장면(최저가 주유소가 우리 기능이라 더 잘 보임), 값은 디버그 메뉴로 넣기.</span></div>
+    <div class="note-in">Q29 주유 알림 = <b>안내 중</b>: 주행가능거리 &lt; 남은 경로 + 30km / <b>안내 없을 때</b>: 연료 20% 아래(또는 주행가능 50km 아래)면 하루 한 번. 둘 다 "주유소(충전소) 들를까요?" → 가까운 최저가 추천 <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q30 <b>오피넷 API</b>로 현재 위치 반경 5km 주유소를 가격순으로 받아 가까운 최저가 3곳 추천(키는 <code>local.properties</code> <code>OPINET_KEY=</code>, 정원이 나중에). 키 없으면 현대 내비 검색 화면으로 "주유소" <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q31 <b>둘 다</b>: 내연기관이면 주유소(오피넷), 전기차면 충전소(내비 검색). 에뮬은 전기차라 충전 문구, 디버그 메뉴에서 연료차로 바꿔 주유 장면 <span class="decided">정함</span> 2026-10-30</div>
 
     <div class="sub-block wide">
       <div class="sb-t">🅿️ 주차 · ☕ 근처 추천</div>
@@ -527,8 +527,9 @@
       <div class="sb-row">도착 몇 분 전 동승자에게 "주차장 찾아봐 주세요" 푸시 <span class="decided">정함</span></div>
       <div class="sb-row">장면 예: 카페 자리가 없음 → 차로 돌아와 카페 카테고리 → 근처 추천 <span class="decided">정함</span></div>
     </div>
-    <div class="ask wide"><span class="qid">Q32</span><b>차 안 장소 찾기를 현대 내비로 할지</b> (12장 미정)<span class="rec">추천: 예. 카카오 없이 되고, 현대 내비를 쓰는 장면이라 공모전에도 맞음.</span></div>
-    <div class="ask wide"><span class="qid">Q33</span><b>주유 알림을 운전 중 몇 번까지?</b><span class="rec">추천: 한 번 "아니" 하면 그 경로에선 다시 안 묻고, 연료가 더 줄면(예: 10%) 한 번 더.</span></div>
+    <div class="note-in">Q32 차 안 장소 찾기는 <b>현대 내비 검색 화면</b>(카카오 없이 됨), 주유소만 오피넷 우선 <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q33 한 번 "아니" 하면 그 경로에선 다시 안 묻고, 연료가 10%p 더 줄면 한 번 더 <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">만든 것(2026-10-30, 에뮬 미확인): 차 앱이 연료·주행가능거리를 보고 — 안내 중이면 남은 칸까지 직선×1.3 거리 + 30km, 아니면 20%/50km — "연료가 n%예요. 주유소 들를까요?"(전기차는 배터리·충전소) TTS + 검정 띠 [들를게요][아니요]. 들를게요 → 오피넷 반경 5km 가격순 → 3km 안 최저가 3곳 목록 → 고르면 다음 경유지로(그다음 원래 일정). 오피넷 키 없거나 전기차면 내비 검색 화면 "주유소/충전소". 좌표 변환(WGS84⇄KATEC)은 <code>shared/net/Katec.kt</code>. 20장 시연 메뉴: 연료 10/20/50/100% 강제, 연료차/전기차 전환, 가짜 주행 재생(6초마다 다음 칸 도착 + 기록 칸), 도착 처리.</div>
   </div>
 </div>
 
@@ -813,11 +814,6 @@
       <div class="q"><div class="qh"><span class="qid">Q20</span><span class="qt">차에서 일정 만들기</span><span class="qwhere">8장</span></div><div class="qr"><b>추천</b> 주차 중 음성</div></div>
       <div class="q"><div class="qh"><span class="qid">Q26</span><span class="qt">위치 보내는 간격</span><span class="qwhere">11장</span></div><div class="qr"><b>추천</b> 픽업 중 5초</div></div>
       <div class="q"><div class="qh"><span class="qid">Q28</span><span class="qt">픽업 시연 방식</span><span class="qwhere">11장</span></div><div class="qr"><b>추천</b> 가짜 위치 재생</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q29</span><span class="qt">주유 알림 기본값</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 마지막 목적지 + 30km 못 가면</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q30</span><span class="qt">주유소 찾는 범위</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 경로 위 우선, 없으면 반경</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q31</span><span class="qt">시연 연료 종류</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 주유 장면</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q32</span><span class="qt">차 안 장소 찾기 = 현대 내비?</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 예</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q33</span><span class="qt">주유 알림 반복 횟수</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 거절하면 10% 더 줄 때 한 번</div></div>
       <div class="q"><div class="qh"><span class="qid">Q41</span><span class="qt">점검 알림 기준</span><span class="qwhere">15장</span></div><div class="qr"><b>추천</b> 먼저 오는 것</div></div>
       <div class="q"><div class="qh"><span class="qid">Q42</span><span class="qt">항목별 기본 주기</span><span class="qwhere">15장</span></div><div class="qr"><b>추천</b> 15장 초안 보고 고치기</div></div>
       <div class="q"><div class="qh"><span class="qid">Q43</span><span class="qt">주유 금액·리터 입력</span><span class="qwhere">15장</span></div><div class="qr"><b>추천</b> 선택 입력</div></div>
@@ -836,7 +832,7 @@
     </div>
 
     <div class="qgroup">✓ 정함 (질문에서 옮겨 온 것)</div>
-    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)<br>Q06 시간 칸 = 도착 시각만 (2026-10-30)<br>Q07 동시 수정 = 나중 저장 우선 + "○○님이 방금 수정" (2026-10-30)<br>Q08 칸 추가·순서는 화면에만, 빼기만 푸시 (2026-10-30)<br>카카오 키 없이도 3장 전부 동작(이름 입력·직선거리), 키는 local.properties KAKAO_REST_KEY (2026-10-30)<br>Q21 음성 못 알아들으면 1번만 다시 묻고 버튼만 (2026-10-30)<br>Q22 내비엔 최대 3곳(경유지 2 + 목적지), 일정은 제한 없이 등록, 도착마다 하나씩 채움 (2026-10-30)<br>Q23 운전 중 변경은 음성으로 묻기, "아니"면 폰에 "운전자가 보류함" (2026-10-30)<br>Q24 답 없으면 10초 뒤 버튼만, 다음 정차 때 다시 (2026-10-30)<br>Q25 연달아 바뀌면 5초 모아 한 번만 (2026-10-30)<br>Q18 주행 중 운전자 폰 편집 잠금 (2026-10-30)<br>하루 화면 = 레일 타임라인(노드·상자·말풍선 코멘트 글타래·예상 도착 시각·[+] 노드), 계획·주행·기록 한 화면, 차는 도착 때 레일 채움만 움직임 (2026-10-30)<br>10장 구현: 5초 모아 묻기, 바꾸기/그대로, 차에 반영됨·다음 도착·운전자가 보류함 표시, 운전자 폰 잠금 (2026-10-30)<br>Q10 친구 = 그룹 이력 + 친구 코드 / Q11 만든 사람이 그룹장 / Q16 차에서 [새 그룹] / 여행 추가 창에 그룹 칩 / 초대 링크 Hosting 지금 / 이름은 임시 (2026-10-30)<br>4장·7장 구현: 그룹 탭·초대 3종·딥링크 참여·QR·오늘 이 차로 가요·착석 QR, 초대 페이지 배포 (2026-10-30)<br>Q34 P + 운전석 문(없으면 5분) / Q35 운전석 그대로면 칸 없음 / Q36 장소 바꾸기 후보 / Q37 여행 없는 날도 "일상 기록" 칸 / Q38 이동 줄에 실제 시간 / Q39 세로 이미지 / Q40 칸당 10장 / Blaze는 나중, 사진 코드는 미리 (2026-10-30)</div>
+    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)<br>Q06 시간 칸 = 도착 시각만 (2026-10-30)<br>Q07 동시 수정 = 나중 저장 우선 + "○○님이 방금 수정" (2026-10-30)<br>Q08 칸 추가·순서는 화면에만, 빼기만 푸시 (2026-10-30)<br>카카오 키 없이도 3장 전부 동작(이름 입력·직선거리), 키는 local.properties KAKAO_REST_KEY (2026-10-30)<br>Q21 음성 못 알아들으면 1번만 다시 묻고 버튼만 (2026-10-30)<br>Q22 내비엔 최대 3곳(경유지 2 + 목적지), 일정은 제한 없이 등록, 도착마다 하나씩 채움 (2026-10-30)<br>Q23 운전 중 변경은 음성으로 묻기, "아니"면 폰에 "운전자가 보류함" (2026-10-30)<br>Q24 답 없으면 10초 뒤 버튼만, 다음 정차 때 다시 (2026-10-30)<br>Q25 연달아 바뀌면 5초 모아 한 번만 (2026-10-30)<br>Q18 주행 중 운전자 폰 편집 잠금 (2026-10-30)<br>하루 화면 = 레일 타임라인(노드·상자·말풍선 코멘트 글타래·예상 도착 시각·[+] 노드), 계획·주행·기록 한 화면, 차는 도착 때 레일 채움만 움직임 (2026-10-30)<br>10장 구현: 5초 모아 묻기, 바꾸기/그대로, 차에 반영됨·다음 도착·운전자가 보류함 표시, 운전자 폰 잠금 (2026-10-30)<br>Q10 친구 = 그룹 이력 + 친구 코드 / Q11 만든 사람이 그룹장 / Q16 차에서 [새 그룹] / 여행 추가 창에 그룹 칩 / 초대 링크 Hosting 지금 / 이름은 임시 (2026-10-30)<br>4장·7장 구현: 그룹 탭·초대 3종·딥링크 참여·QR·오늘 이 차로 가요·착석 QR, 초대 페이지 배포 (2026-10-30)<br>Q34 P + 운전석 문(없으면 5분) / Q35 운전석 그대로면 칸 없음 / Q36 장소 바꾸기 후보 / Q37 여행 없는 날도 "일상 기록" 칸 / Q38 이동 줄에 실제 시간 / Q39 세로 이미지 / Q40 칸당 10장 / Blaze는 나중, 사진 코드는 미리 (2026-10-30)<br>Q29~Q33 주유: 경로 기준 + 평소 20% 알림, 오피넷 최저가 3곳(키 나중), 전기차는 충전소, 한 번 거절 후 10%p 더 줄면 다시 (2026-10-30)</div>
   </div>
 </div>
 

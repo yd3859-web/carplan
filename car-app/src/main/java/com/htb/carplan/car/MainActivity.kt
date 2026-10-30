@@ -9,6 +9,7 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.htb.carplan.shared.data.InviteLinks
 import com.htb.carplan.shared.model.Group
+import com.htb.carplan.shared.net.GasStation
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -111,6 +112,8 @@ private fun CarHome(vm: CarHomeViewModel) {
     val guiding by vm.guiding.collectAsStateWithLifecycle()
     val qrGroup by vm.qrGroup.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
+    val stations by vm.stations.collectAsStateWithLifecycle()
+    var debug by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
     var qr by remember { mutableStateOf(false) }
     var seatedPrompt by remember { mutableStateOf(false) }
@@ -147,6 +150,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 if (guiding && tripNext != null) BigButton("${tripNext.place.name} 도착 처리 (시연용)") { vm.debugArrive() }
                 BigButton("같이 탄 사람 추가", enabled = !vehicle.drivingRestricted) { qr = true }
                 Spacer(Modifier.weight(1f))
+                BigButton("시연 메뉴") { debug = true }
                 BigButton(
                     if (vehicle.drivingRestricted) "주행 중엔 일정 추가 불가" else "일정 추가",
                     enabled = !vehicle.drivingRestricted,
@@ -158,6 +162,8 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (adding && !vehicle.drivingRestricted) {
         CarAddDialog(onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false })
     }
+    if (stations.isNotEmpty()) StationDialog(stations, onPick = vm::goViaStation, onDismiss = vm::dismissStations)
+    if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
     if (qr && !vehicle.drivingRestricted) {
         InviteQrDialog(qrGroup, seated = seatedPrompt, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
     }
@@ -209,9 +215,10 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val change = p.reason == PromptReason.ROUTE_CHANGE
+        val fuel = p.reason == PromptReason.FUEL
         Column(Modifier.weight(1f)) {
             Text(
-                if (change) "${p.message}. 경로를 바꿀까요?" else "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?",
+                when { fuel -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" },
                 color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
             )
             Text(
@@ -224,10 +231,10 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
             )
         }
         Button(onClick = onGo, modifier = Modifier.height(80.dp).width(190.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink)) {
-            Text(if (change) "바꾸기" else "가기", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(when { fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         Button(onClick = onLater, modifier = Modifier.height(80.dp).width(190.dp).border(1.dp, Color(0xFF55595E), Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White)) {
-            Text(if (change) "그대로" else "나중에", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text(when { fuel -> "아니요"; change -> "그대로"; else -> "나중에" }, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -368,6 +375,58 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, onNewGroup: () -> Uni
             else TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) }
         },
         dismissButton = { if (group == null) TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Soft) } },
+    )
+}
+
+/** 12장: the three cheapest stations near the car; one tap makes it the next waypoint. */
+@Composable
+private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss, shape = Corner, containerColor = Bg,
+        title = { Text("가까운 최저가 주유소", fontSize = 28.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                stations.forEach { st ->
+                    Button(onClick = { onPick(st) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
+                        Text(st.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("${"%,d".format(st.price)}원", fontSize = 22.sp, color = Accent, fontWeight = FontWeight.Bold)
+                        Text("  ${if (st.meters >= 1000) "%.1fkm".format(st.meters / 1000.0) else "${st.meters}m"}", fontSize = 18.sp, color = Soft)
+                    }
+                }
+                Text("고르면 다음 경유지로 들어가고, 그다음 원래 일정으로 이어져요", fontSize = 16.sp, color = Soft)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Soft) } },
+    )
+}
+
+/** 20장: demo controls — fuel %, car type, fake drive, arrival. */
+@Composable
+private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss, shape = Corner, containerColor = Bg,
+        title = { Text("시연 메뉴", fontSize = 28.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("연료/배터리  지금 ${v.fuelPercent?.toInt() ?: "—"}%  ·  ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"}", fontSize = 18.sp, color = Soft)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(10.0, 20.0, 50.0, 100.0).forEach { p -> FilterChip(selected = v.fuelPercent == p, onClick = { vm.setFuelOverride(p) }, shape = Corner, label = { Text("${p.toInt()}%", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) }) }
+                    FilterChip(selected = false, onClick = { vm.setFuelOverride(null) }, shape = Corner, label = { Text("실제값", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = v.isEv == false, onClick = { vm.setEvOverride(false) }, shape = Corner, label = { Text("연료차로", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                    FilterChip(selected = v.isEv == true, onClick = { vm.setEvOverride(true) }, shape = Corner, label = { Text("전기차로", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                    FilterChip(selected = false, onClick = { vm.setEvOverride(null) }, shape = Corner, label = { Text("실제값", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                }
+                HorizontalDivider(color = Line)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { vm.playFakeDrive(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("가짜 주행 재생 (6초마다 다음 칸 도착)", fontSize = 18.sp) }
+                    TextButton(onClick = { vm.stopFakeDrive() }) { Text("멈춤", fontSize = 18.sp, color = Soft) }
+                }
+                Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 16.sp, color = Soft)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) } },
     )
 }
 
