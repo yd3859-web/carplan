@@ -141,7 +141,10 @@ private fun TripRail(trip: CalendarEvent, stops: List<Stop>, comments: List<Comm
                         Text(s.place.name, fontSize = 17.sp, fontWeight = if (s.id == nextId) FontWeight.Bold else FontWeight.Normal, color = if (s.visited) Palette.TextSoft else Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                         if (s.id == nextId) Text("  다음", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
                     }
-                    if (s.memo.isNotBlank()) Text(s.memo, fontSize = 14.sp, color = Palette.ChipText, modifier = Modifier.padding(start = if (s.time != null) 52.dp else 0.dp))
+                    if (s.memo.isNotBlank()) {
+                        val (tag, rest) = com.htb.carplan.shared.calendar.StopMemo.split(s.memo)
+                        Text(listOfNotNull(tag, rest.ifBlank { null }).joinToString("  "), fontSize = 14.sp, color = if (tag != null && rest.isBlank()) Palette.TextSoft else Palette.ChipText, modifier = Modifier.padding(start = if (s.time != null) 52.dp else 0.dp))
+                    }
                     comments.lastOrNull { it.stopId == s.id }?.let { c ->
                         Text(c.text, fontSize = 14.sp, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, end = 12.dp).speechBubble().padding(horizontal = 10.dp, vertical = 6.dp))
                     }

@@ -93,6 +93,24 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 6장 game: the dart stuck at (lat, lng) → nearest 동네 in the scope (same as the phone). */
+    fun throwDartAt(scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double) {
+        val t = trip.value ?: return
+        val u = owner.value ?: return
+        loadRegions()
+        viewModelScope.launch {
+            val cur = dart.value
+            val same = cur != null && cur.scope == scope && cur.region == region && cur.eventId == t.eventId
+            val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region)) ?: run { _error.value = "그 범위엔 동네가 없어요"; return@launch }
+            runCatching { dartRepo.throwDart(t.groupId, if (same) cur!!.id else null, scope, centerLat, centerLng, region, pick, if (same) cur!!.throwCount + 1 else 1, u.uid, t.eventId, t.date) }
+                .onFailure { _error.value = it.message }
+        }
+    }
+    fun ensureRegions() = loadRegions()
+    val ownerUid: String? get() = owner.value?.uid
+    /** Owner name of a uid for "○○님이 던짐" (names are in users/{uid}; the car only knows its owner). */
+    fun nameOf(uid: String): String = if (uid == owner.value?.uid) owner.value?.name?.ifBlank { null } ?: "차주" else "일행"
+
     fun addDartAsStop() {
         val t = trip.value ?: return
         val d = dart.value ?: return

@@ -280,8 +280,14 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             flying = false; onFlying(false)
         }
 
+        var seenKey by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(hit?.key) {
             val s = hit ?: return@LaunchedEffect
+            if (seenKey == null) {
+                // Opening the game with an old result: just show it stuck in the overview, no replay, no dive.
+                seenKey = s.key; stuck = s.lat to s.lng; fly.snapTo(1f); return@LaunchedEffect
+            }
+            seenKey = s.key
             val mine = stuck?.let { (la, lo) -> sqrt((la - s.lat) * (la - s.lat) + (lo - s.lng) * (lo - s.lng)) < spanLat * 0.25 } == true
             if (!(mine && !flying)) throwTo(toScreen(s.lat, s.lng), 650)
             stuck = s.lat to s.lng
@@ -289,6 +295,7 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             focus = s.lat to s.lng // dive into the 동네
         }
 
+        LaunchedEffect(Unit) { if (hit == null) seenKey = "" }
         val detail = ((camK.value / detailK - 0.45f) / 0.45f).coerceIn(0f, 1f) // 0 = overview, 1 = dived in
         val ink = Palette.TextStrong
         Canvas(Modifier.fillMaxSize()) {

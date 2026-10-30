@@ -494,7 +494,13 @@ private fun StopBox(
                 editedBy,
             ).joinToString("  ·  ")
             if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft)
-            if (stop.memo.isNotBlank()) Text(stop.memo, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
+            if (stop.memo.isNotBlank()) {
+                val (tag, rest) = com.htb.carplan.shared.calendar.StopMemo.split(stop.memo)
+                Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    tag?.let { Text(it, fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
+                    if (rest.isNotBlank()) Text(rest, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(start = if (tag != null) 6.dp else 0.dp))
+                }
+            }
         }
         if (!locked) IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) } else Spacer(Modifier.width(12.dp))
     }
