@@ -33,6 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.htb.carplan.phone.trip.TripDayScreen
+import com.htb.carplan.phone.trip.TripRef
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
@@ -62,6 +66,10 @@ private val BAR_GAP = 2.dp
 private val MARK_AREA = 16.dp
 private const val MAX_LANES = 2
 private val WEEKDAYS = listOf("일", "월", "화", "수", "목", "금", "토")
+private val TripRefSaver = Saver<TripRef?, List<String>>(
+    save = { it?.let { r -> listOf(r.groupId, r.eventId, r.date) } },
+    restore = { TripRef(it[0], it[1], it[2]) },
+)
 
 /**
  * 2장 캘린더 메인 (A안): 오늘 카드 on top, a light month view below
@@ -78,8 +86,15 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val car by vm.car.collectAsStateWithLifecycle()
     val categories by vm.customCategories.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val tripStops by vm.tripStops.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
+    var openTrip by rememberSaveable(stateSaver = TripRefSaver) { mutableStateOf<TripRef?>(null) }
+
+    openTrip?.let { ref ->
+        TripDayScreen(ref, onBack = { openTrip = null })
+        return
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
         val wide = maxWidth >= 720.dp
@@ -102,6 +117,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     categories = categories,
                     onAdd = { quickAddDate = selected },
                     modifier = Modifier.width(360.dp).fillMaxHeight().background(Palette.Panel),
+                    tripStops = tripStops,
+                    onOpenTrip = { openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
                 )
             }
         }
@@ -115,6 +132,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 categories = categories,
                 onAdd = { daySheetOpen = false; quickAddDate = selected },
                 modifier = Modifier.fillMaxWidth().height(480.dp),
+                tripStops = tripStops,
+                onOpenTrip = { daySheetOpen = false; openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
             )
         }
     }
@@ -124,7 +143,13 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             initialDate = date,
             categories = categories,
             onAddCategory = vm::addCategory,
-            onSave = { vm.addEvent(it); quickAddDate = null },
+            onSave = { e ->
+                quickAddDate = null
+                vm.addEvent(e) { gid, eid ->
+                    // A new trip opens straight into its first day's stops (3장).
+                    if (e.categoryId == BuiltInCategory.TRIP.id) openTrip = TripRef(gid, eid, e.startDate)
+                }
+            },
             onDismiss = { quickAddDate = null },
         )
     }

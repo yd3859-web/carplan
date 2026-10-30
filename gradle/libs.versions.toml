@@ -15,6 +15,8 @@ vehicle = "2.3.2"
 naviHelper = "3.0.5"
 textToSpeech = "3.3.1"
 speechToText = "3.3.1"
+okhttp = "4.12.0"
+reorderable = "2.5.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +36,8 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 pleos-vehicle = { group = "ai.pleos.playground", name = "Vehicle", version.ref = "vehicle" }
 pleos-navihelper = { group = "ai.pleos.playground", name = "NaviHelper", version.ref = "naviHelper" }
 pleos-texttospeech = { group = "ai.pleos.playground", name = "TextToSpeech", version.ref = "textToSpeech" }

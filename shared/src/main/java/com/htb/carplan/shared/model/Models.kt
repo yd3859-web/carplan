@@ -158,10 +158,13 @@ data class Stop(
     @DocumentId val id: String = "",
     val order: Int = 0,
     val place: Place = Place(),
-    /** Planned arrival time "HH:mm". */
+    /** Planned arrival time "HH:mm" (Q06: arrival only). */
     val time: String? = null,
     val memo: String = "",
     val createdBy: String = "",
+    /** Who changed this slot last and when (Q07: last write wins, shown as "○○님이 방금 수정"). */
+    val updatedBy: String? = null,
+    @ServerTimestamp val updatedAt: Timestamp? = null,
     /** Soft delete: kept for undo and "○○님이 뺐어요" notices. */
     val deleted: Boolean = false,
     val visited: Boolean = false,

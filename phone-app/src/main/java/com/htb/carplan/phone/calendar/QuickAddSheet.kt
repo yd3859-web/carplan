@@ -112,8 +112,15 @@ fun QuickAddSheet(
     var reminderMenu by remember { mutableStateOf(false) }
     var categorySheet by remember { mutableStateOf(false) }
 
+    val isTrip = categoryId == BuiltInCategory.TRIP.id
+
     fun save() {
         if (title.isBlank()) return
+        if (isTrip) {
+            // 3장: a trip is title + dates; its places live in day stops, edited on the next screen.
+            onSave(Event(categoryId = categoryId, title = title.trim(), startDate = start.toString(), endDate = end.toString(), allDay = true, memo = memo.orEmpty().trim()))
+            return
+        }
         onSave(
             Event(
                 categoryId = categoryId,
@@ -141,7 +148,7 @@ fun QuickAddSheet(
                 TextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text("무슨 일정이에요?", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
+                    placeholder = { Text(if (isTrip) "어디로 떠나요? (여행 이름)" else "무슨 일정이에요?", fontSize = 22.sp, fontWeight = FontWeight.Bold) },
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -158,9 +165,9 @@ fun QuickAddSheet(
             }
 
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Chip(Icons.Filled.Place, place?.takeIf { it.isNotBlank() } ?: "장소", active = place != null) { if (place == null) place = "" }
+                if (!isTrip) Chip(Icons.Filled.Place, place?.takeIf { it.isNotBlank() } ?: "장소", active = place != null) { if (place == null) place = "" }
                 Box {
-                    Chip(Icons.Filled.DateRange, dateLabel(start, end, time, repeat), active = true) { dateMenu = true }
+                    Chip(Icons.Filled.DateRange, dateLabel(start, end, if (isTrip) null else time, if (isTrip) Repeat.NONE else repeat), active = true) { if (isTrip) rangePicker = true else dateMenu = true }
                     DropdownMenu(dateMenu, onDismissRequest = { dateMenu = false }) {
                         DropdownMenuItem({ Text("날짜 고르기 (여러 날 가능)") }, onClick = { dateMenu = false; rangePicker = true })
                         DropdownMenuItem({ Text(if (time == null) "시간 정하기" else "시간 바꾸기 ($time)") }, onClick = { dateMenu = false; timePicker = true })
@@ -171,7 +178,7 @@ fun QuickAddSheet(
                         }
                     }
                 }
-                Box {
+                if (!isTrip) Box {
                     Chip(Icons.Filled.Notifications, reminder?.let(::reminderLabel), active = reminder != null) { reminderMenu = true }
                     DropdownMenu(reminderMenu, onDismissRequest = { reminderMenu = false }) {
                         REMINDERS.forEach { m ->
@@ -180,9 +187,13 @@ fun QuickAddSheet(
                     }
                 }
                 Chip(Icons.Filled.Edit, null, active = memo != null) { memo = if (memo == null) "" else memo }
-                Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
+                if (!isTrip) Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
                 CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
             }
+            if (isTrip) Text(
+                "여행은 날짜만 고르고 추가하면, 바로 날짜별 장소 칸을 짜는 화면으로 가요 (3장)",
+                fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp),
+            )
 
             memo?.let { m ->
                 SmallField(m, { memo = it }, "메모", onRemove = { memo = null })

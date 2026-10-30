@@ -311,9 +311,9 @@
     <div class="step"><div class="step-n">4</div><div class="step-t"><b>카테고리 눌러 근처 추천</b>: 카페·맛집·관광지 버튼 → 현재 위치(또는 앞 칸 장소) 기준 카카오 카테고리 검색 → 골라서 칸 추가 <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">5</div><div class="step-t"><b>모두가 편집</b>. 누가 칸을 빼면 그룹 전원에게 "○○님이 △△를 뺐어요" 알림 <span class="decided">정함</span></div></div>
     <div class="note-in">저장은 바로바로(저장 버튼 없음). Firestore가 실시간으로 다른 멤버 화면과 차에 반영. 지운 칸은 진짜 지우지 않고 <b>deleted 표시</b>(되살리기·알림 문구용) <span class="suggest">Claude 제안</span></div>
-    <div class="ask"><span class="qid">Q06</span><b>시간 칸은 "도착 시각"인가 "머무는 시간"인가?</b><span class="rec">추천: 도착 시각 하나만(선택). 머무는 시간까지 받으면 입력이 무거워짐.</span></div>
-    <div class="ask"><span class="qid">Q07</span><b>두 사람이 동시에 같은 칸을 고치면?</b><span class="rec">추천: 나중에 저장한 게 이김. 칸 위에 "○○님이 방금 수정" 작게 표시.</span></div>
-    <div class="ask"><span class="qid">Q08</span><b>칸을 추가할 때도 알림을 줄까?</b> (정한 건 "뺄 때 알림")<span class="rec">추천: 추가·순서 변경은 알림 없이 화면에만, 빼기만 푸시.</span></div>
+    <div class="note-in">Q06 시간 칸 = <b>도착 시각 하나만</b>(선택) <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q07 동시 수정 = <b>나중에 저장한 게 이김</b> + 칸에 "○○님이 방금 수정" 작게 표시(칸마다 updatedBy·updatedAt 저장) <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q08 추가·순서 변경은 화면에만, <b>빼기만 푸시</b>(17장) <span class="decided">정함</span> 2026-10-30<br>카카오 키가 없을 때: 장소는 이름만 직접 입력, 근처 추천은 안내만, 이동 시간·동선 정렬은 직선거리로 계산. <code>local.properties</code>에 <code>KAKAO_REST_KEY=</code>를 넣으면 카카오로 바뀜 <span class="decided">정함</span> 2026-10-30</div>
     <div class="step"><div class="step-n">·</div><div class="step-t">보통 일정 입력 = <b>한 줄 빠른 입력</b>: "무슨 일정이에요?" + 칩 [날짜] [알림] [메모] [체크리스트] [카테고리 ∨] <span class="decided">정함</span>. 우리 앱에 더함: [장소] 칩(차에서 "여기로 갈까요?"용, 카카오 검색은 키 생기면), 반복(출퇴근)은 날짜 칩 안 <span class="suggest">Claude 제안</span></div></div>
   </div>
 </div>
@@ -688,7 +688,7 @@
       <div class="sb-row"><code>groups/{gid}</code> 이름, memberIds[], ownerUid, inviteCode, solo(나만 그룹 여부)</div>
       <div class="sb-row"><code>groups/{gid}/events/{eid}</code> <b>캘린더의 모든 일정</b>: 카테고리, 제목, 시작·끝 날짜(시간), 하루종일?, 장소?, 반복?, 알림(몇 분 전)?, 메모, 체크리스트[{글, 완료}], 만든사람, deleted<br>· 여행: 사용자가 고른 날짜들(여러 날 가능), carId?, driverUid?<br>· 차량 관리: 항목(주유·점검…), 주행거리, 자동여부, 금액?·리터? — 차 주인의 나만 그룹에 들어감</div>
       <div class="sb-row"><code>…/events/{eid}/days/{yyyy-MM-dd}</code> 여행의 <b>하루</b>: version, 지금 칸 번호, 상태(준비/이동중/끝)</div>
-      <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 장소 칸: 순서, 장소{이름,좌표,주소,kakaoId}, 시간?, 메모, 만든사람, deleted, 다녀옴</div>
+      <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 장소 칸: 순서, 장소{이름,좌표,주소,kakaoId}, 시간?(도착 시각), 메모, 만든사람, 마지막 수정자·시각(Q07), deleted, 다녀옴</div>
       <div class="sb-row"><code>…/days/{date}/pickups/{uid}</code> 장소, 순서, 상태(대기/탔음/끝), 예상도착</div>
       <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[]</div>
       <div class="sb-row"><code>…/records/{id}/comments/{id}</code> uid, 글, 시각</div>
@@ -811,10 +811,7 @@
     <div class="qlist">
       <div class="q"><div class="qh"><span class="qid">Q02</span><span class="qt">권한 묻는 시점</span><span class="qwhere">1장</span></div><div class="qr"><b>추천</b> 쓸 때마다</div></div>
       <div class="q"><div class="qh"><span class="qid">Q05</span><span class="qt">구글 캘린더 불러오기 범위</span><span class="qwhere">2장</span></div><div class="qr"><b>추천</b> 읽기만</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q06</span><span class="qt">시간 칸 = 도착 시각?</span><span class="qwhere">3장</span></div><div class="qr"><b>추천</b> 도착 시각만</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q07</span><span class="qt">동시 수정 충돌</span><span class="qwhere">3장</span></div><div class="qr"><b>추천</b> 나중 저장 우선</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q08</span><span class="qt">칸 추가도 알림?</span><span class="qwhere">3장</span></div><div class="qr"><b>추천</b> 빼기만 푸시</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q10</span><span class="qt">친구 추가 방법</span><span class="qwhere">4장</span></div><div class="qr"><b>추천</b> 같은 그룹 이력 + 친구 코드</div></div>
+                        <div class="q"><div class="qh"><span class="qid">Q10</span><span class="qt">친구 추가 방법</span><span class="qwhere">4장</span></div><div class="qr"><b>추천</b> 같은 그룹 이력 + 친구 코드</div></div>
       <div class="q"><div class="qh"><span class="qid">Q11</span><span class="qt">그룹장·나가기</span><span class="qwhere">4장</span></div><div class="qr"><b>추천</b> 만든 사람 = 그룹장</div></div>
       <div class="q"><div class="qh"><span class="qid">Q12</span><span class="qt">과반 안 나올 때 투표</span><span class="qwhere">5장</span></div><div class="qr"><b>추천</b> 전원 완료 시 최다</div></div>
       <div class="q"><div class="qh"><span class="qid">Q13</span><span class="qt">기본 투표 예시</span><span class="qwhere">5장</span></div></div>
@@ -850,7 +847,7 @@
     </div>
 
     <div class="qgroup">✓ 정함 (질문에서 옮겨 온 것)</div>
-    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)</div>
+    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)<br>Q06 시간 칸 = 도착 시각만 (2026-10-30)<br>Q07 동시 수정 = 나중 저장 우선 + "○○님이 방금 수정" (2026-10-30)<br>Q08 칸 추가·순서는 화면에만, 빼기만 푸시 (2026-10-30)<br>카카오 키 없이도 3장 전부 동작(이름 입력·직선거리), 키는 local.properties KAKAO_REST_KEY (2026-10-30)</div>
   </div>
 </div>
 

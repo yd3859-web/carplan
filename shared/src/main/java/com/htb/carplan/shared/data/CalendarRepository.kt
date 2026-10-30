@@ -36,9 +36,12 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
         return combine(perGroup) { lists -> lists.flatMap { it } }
     }
 
-    suspend fun addEvent(groupId: String, event: Event) {
-        db.collection(FirestorePaths.events(groupId)).add(event).await()
-    }
+    /** Adds an event and returns its id (a trip then opens its first day in 3장). */
+    suspend fun addEvent(groupId: String, event: Event): String =
+        db.collection(FirestorePaths.events(groupId)).add(event).await().id
+
+    fun observeEvent(groupId: String, eventId: String): Flow<Event?> =
+        db.document(FirestorePaths.event(groupId, eventId)).observeDoc(Event::class.java)
 
     fun observeCustomCategories(uid: String): Flow<List<CustomCategory>> =
         db.collection(FirestorePaths.customCategories(uid)).observe(CustomCategory::class.java)

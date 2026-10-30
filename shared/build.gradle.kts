@@ -21,5 +21,6 @@ dependencies {
     api(libs.firebase.firestore)
     api(libs.firebase.auth)
     api(libs.kotlinx.coroutines.play.services)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
 }
