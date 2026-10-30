@@ -98,9 +98,9 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 17장 코드 완료(`functions/index.js` 5개 트리거, 폰 `push/CarplanMessagingService` + 토큰 등록). **Blaze 전환 뒤** `firebase deploy --only functions,storage`.
 - 폰 알림 탭 딥링크 `carplan://trip/{gid}/{eid}/{date}` 처리됨(`InviteInbox.offerTrip` → `AppRoot`가 그날 레일을 전체 화면으로). `hosting/public/.well-known/assetlinks.json`에 release·debug 키 SHA-256 들어감(release 키 `~/carplan-keys/carplan-release.jks`).
 - 설정 탭 완료(`phone/settings/SettingsTab.kt`: 이름·친구 코드·일정 알림 스위치·주유 알림 기준 `cars.fuelAlertPercent`·계정·버전). 일정 [알림] 칩은 `phone/push/Reminders.kt`(AlarmManager, 2주, 반복 포함)로 실제로 울림. 11장 픽업 순서(총 시간)·지도 경로선·ETA, 17장 "곧 도착"·"주차장" 푸시까지 코드 완료.
-- 18장 보안 규칙 = `firestore.rules`(= `firestore.prod.rules`, 에뮬레이터로 23개 경우 통과). **배포는 정원이 직접** `firebase deploy --only firestore:rules`(Claude는 배포 권한 없음). 문제 생기면 `firestore.dev.rules`를 `firestore.rules`로 복사해 다시 배포. 규칙 테스트는 `firebase emulators:exec --only firestore "python3 -I <스크립트>"`로 가짜 JWT(alg none) + REST. 주의: v2 규칙에서 `{doc=**}`는 0단계도 잡아 부모 문서 규칙을 덮는다.
+- 18장 보안 규칙 = `firestore.rules`(= `firestore.prod.rules`, 에뮬레이터로 23개 경우 통과). 배포 완료(2026-10-30). 바꾸면 **정원이 직접** `firebase deploy --only firestore:rules`(Claude는 배포 권한 없음). 문제 생기면 `firestore.dev.rules`를 `firestore.rules`로 복사해 다시 배포. 규칙 테스트는 `firebase emulators:exec --only firestore "python3 -I <스크립트>"`로 가짜 JWT(alg none) + REST. 주의: v2 규칙에서 `{doc=**}`는 0단계도 잡아 부모 문서 규칙을 덮는다.
 - 다음(순서): 정원이 규칙 배포(`firebase deploy --only firestore:rules`)·Blaze → Functions·Storage 배포 → 에뮬 테스트 F2~F10 → release APK(`apk/팀명_carplan_release.apk`)·심사용 README → 기획서 DOCX(접수양식 받으면) → 시연 영상 → 시간 남으면 구글 캘린더 불러오기(Q05).
-- Firestore 규칙 파일은 18장 규칙으로 바뀌었고, 배포만 남음(정원).
+- Firestore 18장 규칙 **배포됨**(2026-10-30, 실서버 23개 경우 통과). 개발용으로 되돌리려면 `cp firestore.dev.rules firestore.rules` 후 정원이 다시 배포.
 
 ## 에뮬레이터 테스트 요령
 - AVD `Pleos_Connect_v2_1_0`, 반드시 Cold boot: `emulator -avd Pleos_Connect_v2_1_0 -no-snapshot-load`.
