@@ -149,7 +149,7 @@ fun PlaceSearchSheet(
                             }
                         },
                         label = { Text(c.label, fontSize = 16.sp) },
-                        shape = Corner,
+                        shape = Corner, colors = com.htb.carplan.phone.ui.inkChipColors(),
                     )
                 }
             }

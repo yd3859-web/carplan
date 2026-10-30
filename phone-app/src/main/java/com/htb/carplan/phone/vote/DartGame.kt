@@ -173,7 +173,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
 @Composable
 private fun ScopeChip(label: String, selected: Boolean, onClick: () -> Unit) = FilterChip(
     selected = selected, onClick = onClick, shape = Corner, label = { Text(label, fontSize = 15.sp) },
-    colors = FilterChipDefaults.filterChipColors(containerColor = Palette.Background, labelColor = Palette.TextStrong, selectedContainerColor = Palette.Navy, selectedLabelColor = Color.White),
+    colors = com.htb.carplan.phone.ui.inkChipColors(),
 )
 
 private data class HitSpot(val lat: Double, val lng: Double, val key: String)

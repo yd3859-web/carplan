@@ -57,6 +57,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -76,6 +77,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -192,11 +194,6 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 )
             }
             if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
-            if (!locked) {
-                TextButton(onClick = { pickupOpen = true }) { Text(if (pickups.isEmpty()) "픽업" else "픽업 ${pickups.size}", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-                TextButton(onClick = { voteOpen = true }) { Text("투표", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-                TextButton(onClick = { dartOpen = true }) { Text("다트", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-            }
             // 14장 내보내기: 이미지 1장(Q39) 또는 짧은 영상(사진 슬라이드 + 장소·시간 자막)
             var exportMenu by remember { mutableStateOf(false) }
             var exporting by remember { mutableStateOf<String?>(null) }
@@ -208,14 +205,30 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 }
                 if (stops.isEmpty()) unplanned.forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true, u.photoUrls)) }
             }
-            if (records.isNotEmpty()) Box {
-                TextButton(onClick = { exportMenu = true }, enabled = exporting == null) { Text(exporting ?: "내보내기", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+            // 7장 2: "오늘 이 차로 가요" — the trip gets my car and me as driver; the car app then shows it.
+            val e = event
+            when {
+                e?.carId != null -> TextButton(onClick = { if (e.driverUid == me) vm.useMyCar(null) }) {
+                    Text(if (e.driverUid == me) "내 차 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}", color = Palette.Teal, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+            }
+            // Everything else (픽업·투표·다트·내보내기) behind one menu — the header stays calm.
+            Box {
+                IconButton(onClick = { exportMenu = true }, enabled = exporting == null) { Icon(Icons.Filled.MoreVert, "더보기", tint = Palette.TextStrong) }
+                exporting?.let { Text(it, fontSize = 11.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomCenter)) }
                 androidx.compose.material3.DropdownMenu(exportMenu, onDismissRequest = { exportMenu = false }) {
-                    androidx.compose.material3.DropdownMenuItem({ Text("이미지 1장") }, onClick = {
+                    if (!locked) {
+                        androidx.compose.material3.DropdownMenuItem({ Text(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") }, onClick = { exportMenu = false; pickupOpen = true })
+                        androidx.compose.material3.DropdownMenuItem({ Text("투표") }, onClick = { exportMenu = false; voteOpen = true })
+                        androidx.compose.material3.DropdownMenuItem({ Text("다트 — 동네 뽑기") }, onClick = { exportMenu = false; dartOpen = true })
+                        if (records.isNotEmpty()) androidx.compose.material3.HorizontalDivider(color = Palette.Line)
+                    }
+                    if (records.isNotEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보내기 · 이미지 1장") }, onClick = {
                         exportMenu = false
                         scope.launch { runCatching { DayExport.share(context, event?.title ?: "하루 기록", "${date}  ·  ${group?.name ?: ""}", exportItems()) } }
                     })
-                    androidx.compose.material3.DropdownMenuItem({ Text("짧은 영상") }, onClick = {
+                    if (records.isNotEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보내기 · 짧은 영상") }, onClick = {
                         exportMenu = false
                         scope.launch {
                             exporting = "영상 준비 중"
@@ -225,14 +238,6 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                         }
                     })
                 }
-            }
-            // 7장 2: "오늘 이 차로 가요" — the trip gets my car and me as driver; the car app then shows it.
-            val e = event
-            when {
-                e?.carId != null -> TextButton(onClick = { if (e.driverUid == me) vm.useMyCar(null) }) {
-                    Text(if (e.driverUid == me) "내 차 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}", color = Palette.Teal, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                }
-                myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
             }
         }
 
@@ -427,6 +432,8 @@ private fun TimelineStop(
     onNote: (Record) -> Unit = {},
 ) {
     val belowFill by animateFloatAsState(if (railBelowPassed) 1f else 0f, tween(450), label = "railFill")
+    // Collapsed: the box, photos, the latest comment and one ghost bubble. Open: every comment, the composer, photo/note buttons.
+    var open by rememberSaveable(stop.id) { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Rail(
             modifier = modifier.width(RAIL_W).fillMaxHeight(),
@@ -437,9 +444,20 @@ private fun TimelineStop(
         )
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
             StopBox(stop, state, estimate, editedBy, dragging, locked, onOpen, onRemove, onTimeTap, record)
-            record?.let { r -> RecordStrip(r, locked, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }) }
-            comments.forEach { c -> Bubble(c, nameOf) }
-            if (!locked) CommentComposer(onSend = onSendComment)
+            record?.let { r -> RecordStrip(r, locked, editable = open, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }) }
+            val shownComments = if (open) comments else comments.takeLast(1)
+            shownComments.forEach { c -> Bubble(c, nameOf) }
+            if (!open) {
+                val hidden = comments.size - shownComments.size
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!locked) Text("코멘트 남기기", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
+                    if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 13.sp, color = Palette.TextSoft) }
+                    else if (locked && record != null) Spacer(Modifier.height(8.dp))
+                }
+            } else {
+                if (!locked) CommentComposer(onSend = onSendComment, startOpen = true)
+                TextButton(onClick = { open = false }, modifier = Modifier.padding(start = 4.dp)) { Text("접기", fontSize = 13.sp, color = Palette.TextSoft) }
+            }
             if (!isLast) LegLabel(leg, driving = state == NodeState.NEXT && false)
         }
     }
@@ -535,8 +553,8 @@ private fun Bubble(c: Comment, nameOf: (String?) -> String) {
 /** "코멘트 남기기" ghost bubble that turns into a one-line field in place. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CommentComposer(onSend: (String) -> Unit) {
-    var open by remember { mutableStateOf(false) }
+private fun CommentComposer(onSend: (String) -> Unit, startOpen: Boolean = false) {
+    var open by remember { mutableStateOf(startOpen) }
     var text by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     fun send() { if (text.isNotBlank()) { onSend(text); text = ""; open = false } }
@@ -565,21 +583,21 @@ private fun CommentComposer(onSend: (String) -> Unit) {
 
 /** Photos + 한 줄 under a stop the car reached (14장). */
 @Composable
-private fun RecordStrip(r: Record, locked: Boolean, onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit) {
+private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit) {
     Column(Modifier.padding(top = 8.dp, start = 4.dp)) {
         if (r.photoUrls.isNotEmpty()) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 r.photoUrls.forEach { url ->
                     Box {
                         AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(96.dp).clip(Corner))
-                        if (!locked) Text("×", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.TopEnd).background(Color(0x66000000)).clickable { onRemovePhoto(url) }.padding(horizontal = 8.dp, vertical = 2.dp))
+                        if (!locked && editable) Text("×", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.TopEnd).background(Color(0x66000000)).clickable { onRemovePhoto(url) }.padding(horizontal = 8.dp, vertical = 2.dp))
                     }
                 }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (r.note.isNotBlank()) Text(r.note, fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
-            if (!locked) {
+            if (!locked && editable) {
                 TextButton(onClick = onAddPhoto, enabled = r.photoUrls.size < 10) { Text(if (r.photoUrls.isEmpty()) "사진" else "사진 ${r.photoUrls.size}/10", fontSize = 13.sp, color = Palette.Navy) }
                 TextButton(onClick = onNote) { Text(if (r.note.isBlank()) "한 줄" else "한 줄 고치기", fontSize = 13.sp, color = Palette.Navy) }
             }
@@ -612,9 +630,15 @@ private fun UnplannedRow(
                     Text(listOfNotNull(record.place.address.takeIf { it.isNotBlank() && it != record.place.name }, if (!locked) "눌러서 장소 바꾸기" else null).joinToString("  ·  "), fontSize = 13.sp, color = Palette.TextSoft)
                 }
             }
-            RecordStrip(record, locked, onAddPhoto, onRemovePhoto, onNote)
-            comments.forEach { c -> Bubble(c, nameOf) }
-            if (!locked) CommentComposer(onSend = onSendComment)
+            var open by rememberSaveable(record.id) { mutableStateOf(false) }
+            RecordStrip(record, locked, editable = open, onAddPhoto = onAddPhoto, onRemovePhoto = onRemovePhoto, onNote = onNote)
+            (if (open) comments else comments.takeLast(1)).forEach { c -> Bubble(c, nameOf) }
+            if (!open) {
+                if (!locked) Text("코멘트 남기기", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
+            } else {
+                if (!locked) CommentComposer(onSend = onSendComment, startOpen = true)
+                TextButton(onClick = { open = false }, modifier = Modifier.padding(start = 4.dp)) { Text("접기", fontSize = 13.sp, color = Palette.TextSoft) }
+            }
             Spacer(Modifier.height(10.dp))
         }
     }

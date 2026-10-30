@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -33,7 +34,9 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     val message = MutableStateFlow<String?>(null)
 
     val group: StateFlow<Group?> = groups.observeGroup(groupId).catch { emit(null) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val list: StateFlow<List<Vote>> = votes.observe(groupId).catch { message.value = it.message; emit(emptyList()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val listLoaded = MutableStateFlow(false)
+    val list: StateFlow<List<Vote>> = votes.observe(groupId).catch { message.value = it.message; emit(emptyList()) }
+        .onEach { listLoaded.value = true }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val dart: StateFlow<Dart?> = darts.observeLatest(groupId).catch { emit(null) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init { viewModelScope.launch { runCatching { SessionRepository().ensureSession() }.onSuccess { uid.value = it.uid } } }

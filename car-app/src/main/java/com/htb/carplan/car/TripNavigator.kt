@@ -295,6 +295,9 @@ class TripNavigator(
                 } else {
                     val place = Place(name = lastAddress.ifBlank { "이름 없는 곳" }, lat = loc?.first ?: 0.0, lng = loc?.second ?: 0.0, address = lastAddress)
                     val (g, e) = if (t != null) t.groupId to t.eventId else dailyLogTarget(today) ?: return@runCatching
+                    // Stopping again where we just stopped (traffic, a second look) is the same record, not a new one.
+                    val again = records.recentUnplannedNear(g, e, today, place.lat, place.lng, NEAR_METERS, SAME_PARKING_MS)
+                    if (again != null) { parkedRecord = Triple(g, e, again.id); parkedDate = today; return@runCatching }
                     val id = records.addRecord(g, e, today, Record(place = place, unplanned = true, createdBy = carUid))
                     parkedRecord = Triple(g, e, id); parkedDate = today
                     _notice.value = "계획 밖 기록 칸: ${place.name} ($reason)"
@@ -851,6 +854,8 @@ class TripNavigator(
         private const val SHARE_INTERVAL_MS = 5_000L
         /** 11장 7 */
         private const val PICKUP_DONE_MS = 10 * 60_000L
+        /** A second stop within this long and [NEAR_METERS] of an unplanned record reuses it. */
+        private const val SAME_PARKING_MS = 30 * 60_000L
         /** ETA refresh while guiding (Kakao Mobility call each time). */
         private const val ETA_INTERVAL_MS = 30_000L
         /** 12장: "주차장 찾아봐 주세요" this many seconds before the next stop. */

@@ -38,6 +38,15 @@ class RecordRepository(
         return ref.id
     }
 
+    /** An unplanned record made within [withinMs] at most [meters] from (lat, lng) — the same parking, not a new one. */
+    suspend fun recentUnplannedNear(groupId: String, eventId: String, date: String, lat: Double, lng: Double, meters: Double, withinMs: Long): Record? {
+        if (lat == 0.0 && lng == 0.0) return null
+        val now = System.currentTimeMillis()
+        return db.collection(FirestorePaths.records(groupId, eventId, date)).get().await().toObjects(Record::class.java)
+            .filter { it.unplanned && it.arrivedAt != null && now - it.arrivedAt!!.toDate().time <= withinMs }
+            .firstOrNull { com.htb.carplan.shared.calendar.RouteMath.metersBetween(lat, lng, it.place.lat, it.place.lng) <= meters }
+    }
+
     /** The car pulled away (P → D): close the newest open record (13장 9). */
     suspend fun markLeft(groupId: String, eventId: String, date: String, recordId: String) {
         db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("leftAt", Timestamp.now()).await()

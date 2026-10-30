@@ -77,7 +77,10 @@ fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String)
     val group by vm.group.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
-    var creating by remember { mutableStateOf(votes.isEmpty() || seed != null) }
+    val loaded by vm.listLoaded.collectAsStateWithLifecycle()
+    var creating by remember { mutableStateOf(seed != null) }
+    // The list arrives a moment later: open on the list when there are votes, on "새 투표" only when there are none.
+    LaunchedEffect(loaded) { if (loaded && seed == null) creating = votes.isEmpty() }
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -166,9 +169,3 @@ private fun lastKnown(context: Context): Pair<Double, Double>? {
     return listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }?.let { it.latitude to it.longitude }
 }
 
-/** Selected chips in ink (design rule: no Material purple). */
-@Composable
-private fun inkChip() = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-    containerColor = Palette.Background, labelColor = Palette.TextStrong,
-    selectedContainerColor = Palette.Navy, selectedLabelColor = androidx.compose.ui.graphics.Color.White,
-)
