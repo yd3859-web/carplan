@@ -4,6 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.htb.carplan.shared.data.CalendarEvent
 import com.htb.carplan.shared.data.CalendarRepository
+import com.htb.carplan.shared.data.FirestorePaths
+import com.htb.carplan.shared.data.RecordRepository
+import com.htb.carplan.shared.calendar.CategoryColors
+import com.htb.carplan.shared.calendar.Commute
+import com.htb.carplan.shared.calendar.Repeat
+import kotlinx.coroutines.flow.first
 import com.htb.carplan.shared.data.GroupRepository
 import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.data.Session
@@ -114,6 +120,40 @@ class CalendarViewModel : ViewModel() {
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+    /** 16장 Q45: a commute the last 30 days of records suggest; null = nothing (or dismissed today). */
+    private val _commuteSuggestion = MutableStateFlow<Commute.Suggestion?>(null)
+    val commuteSuggestion: StateFlow<Commute.Suggestion?> = _commuteSuggestion.asStateFlow()
+    private var suggestionDismissed = false
+
+    private suspend fun learnCommute(s: Session, existing: List<CalendarEvent>) {
+        if (suggestionDismissed) return
+        val records = RecordRepository()
+        val today = LocalDate.now()
+        val pairs = mutableListOf<Pair<LocalDate, com.htb.carplan.shared.model.Record>>()
+        for (i in 0 until 30) {
+            val d = today.minusDays(i.toLong())
+            val list = runCatching { records.observeRecords(s.soloGroupId, FirestorePaths.dailyLogEventId(d.toString()), d.toString()).first() }.getOrNull().orEmpty()
+            list.forEach { pairs += d to it }
+        }
+        _commuteSuggestion.value = Commute.suggest(pairs, existing.map { it.event })
+    }
+
+    /** "등록": a repeating 출퇴근 event (category made on first use) at the suggested time. */
+    fun registerCommute(sg: Commute.Suggestion, title: String = "출근") {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                val cat = customCategories.value.firstOrNull { it.name == "출퇴근" }?.id
+                    ?: calendar.addCustomCategory(s.uid, "출퇴근", CategoryColors.PALETTE[3])
+                val today = LocalDate.now().toString()
+                calendar.addEvent(s.soloGroupId, Event(categoryId = cat, title = title, startDate = today, endDate = today, allDay = false, startTime = sg.time, place = sg.place, repeat = Repeat.weeklyRule(sg.days), createdBy = s.uid))
+                _commuteSuggestion.value = null
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
+    fun dismissCommute() { suggestionDismissed = true; _commuteSuggestion.value = null }
+
     val customCategories: StateFlow<List<CustomCategory>> = _session
         .flatMapLatest { s -> if (s == null) emptyFlow() else calendar.observeCustomCategories(s.uid) }
         .catch { _error.value = it.message }
@@ -124,6 +164,11 @@ class CalendarViewModel : ViewModel() {
             runCatching { sessions.ensureSession() }
                 .onSuccess { _session.value = it }
                 .onFailure { _error.value = it.message }
+        }
+        viewModelScope.launch {
+            val s = _session.filterNotNull().first()
+            val existing = upcoming.first { true }
+            runCatching { learnCommute(s, existing) }
         }
     }
 

@@ -98,6 +98,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val tripDays by vm.tripDays.collectAsStateWithLifecycle()
     val groups by vm.groups.collectAsStateWithLifecycle()
     val lastGroupId by vm.lastGroupId.collectAsStateWithLifecycle()
+    val commute by vm.commuteSuggestion.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
     var openTrip by rememberSaveable(stateSaver = TripRefSaver) { mutableStateOf<TripRef?>(null) }
@@ -114,6 +115,18 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 16.dp)) {
                 Spacer(Modifier.height(12.dp))
                 TodayCard(upcoming, car)
+                commute?.let { sg ->
+                    // 16장 Q45: the records found a routine — one tap makes it a repeating 출퇴근 event.
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${sg.days.sortedBy { it.value }.joinToString("·") { it.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.KOREAN) }} ${sg.time}쯤 ${sg.place.name}에 ${sg.count}번 갔어요. 출근 일정으로 등록할까요?",
+                            fontSize = 14.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f),
+                        )
+                        androidx.compose.material3.TextButton(onClick = { vm.registerCommute(sg) }) { Text("등록", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                        androidx.compose.material3.TextButton(onClick = vm::dismissCommute) { Text("아니요", color = Palette.TextSoft) }
+                    }
+                    androidx.compose.material3.HorizontalDivider(color = Palette.Line)
+                }
                 error?.let { Text("오류: $it", color = Palette.Sunday, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
                 Spacer(Modifier.height(4.dp))
                 MonthHeader(month, onPrev = { vm.showMonth(month.minusMonths(1)) }, onNext = { vm.showMonth(month.plusMonths(1)) })

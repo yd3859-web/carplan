@@ -65,7 +65,8 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
     }
 
     private fun Flow<List<Event>>.mapEvents(groupId: String, from: String): Flow<List<CalendarEvent>> =
-        map { events -> events.filter { !it.deleted && it.endDate >= from }.map { CalendarEvent(groupId, it) } }
+        // Repeating events (16장) stay in the window no matter how long ago they started.
+        map { events -> events.filter { !it.deleted && (it.endDate >= from || it.repeat != null) }.map { CalendarEvent(groupId, it) } }
 
     private fun <T : Any> Query.observe(type: Class<T>): Flow<List<T>> = callbackFlow {
         val reg = addSnapshotListener { snap, err ->

@@ -1,5 +1,6 @@
 package com.htb.carplan.phone.calendar
 
+import com.htb.carplan.shared.calendar.Repeat
 import com.htb.carplan.shared.data.CalendarEvent
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -46,11 +47,8 @@ object MonthGrid {
             }
     }
 
-    fun eventsOn(date: LocalDate, events: List<CalendarEvent>): List<CalendarEvent> = events.filter {
-        val s = LocalDate.parse(it.event.startDate)
-        val e = LocalDate.parse(it.event.endDate.ifEmpty { it.event.startDate })
-        date in s..e
-    }.sortedWith(compareBy({ it.event.allDay.not() }, { it.event.startTime ?: "" }))
+    fun eventsOn(date: LocalDate, events: List<CalendarEvent>): List<CalendarEvent> = events.filter { Repeat.occursOn(it.event, date) }
+        .sortedWith(compareBy({ it.event.allDay.not() }, { it.event.startTime ?: "" }))
 
     private fun col(weekStart: LocalDate, d: LocalDate) = ChronoUnit.DAYS.between(weekStart, d).toInt()
 

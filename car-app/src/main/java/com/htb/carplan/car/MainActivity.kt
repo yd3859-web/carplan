@@ -241,9 +241,10 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
         val fuel = p.reason == PromptReason.FUEL || p.reason == PromptReason.FUELED || p.reason == PromptReason.PICKUP
         val fueled = p.reason == PromptReason.FUELED
         val pickup = p.reason == PromptReason.PICKUP
+        val commute = p.reason == PromptReason.COMMUTE
         Column(Modifier.weight(1f)) {
             Text(
-                when { fuel -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" },
+                when { fuel || commute -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" },
                 color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
             )
             Text(

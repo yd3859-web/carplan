@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.htb.carplan.shared.data.CalendarEvent
+import com.htb.carplan.shared.calendar.Commute
+import com.htb.carplan.shared.calendar.Repeat
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.GroupRepository
@@ -124,6 +126,13 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         TripSyncService.start(app)
+        // 16장 Q46: within ±60 min of a registered commute, offer it (the trip question wins when there is a trip).
+        viewModelScope.launch {
+            week.collect { all ->
+                val c = Commute.candidate(all.map { it.event }, LocalDate.now(), LocalTime.now()) ?: return@collect
+                navigator.offerCommute(c)
+            }
+        }
         viewModelScope.launch {
             runCatching {
                 val uid = FirebaseAuth.getInstance().ensureSignedIn()
@@ -133,9 +142,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun eventsOn(date: LocalDate, all: List<CalendarEvent>): List<CalendarEvent> = all.filter {
-        date.toString() in it.event.startDate..it.event.endDate.ifEmpty { it.event.startDate }
-    }.sortedWith(compareBy({ !it.event.allDay }, { it.event.startTime ?: "" }))
+    fun eventsOn(date: LocalDate, all: List<CalendarEvent>): List<CalendarEvent> = all.filter { Repeat.occursOn(it.event, date) }
+        .sortedWith(compareBy({ !it.event.allDay }, { it.event.startTime ?: "" }))
 
     /** Today's next event that has a place and is not past. */
     fun nextDestination(all: List<CalendarEvent>): CalendarEvent? {

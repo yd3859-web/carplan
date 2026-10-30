@@ -18,6 +18,7 @@ import com.htb.carplan.shared.model.MaintenanceItem
 import com.htb.carplan.shared.data.RecordRepository
 import com.htb.carplan.shared.calendar.RouteMath
 import com.htb.carplan.shared.model.CarState
+import com.htb.carplan.shared.model.Event
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.net.GasStation
@@ -59,7 +60,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     val version: Long get() = day?.version ?: 0
 }
 
-enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP }
+enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE }
 
 /**
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
@@ -90,6 +91,9 @@ class TripNavigator(
     private val maintenance = MaintenanceRepository()
     private val pickupsRepo = PickupRepository()
     private var shareJob: Job? = null
+    private var commuteEvent: Event? = null
+    private var commuteDeclinedDate: String? = null
+    private var commuteAskedDate: String? = null
     /** Pickup uids currently in the navigation route (in front of [routed] stops). */
     private var routedPickups: List<String> = emptyList()
     private var fuelAtPark: Double? = null
@@ -190,7 +194,7 @@ class TripNavigator(
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
-                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
+                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
         }
     }
@@ -264,6 +268,27 @@ class TripNavigator(
 
     /** The 🎤 button: ask again now. */
     fun askNow() = ask(PromptReason.MANUAL)
+
+    /** 16장: a commute is due now. Asked once per day unless there is a trip (9장 asks first). */
+    fun offerCommute(e: Event) {
+        commuteEvent = e
+        val today = LocalDate.now().toString()
+        if (commuteAskedDate == today || commuteDeclinedDate == today) return
+        if (trip.value?.next != null || _guiding.value || _prompt.value != null) return
+        val place = e.place ?: return
+        commuteAskedDate = today
+        val message = "${withRo(place.name)} 갈까요?"
+        askJob?.cancel()
+        _prompt.value = NextPrompt(Stop(place = place), PromptReason.COMMUTE, message = message)
+        askJob = scope.launch {
+            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
+            when (answer) {
+                VoicePrompt.Answer.YES -> go()
+                VoicePrompt.Answer.NO -> later()
+                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
+            }
+        }
+    }
 
     // ---------- 12장: fuel / charge ----------
 
@@ -486,6 +511,13 @@ class TripNavigator(
         if (_prompt.value?.reason == PromptReason.FUELED) {
             askJob?.cancel(); _prompt.value = null; logFuel(); return
         }
+        if (_prompt.value?.reason == PromptReason.COMMUTE) {
+            askJob?.cancel(); _prompt.value = null
+            commuteEvent?.place?.let { p -> if (p.hasCoords()) { router.route(listOf(p)); router.openNavigation() } else router.search(p.name) }
+            lastRouteSentAt = System.currentTimeMillis()
+            _notice.value = "${commuteEvent?.title ?: "출근"} · ${commuteEvent?.place?.name} 안내"
+            return
+        }
         val wasPickup = _prompt.value?.reason == PromptReason.PICKUP
         val t = trip.value ?: return
         if (wasPickup) startSharing(t)
@@ -511,6 +543,7 @@ class TripNavigator(
         askJob?.cancel()
         if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.FUELED) { _prompt.value = null; return }
+        if (_prompt.value?.reason == PromptReason.COMMUTE) { commuteDeclinedDate = LocalDate.now().toString(); _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.PICKUP) {
             // "아니": still drive to the pickups, just without sharing the position.
             _prompt.value = null
