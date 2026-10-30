@@ -53,6 +53,8 @@ fun StopEditSheet(
     existing: Stop?,
     onSave: (Place, String?, String) -> Unit,
     onDismiss: () -> Unit,
+    /** 5장 1: "이거 투표로" — opens a new vote with this stop's place as the first candidate. */
+    onVote: ((Place) -> Unit)? = null,
 ) {
     var place by remember { mutableStateOf(existing?.place) }
     var time by remember { mutableStateOf(existing?.time) }
@@ -102,6 +104,11 @@ fun StopEditSheet(
                 shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
             ) { Text(if (existing == null) "칸 추가" else "저장", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
+            if (onVote != null && existing != null && place != null) {
+                TextButton(onClick = { onVote(place!!) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Text("이 장소로 투표 열기", color = Palette.TextSoft, fontSize = 16.sp)
+                }
+            }
         }
     }
 

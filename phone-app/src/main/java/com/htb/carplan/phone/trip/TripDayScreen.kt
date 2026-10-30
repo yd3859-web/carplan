@@ -151,6 +151,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     var placeFor by remember { mutableStateOf<Record?>(null) }
     var manualRecord by remember { mutableStateOf(false) }
     var voteOpen by remember { mutableStateOf(false) }
+    var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
     var pickupOpen by remember { mutableStateOf(false) }
     val pickups by vm.pickups.collectAsStateWithLifecycle()
     var dartOpen by remember { mutableStateOf(false) }
@@ -341,10 +342,11 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
         StopEditSheet(vm, existing = null, onSave = { p, t, m -> vm.addStop(p, t, m); adding = false }, onDismiss = { adding = false })
     }
     editing?.let { stop ->
-        StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null })
+        StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null },
+            onVote = { p -> voteSeed = p; editing = null; voteOpen = true })
     }
     if (pickupOpen) PickupSheet(vm, onDismiss = { pickupOpen = false })
-    if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false })
+    if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null }, seed = voteSeed)
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
     placePicker?.let { cb -> PlaceSearchSheet(vm = vm, onPick = { cb(it); placePicker = null }, onDismiss = { placePicker = null }) }
     noteFor?.let { r ->

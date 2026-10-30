@@ -125,6 +125,18 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 17장 표: 차량 관리 시기는 차 첫 화면에도 — this week's nearest 차량 관리 due (events `due-*`, 15장). */
+    val careDue: StateFlow<String?> = week.map { all ->
+        val today = LocalDate.now()
+        all.filter { it.event.categoryId == com.htb.carplan.shared.model.BuiltInCategory.CAR.id && it.event.id.startsWith("due-") && LocalDate.parse(it.event.startDate) >= today }
+            .minByOrNull { it.event.startDate }
+            ?.let { e ->
+                val days = java.time.temporal.ChronoUnit.DAYS.between(today, LocalDate.parse(e.event.startDate))
+                val what = e.event.maintenance?.item?.label ?: e.event.title
+                what + " " + if (days == 0L) "오늘" else "${days}일 뒤"
+            }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     init {
         TripSyncService.start(app)
         // 16장 Q46: within ±60 min of a registered commute, offer it (the trip question wins when there is a trip).

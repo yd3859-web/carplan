@@ -1,12 +1,20 @@
 rules_version = '2';
 
-// DEV RULES: any signed-in user may read/write record photos.
-// Tighten to group members before 1차 제출 (18장).
+// 18장: 기록 사진은 records/{groupId}/{eventId}/{date}/{recordId}/{file}.
+// 그 그룹의 멤버와 멤버의 차(차 계정 uid = cars/{id}, ownerUid가 멤버)만 읽고 쓴다. 이미지 5MB까지.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /records/{allPaths=**} {
-      allow read, write: if request.auth != null && request.resource == null
-        || (request.auth != null && request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*'));
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function members(gid) { return firestore.get(/databases/(default)/documents/groups/$(gid)).data.memberIds; }
+    function isCar() { return firestore.exists(/databases/(default)/documents/cars/$(me())); }
+    function carOwner() { return firestore.get(/databases/(default)/documents/cars/$(me())).data.ownerUid; }
+    function canAct(gid) { return me() in members(gid) || (isCar() && carOwner() in members(gid)); }
+
+    match /records/{gid}/{eid}/{date}/{recordId}/{file} {
+      allow read: if signedIn() && canAct(gid);
+      allow write: if signedIn() && canAct(gid)
+        && (request.resource == null || (request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*')));
     }
   }
 }

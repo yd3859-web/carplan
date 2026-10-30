@@ -36,6 +36,10 @@ class VehicleMonitor(private val context: Context) {
     /** Fires once each time a passenger seat (not the driver's) becomes occupied (7장 4: "같이 타셨나요?"). */
     private val _passengerSeated = MutableSharedFlow<SeatValue>(extraBufferCapacity = 4)
     val passengerSeated: SharedFlow<SeatValue> = _passengerSeated
+    /** 13장 Q34: the driver's belt went from buckled to unbuckled while parked (real car; the Virtual Console has no belt). */
+    private val _driverUnbuckled = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val driverUnbuckled: SharedFlow<Unit> = _driverUnbuckled
+    private var driverBuckled: Boolean? = null
     /** 8장 status band: how many passenger seats (not the driver's) are occupied right now. */
     private val _passengerCount = MutableStateFlow(0)
     val passengerCount: StateFlow<Int> = _passengerCount.asStateFlow()
@@ -109,6 +113,19 @@ class VehicleMonitor(private val context: Context) {
                 { m -> m?.let { r -> _state.update { it.copy(rangeKm = r.toDouble() / 1000) } } },
                 { Log.w(TAG, "range read failed", it) },
             )
+            // 13장: no belt listener in the SDK → while in P, read the driver's buckle every 2 s.
+            handler.postDelayed(object : Runnable {
+                override fun run() {
+                    if (_state.value.gear == Gear.P) runCatching {
+                        v.getSeat().getCurrentSeatBeltBuckledState(SeatArea(SeatValue.ROW_1_LEFT), { buckled ->
+                            val now = buckled == true
+                            if (driverBuckled == true && !now) _driverUnbuckled.tryEmit(Unit)
+                            driverBuckled = now
+                        }, { })
+                    } else driverBuckled = null
+                    handler.postDelayed(this, 2_000)
+                }
+            }, 2_000)
             // 15장: odometer has no listener → poll once a minute (Virtual Console: /vehicle/odometer).
             pollOdometer(v)
             handler.postDelayed(object : Runnable { override fun run() { vehicle?.let(::pollOdometer); handler.postDelayed(this, 60_000) } }, 60_000)

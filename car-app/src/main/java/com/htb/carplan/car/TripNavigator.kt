@@ -235,6 +235,11 @@ class TripNavigator(
         if (lastGear == Gear.P) { parkTimer?.cancel(); confirmArrival(reason = "운전석 문") }
     }
 
+    /** Driver's belt unbuckled while parked (13장 2): same meaning as the door — about to get out. */
+    fun onDriverUnbuckled() {
+        if (lastGear == Gear.P) { parkTimer?.cancel(); confirmArrival(reason = "운전석 벨트") }
+    }
+
     /**
      * Makes the record for this parking (once): linked to the next planned stop when within
      * [NEAR_METERS] of it (or when we cannot measure and a route is active), otherwise unplanned;

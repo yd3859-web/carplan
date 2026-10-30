@@ -126,7 +126,8 @@ private fun CarHome(vm: CarHomeViewModel) {
 
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
-        StatusBand(car, vehicle, qrGroup?.name, passengers)
+        val careDue by vm.careDue.collectAsStateWithLifecycle()
+        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue)
         error?.let { Text("오류: $it", color = Warn, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         notice?.let { Text(it, color = Accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
@@ -193,7 +194,7 @@ private fun CarHome(vm: CarHomeViewModel) {
 }
 
 @Composable
-private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int) {
+private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(28.dp),
@@ -208,6 +209,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         Spacer(Modifier.weight(1f))
         groupName?.let { Stat("그룹", it) }
         if (passengers > 0) Stat("동승자", "${passengers}명")
+        careDue?.let { Stat("정비", it) }
         Text(if (car?.ownerUid != null) "차주 연결됨" else "연결 전", color = Soft, fontSize = 16.sp)
     }
     HorizontalDivider(color = Line)
