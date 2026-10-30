@@ -9,6 +9,8 @@ import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.BuiltInCategory
 import com.htb.carplan.shared.model.Stop
+import com.htb.carplan.shared.model.Comment
+import com.htb.carplan.shared.model.TripDay
 import com.htb.carplan.shared.model.Car
 import com.htb.carplan.shared.model.CustomCategory
 import com.htb.carplan.shared.model.Event
@@ -77,6 +79,26 @@ class CalendarViewModel : ViewModel() {
     }.flatMapLatest { trips ->
         if (trips.isEmpty()) flowOf(emptyMap())
         else combine(trips.map { (t, date) -> tripRepo.observeStops(t.groupId, t.event.id, date).map { t.event.id to it.filterNot { s -> s.deleted } } }) { it.toMap() }
+    }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    private val selectedTrips = combine(events, _selected) { all, date ->
+        MonthGrid.eventsOn(date, all).filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to date.toString() }
+    }
+
+    /** Latest comments under each trip's stops (그날 동선 shows the newest one per stop). */
+    val tripComments: StateFlow<Map<String, List<Comment>>> = selectedTrips.flatMapLatest { trips ->
+        if (trips.isEmpty()) flowOf(emptyMap())
+        else combine(trips.map { (t, date) -> tripRepo.observeDayComments(t.groupId, t.event.id, date).map { t.event.id to it } }) { it.toMap() }
+    }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Day status per trip (DRIVING makes the first unreached stop the "next" node). */
+    val tripDays: StateFlow<Map<String, TripDay?>> = selectedTrips.flatMapLatest { trips ->
+        if (trips.isEmpty()) flowOf(emptyMap())
+        else combine(trips.map { (t, date) -> tripRepo.observeDay(t.groupId, t.event.id, date).map { t.event.id to it } }) { it.toMap() }
     }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())

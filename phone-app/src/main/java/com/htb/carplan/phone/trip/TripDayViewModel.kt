@@ -4,11 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.htb.carplan.phone.BuildConfig
 import com.htb.carplan.shared.calendar.RouteMath
+import com.htb.carplan.shared.calendar.Schedule
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.data.TripRepository
+import com.htb.carplan.shared.model.Comment
 import com.htb.carplan.shared.model.Event
+import com.htb.carplan.shared.model.TripDay
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Stop
 import com.htb.carplan.shared.net.KakaoApi
@@ -84,6 +87,22 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         else live.sortedBy { order.indexOf(it.id).let { i -> if (i < 0) Int.MAX_VALUE else i } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** The day document: status (READY/DRIVING/DONE) tells the timeline which node is "next". */
+    val day: StateFlow<TripDay?> = _date
+        .flatMapLatest { trips.observeDay(groupId, eventId, it) }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val remoteComments: StateFlow<List<Comment>> = _date
+        .flatMapLatest { trips.observeDayComments(groupId, eventId, it) }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Comments under each stop (3장 말풍선), oldest first, keyed by stop id. */
+    val comments: StateFlow<Map<String, List<Comment>>> = remoteComments
+        .map { list -> list.filter { it.stopId != null }.groupBy { it.stopId!! } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     /** Stops someone removed; shown as "○○님이 △△를 뺐어요 · 되살리기". */
     val removed: StateFlow<List<Stop>> = remoteStops.map { all -> all.filter { it.deleted } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -92,6 +111,11 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     private val _legs = MutableStateFlow<Map<String, LegInfo>>(emptyMap())
     val legs: StateFlow<Map<String, LegInfo>> = _legs.asStateFlow()
     private val legCache = HashMap<String, LegInfo>()
+
+    /** "예상 12:05" for stops without a typed time: previous time + stay + drive (Schedule). */
+    val estimates: StateFlow<Map<String, String>> = combine(stops, _legs) { list, legs ->
+        Schedule.estimate(list, { id -> legs[id]?.seconds })
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /** uid → display name for "○○님" labels (anonymous users have none → "일행"). */
     private val _names = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -105,6 +129,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         }
         viewModelScope.launch { stops.collect { refreshLegs(it) } }
         viewModelScope.launch { remoteStops.collect { list -> list.mapNotNull { it.updatedBy }.distinct().forEach(::loadName) } }
+        viewModelScope.launch { remoteComments.collect { list -> list.map { it.uid }.distinct().forEach(::loadName) } }
     }
 
     fun showDate(d: String) {
@@ -137,6 +162,17 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
 
     fun updateStop(stopId: String, place: Place, time: String?, memo: String) = write {
         trips.updateStop(groupId, eventId, _date.value, stopId, place, time, memo, me())
+    }
+
+    /** Tapping the time on the timeline: confirm an estimate or change the typed time in place. */
+    fun setTime(stopId: String, time: String?) = write {
+        val s = stops.value.firstOrNull { it.id == stopId } ?: return@write
+        trips.updateStop(groupId, eventId, _date.value, stopId, s.place, time, s.memo, me())
+    }
+
+    fun addComment(stopId: String, text: String) = write {
+        if (text.isBlank()) return@write
+        trips.addComment(groupId, eventId, _date.value, stopId, text, me())
     }
 
     fun remove(stopId: String) = write { trips.setDeleted(groupId, eventId, _date.value, stopId, true, me()) }

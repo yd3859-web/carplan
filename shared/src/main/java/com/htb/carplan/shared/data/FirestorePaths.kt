@@ -24,6 +24,8 @@ object FirestorePaths {
     fun day(groupId: String, eventId: String, date: String) = "${event(groupId, eventId)}/days/$date"
     fun stops(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/stops"
     fun pickups(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/pickups"
+    /** Member comments hanging under the day's stops (3장 말풍선). */
+    fun dayComments(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/comments"
     fun records(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/records"
     fun comments(groupId: String, eventId: String, date: String, recordId: String) =
         "${records(groupId, eventId, date)}/$recordId/comments"

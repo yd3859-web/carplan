@@ -1,9 +1,16 @@
 package com.htb.carplan.phone.trip
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,22 +29,32 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,9 +62,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,8 +80,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.htb.carplan.phone.ui.Corner
+import com.htb.carplan.phone.ui.NodeState
 import com.htb.carplan.phone.ui.Palette
+import com.htb.carplan.phone.ui.RailNode
+import com.htb.carplan.phone.ui.railLine
+import com.htb.carplan.phone.ui.speechBubble
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
+import com.htb.carplan.shared.model.Comment
+import com.htb.carplan.shared.model.DayStatus
 import com.htb.carplan.shared.model.Stop
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -65,10 +95,14 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
+private val RAIL_W = 48.dp
+private val NODE = 26.dp
+
 /**
- * 3장 그날 장소 칸: date tabs across the trip, the day's stops in route order
- * (long-press to drag), the drive between them, 추가 / 빼기 / 되살리기 / [동선 최소로 정렬].
- * Everything saves immediately; other members and the car see it live.
+ * 3장 그날 장소 칸 as one living timeline (the sketch in 이미지/): a rail on the left with a node
+ * per stop, a box with time + place, comment bubbles hanging under each stop, the drive between
+ * stops on a dotted rail, and a "+" node at the end. The same rail is what the car fills in later
+ * (visited nodes grey, the next one blue). Everything saves immediately.
  */
 @Composable
 fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
@@ -79,6 +113,9 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     val stops by vm.stops.collectAsStateWithLifecycle()
     val removed by vm.removed.collectAsStateWithLifecycle()
     val legs by vm.legs.collectAsStateWithLifecycle()
+    val comments by vm.comments.collectAsStateWithLifecycle()
+    val estimates by vm.estimates.collectAsStateWithLifecycle()
+    val day by vm.day.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val me by vm.uid.collectAsStateWithLifecycle()
@@ -86,18 +123,25 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
 
     var editing by remember { mutableStateOf<Stop?>(null) }
     var adding by remember { mutableStateOf(false) }
+    var timeFor by remember { mutableStateOf<Stop?>(null) }
 
     BackHandler(onBack = onBack)
+
+    val driving = day?.status == DayStatus.DRIVING
+    val nextId = if (driving) stops.firstOrNull { !it.visited }?.id else null
 
     Column(Modifier.fillMaxSize().background(Palette.Background).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
             Column(Modifier.weight(1f)) {
-                Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+                Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                 // 4장에서 그룹 고르기가 생기면 여기 그룹 이름이 들어간다.
-                Text("나만 그룹 · 모두가 편집 · 바로 저장", fontSize = 12.sp, color = Palette.TextSoft)
+                Text(
+                    listOf("나만 그룹", "모두가 편집", when (day?.status) { DayStatus.DRIVING -> "차가 가는 중"; DayStatus.DONE -> "다 다녀옴"; else -> "바로 저장" }).joinToString(" · "),
+                    fontSize = 13.sp, color = Palette.TextSoft,
+                )
             }
-            if (busy) Text("저장 중", fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
+            if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
         }
 
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -107,7 +151,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
 
         error?.let {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("오류: $it", color = Palette.Sunday, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text("오류: $it", color = Palette.Sunday, fontSize = 13.sp, modifier = Modifier.weight(1f))
                 IconButton(onClick = vm::clearError) { Icon(Icons.Filled.Close, "닫기", tint = Palette.TextSoft) }
             }
         }
@@ -117,37 +161,52 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             vm.moveLocally(from.key as String, to.key as String)
         }
         LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-            if (stops.isEmpty()) item { Text("아직 장소 칸이 없어요. 아래에서 추가해요", color = Palette.TextSoft, fontSize = 14.sp, modifier = Modifier.padding(vertical = 12.dp)) }
-            items(stops, key = { it.id }) { stop ->
+            item { Spacer(Modifier.height(12.dp)) }
+            itemsIndexed(stops, key = { _, s -> s.id }) { i, stop ->
                 ReorderableItem(reorder, key = stop.id) { dragging ->
-                    val i = stops.indexOfFirst { it.id == stop.id }
-                    Column {
-                        StopRow(
+                    val state = when {
+                        stop.visited -> NodeState.VISITED
+                        stop.id == nextId -> NodeState.NEXT
+                        else -> NodeState.PLANNED
+                    }
+                    val nextStop = stops.getOrNull(i + 1)
+                    Appear(index = i) {
+                        TimelineStop(
                             index = i,
                             stop = stop,
+                            state = state,
+                            estimate = estimates[stop.id],
                             editedBy = recentEditor(stop, me, vm::nameOf),
+                            comments = comments[stop.id].orEmpty(),
+                            nameOf = vm::nameOf,
+                            leg = legs[stop.id],
+                            railAbovePassed = i > 0 && stop.visited,
+                            railBelowPassed = nextStop?.visited == true,
+                            isLast = i == stops.lastIndex,
                             dragging = dragging,
                             modifier = Modifier.longPressDraggableHandle(onDragStopped = { vm.commitOrder() }),
-                            onClick = { editing = stop },
+                            onOpen = { editing = stop },
                             onRemove = { vm.remove(stop.id) },
+                            onTimeTap = { timeFor = stop },
+                            onSendComment = { vm.addComment(stop.id, it) },
                         )
-                        if (i < stops.lastIndex) LegRow(legs[stop.id])
                     }
                 }
             }
+            item(key = "add") { AddNode(empty = stops.isEmpty()) { adding = true } }
             if (removed.isNotEmpty()) {
-                item { Text("뺀 칸", fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }
+                item { Text("뺀 칸", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 20.dp, bottom = 4.dp)) }
                 items(removed, key = { "removed-" + it.id }) { stop ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "${vm.whoDid(stop.updatedBy)} ${stop.place.name}를(을) 뺐어요",
-                            fontSize = 13.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
+                            fontSize = 15.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                        TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
                     }
                 }
             }
-            item { Spacer(Modifier.height(12.dp)) }
+            item { Spacer(Modifier.height(16.dp)) }
         }
 
         HorizontalDivider(color = Palette.Line)
@@ -155,16 +214,16 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             OutlinedButton(
                 onClick = vm::sortShortest,
                 enabled = stops.count { it.place.hasCoords() } >= 3,
-                modifier = Modifier.weight(1f).height(50.dp),
+                modifier = Modifier.weight(1f).height(52.dp),
                 shape = Corner,
                 border = BorderStroke(1.dp, Palette.Line),
-            ) { Text(if (vm.kakaoAvailable) "동선 최소로 정렬" else "동선 정렬 (직선)", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+            ) { Text(if (vm.kakaoAvailable) "동선 최소로 정렬" else "동선 정렬 (직선)", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
             Button(
                 onClick = { adding = true },
-                modifier = Modifier.weight(1f).height(50.dp),
+                modifier = Modifier.weight(1f).height(52.dp),
                 shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-            ) { Text("장소 칸 추가", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+            ) { Text("장소 추가", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
 
@@ -173,6 +232,199 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     }
     editing?.let { stop ->
         StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null })
+    }
+    timeFor?.let { stop ->
+        TimeDialog(
+            initial = stop.time ?: estimates[stop.id],
+            onPick = { vm.setTime(stop.id, it); timeFor = null },
+            onClear = { vm.setTime(stop.id, null); timeFor = null },
+            onDismiss = { timeFor = null },
+        )
+    }
+}
+
+/** Items slide up one after another the first time the list shows (phone only; the car has no such motion). */
+@Composable
+private fun Appear(index: Int, content: @Composable () -> Unit) {
+    val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(
+        visibleState = shown,
+        enter = fadeIn(tween(220, delayMillis = minOf(index, 8) * 45)) + slideInVertically(tween(260, delayMillis = minOf(index, 8) * 45)) { it / 6 },
+    ) { content() }
+}
+
+/**
+ * One stop on the rail: node + rail segments on the left; box, comment bubbles, composer and the
+ * drive to the next stop on the right. The rail above/below is solid when that leg is already driven,
+ * dotted otherwise; the fill slides down when a leg becomes driven.
+ */
+@Composable
+private fun TimelineStop(
+    index: Int,
+    stop: Stop,
+    state: NodeState,
+    estimate: String?,
+    editedBy: String?,
+    comments: List<Comment>,
+    nameOf: (String?) -> String,
+    leg: LegInfo?,
+    railAbovePassed: Boolean,
+    railBelowPassed: Boolean,
+    isLast: Boolean,
+    dragging: Boolean,
+    modifier: Modifier,
+    onOpen: () -> Unit,
+    onRemove: () -> Unit,
+    onTimeTap: () -> Unit,
+    onSendComment: (String) -> Unit,
+) {
+    val belowFill by animateFloatAsState(if (railBelowPassed) 1f else 0f, tween(450), label = "railFill")
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Rail(
+            modifier = modifier.width(RAIL_W).fillMaxHeight(),
+            state = state,
+            abovePassed = railAbovePassed,
+            belowFill = belowFill,
+            drawAbove = index > 0,
+        )
+        Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
+            StopBox(stop, state, estimate, editedBy, dragging, onOpen, onRemove, onTimeTap)
+            comments.forEach { c -> Bubble(c, nameOf) }
+            CommentComposer(onSend = onSendComment)
+            if (!isLast) LegLabel(leg, driving = state == NodeState.NEXT && false)
+        }
+    }
+}
+
+/** The node and the rail segments above and below it (shared drawing in ui/Rail.kt). */
+@Composable
+private fun Rail(modifier: Modifier, state: NodeState, abovePassed: Boolean, belowFill: Float, drawAbove: Boolean) {
+    Box(
+        modifier.railLine(nodeCenter = NODE / 2 + 2.dp, drawAbove = drawAbove, abovePassed = abovePassed, belowFill = belowFill),
+        contentAlignment = Alignment.TopCenter,
+    ) { RailNode(state, NODE, Modifier.padding(top = 2.dp)) }
+}
+
+@Composable
+private fun StopBox(
+    stop: Stop, state: NodeState, estimate: String?, editedBy: String?, dragging: Boolean,
+    onOpen: () -> Unit, onRemove: () -> Unit, onTimeTap: () -> Unit,
+) {
+    val next = state == NodeState.NEXT
+    val visited = state == NodeState.VISITED
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .shadow(if (dragging) 8.dp else 0.dp, Corner)
+            .clip(Corner)
+            .background(Palette.Background)
+            .border(if (next) 2.dp else 1.dp, if (next) Palette.Teal else Palette.SheetEdge, Corner)
+            .clickable(onClick = onOpen)
+            .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Time: typed = black, estimated = grey "예상", none = "시간". Tap to set in place.
+        Column(Modifier.width(68.dp).clickable(onClick = onTimeTap)) {
+            when {
+                stop.time != null -> Text(stop.time!!, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (visited) Palette.TextSoft else Palette.TextStrong)
+                estimate != null -> { Text("예상", fontSize = 11.sp, color = Palette.TextSoft); Text(estimate, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextSoft) }
+                else -> Text("시간", fontSize = 15.sp, color = Palette.SheetEdge)
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stop.place.name, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = if (visited) Palette.TextSoft else Palette.TextStrong, modifier = Modifier.weight(1f, fill = false))
+                if (next) Text("  다음", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
+            }
+            val sub = listOfNotNull(
+                stop.place.address.takeIf { it.isNotBlank() },
+                if (!stop.place.hasCoords()) "좌표 없음" else null,
+                editedBy,
+            ).joinToString("  ·  ")
+            if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft)
+            if (stop.memo.isNotBlank()) Text(stop.memo, fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
+        }
+        IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) }
+    }
+}
+
+/** A member's note hanging off the rail; it slides in from the rail side when it arrives. */
+@Composable
+private fun Bubble(c: Comment, nameOf: (String?) -> String) {
+    val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(visibleState = shown, enter = fadeIn(tween(200)) + slideInHorizontally(tween(240)) { -it / 4 }) {
+        Column(Modifier.padding(top = 8.dp, start = 10.dp, end = 24.dp).speechBubble().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(c.text, fontSize = 16.sp, color = Palette.TextStrong)
+            Text(
+                nameOf(c.uid) + (c.createdAt?.toDate()?.let { " · " + android.text.format.DateFormat.format("HH:mm", it) } ?: ""),
+                fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/** "코멘트 남기기" ghost bubble that turns into a one-line field in place. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommentComposer(onSend: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    fun send() { if (text.isNotBlank()) { onSend(text); text = ""; open = false } }
+    // The field takes the cursor the moment it opens, so typing starts right away.
+    LaunchedEffect(open) { if (open) focus.requestFocus() }
+    if (!open) {
+        Text(
+            "코멘트 남기기",
+            fontSize = 14.sp, color = Palette.TextSoft,
+            modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
+    } else {
+        Row(Modifier.padding(top = 8.dp, start = 10.dp, end = 24.dp).speechBubble(), verticalAlignment = Alignment.CenterVertically) {
+            TextField(
+                text, { text = it }, placeholder = { Text("여기서 뭐 먹을까?", fontSize = 16.sp) }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 16.sp),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send() }),
+                colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
+                modifier = Modifier.weight(1f).focusRequester(focus),
+            )
+            IconButton(onClick = ::send, enabled = text.isNotBlank()) { Icon(Icons.AutoMirrored.Filled.Send, "보내기", tint = if (text.isNotBlank()) Palette.Navy else Palette.SheetEdge) }
+            IconButton(onClick = { open = false; text = "" }) { Icon(Icons.Filled.Close, "닫기", tint = Palette.TextSoft) }
+        }
+    }
+}
+
+/** The drive to the next stop, written beside the dotted rail. */
+@Composable
+private fun LegLabel(leg: LegInfo?, driving: Boolean) {
+    Text(
+        when {
+            leg == null -> "이동"
+            leg.exact -> "이동 ${minutes(leg.seconds)} · ${km(leg.meters)}"
+            else -> "이동 약 ${minutes(leg.seconds)} · ${km(leg.meters)} (직선)"
+        },
+        fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp, start = 4.dp),
+    )
+}
+
+/** The empty node at the end of the rail: the one tap that adds a place. */
+@Composable
+private fun AddNode(empty: Boolean, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.width(RAIL_W).fillMaxHeight().drawBehind {
+                if (!empty) {
+                    val x = size.width / 2
+                    drawLine(Palette.Line, Offset(x, 0f), Offset(x, size.height / 2), 3.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 7.dp.toPx()), 0f))
+                }
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(NODE).clip(CircleShape).background(Palette.Background).border(2.dp, Palette.Navy, CircleShape), contentAlignment = Alignment.Center) {
+                Text("+", color = Palette.Navy, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Text(if (empty) "첫 장소 추가" else "장소 추가", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, modifier = Modifier.padding(vertical = 14.dp))
     }
 }
 
@@ -196,52 +448,25 @@ private fun DateTab(date: String, dayNo: Int, selected: Boolean, onClick: () -> 
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StopRow(index: Int, stop: Stop, editedBy: String?, dragging: Boolean, modifier: Modifier, onClick: () -> Unit, onRemove: () -> Unit) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .shadow(if (dragging) 6.dp else 0.dp, Corner)
-            .clip(Corner)
-            .background(if (dragging) Palette.InputBg else Palette.Background)
-            .clickable(onClick = onClick)
-            .padding(start = 4.dp, top = 12.dp, bottom = 12.dp)
-            .height(IntrinsicSize.Min),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("${index + 1}", Modifier.width(28.dp), color = if (stop.place.hasCoords()) Palette.Teal else Palette.TextSoft, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Column(Modifier.weight(1f).padding(start = 4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                stop.time?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.ChipText, modifier = Modifier.padding(end = 8.dp)) }
-                Text(stop.place.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+private fun TimeDialog(initial: String?, onPick: (String) -> Unit, onClear: () -> Unit, onDismiss: () -> Unit) {
+    val parts = initial?.split(":")?.map { it.toInt() }
+    val state = rememberTimePickerState(initialHour = parts?.get(0) ?: 10, initialMinute = parts?.get(1) ?: 0, is24Hour = true)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = Corner,
+        containerColor = Palette.Background,
+        title = { Text("도착 시각", fontSize = 20.sp) },
+        text = { TimeInput(state) },
+        confirmButton = { TextButton(onClick = { onPick("%02d:%02d".format(state.hour, state.minute)) }) { Text("확정", fontSize = 17.sp, color = Palette.Navy) } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onClear) { Text("비우기", fontSize = 17.sp, color = Palette.TextSoft) }
+                TextButton(onClick = onDismiss) { Text("취소", fontSize = 17.sp, color = Palette.TextSoft) }
             }
-            val sub = listOfNotNull(
-                stop.place.address.takeIf { it.isNotBlank() },
-                if (!stop.place.hasCoords()) "좌표 없음" else null,
-                editedBy,
-            ).joinToString("  ·  ")
-            if (sub.isNotEmpty()) Text(sub, fontSize = 12.sp, color = Palette.TextSoft)
-            if (stop.memo.isNotBlank()) Text(stop.memo, fontSize = 13.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
-        }
-        IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) }
-    }
-}
-
-/** The drive between two stops; Kakao time when there is a key, a straight-line guess otherwise. */
-@Composable
-private fun LegRow(leg: LegInfo?) {
-    Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-        Spacer(Modifier.width(4.dp))
-        Box(Modifier.width(28.dp).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
-            Box(Modifier.padding(start = 5.dp).width(1.dp).fillMaxHeight().background(Palette.Line))
-        }
-        val label = when {
-            leg == null -> "이동"
-            leg.exact -> "이동 ${minutes(leg.seconds)} · ${km(leg.meters)}"
-            else -> "이동 약 ${minutes(leg.seconds)} · ${km(leg.meters)} (직선)"
-        }
-        Text(label, Modifier.padding(start = 4.dp), fontSize = 12.sp, color = Palette.TextSoft)
-    }
+        },
+    )
 }
 
 private fun minutes(seconds: Int) = if (seconds >= 3600) "${seconds / 3600}시간 ${seconds % 3600 / 60}분" else "${maxOf(1, seconds / 60)}분"

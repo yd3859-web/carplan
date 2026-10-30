@@ -94,6 +94,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val categories by vm.customCategories.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     val tripStops by vm.tripStops.collectAsStateWithLifecycle()
+    val tripComments by vm.tripComments.collectAsStateWithLifecycle()
+    val tripDays by vm.tripDays.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
     var openTrip by rememberSaveable(stateSaver = TripRefSaver) { mutableStateOf<TripRef?>(null) }
@@ -127,6 +129,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     onAdd = { quickAddDate = selected },
                     modifier = Modifier.width(400.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) },
                     tripStops = tripStops,
+                    tripComments = tripComments,
+                    tripDays = tripDays,
                     onOpenTrip = { openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
                 )
             }
@@ -142,6 +146,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 onAdd = { daySheetOpen = false; quickAddDate = selected },
                 modifier = Modifier.fillMaxWidth().height(480.dp),
                 tripStops = tripStops,
+                tripComments = tripComments,
+                tripDays = tripDays,
                 onOpenTrip = { daySheetOpen = false; openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
             )
         }

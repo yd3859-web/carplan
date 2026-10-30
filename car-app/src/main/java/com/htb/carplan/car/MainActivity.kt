@@ -6,11 +6,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,8 +21,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -41,7 +46,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +73,7 @@ private val Line = Color(0xFFE4E6E9)
 private val Accent = Color(0xFF0066B3)
 private val Warn = Color(0xFFD9342B)
 private val Corner = RoundedCornerShape(4.dp)
+private val RailPassed = Color(0xFFB9BEC4)
 
 class MainActivity : ComponentActivity() {
     private val vm: CarHomeViewModel by viewModels()
@@ -221,7 +232,10 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
     }
 }
 
-/** The day's stops in route order: number, done ones greyed with a check, the next one in the accent color (9장). */
+/**
+ * The day's stops on one rail (same idea as the phone): grey check = reached, blue = next, ring = planned.
+ * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
+ */
 @Composable
 private fun TripStops(trip: TodayTrip) {
     val nextId = trip.next?.id
@@ -229,11 +243,36 @@ private fun TripStops(trip: TodayTrip) {
     trip.stops.forEachIndexed { i, s ->
         val isNext = s.id == nextId
         val color = when { s.visited -> Soft; isNext -> Accent; else -> Ink }
-        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (s.visited) "✓" else "${i + 1}", Modifier.width(34.dp), color = color, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text((s.time?.let { "$it  " } ?: "") + s.place.name, color = color, fontSize = 21.sp, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal)
-            if (isNext) Text("  다음", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            if (s.memo.isNotBlank()) Text("  · ${s.memo}", color = Soft, fontSize = 17.sp, maxLines = 1)
+        val below = trip.stops.getOrNull(i + 1)
+        val fill by animateFloatAsState(if (below?.visited == true) 1f else 0f, tween(450), label = "railFill")
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                Modifier.width(44.dp).fillMaxHeight().drawBehind {
+                    val x = size.width / 2
+                    val cy = 15.dp.toPx()
+                    val w = 3.dp.toPx()
+                    val dots = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 7.dp.toPx()), 0f)
+                    if (i > 0) drawLine(if (s.visited) RailPassed else Line, Offset(x, 0f), Offset(x, cy), w, StrokeCap.Round, if (s.visited) null else dots)
+                    if (below != null) {
+                        drawLine(Line, Offset(x, cy), Offset(x, size.height), w, StrokeCap.Round, dots)
+                        if (fill > 0f) drawLine(RailPassed, Offset(x, cy), Offset(x, cy + (size.height - cy) * fill), w, StrokeCap.Round)
+                    }
+                },
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(Modifier.padding(top = 4.dp).size(22.dp), contentAlignment = Alignment.Center) {
+                    when {
+                        s.visited -> Box(Modifier.size(18.dp).clip(CircleShape).background(RailPassed), contentAlignment = Alignment.Center) { Text("✓", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                        isNext -> Box(Modifier.size(22.dp).clip(CircleShape).background(Accent))
+                        else -> Box(Modifier.size(18.dp).clip(CircleShape).background(Bg).border(2.dp, Color(0xFFAEB4BA), CircleShape))
+                    }
+                }
+            }
+            Row(Modifier.weight(1f).padding(bottom = if (below != null) 10.dp else 0.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text((s.time?.let { "$it  " } ?: "") + s.place.name, color = color, fontSize = 21.sp, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal)
+                if (isNext) Text("  다음", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                if (s.memo.isNotBlank()) Text("  · ${s.memo}", color = Soft, fontSize = 17.sp, maxLines = 1)
+            }
         }
     }
 }

@@ -192,11 +192,17 @@ data class Record(
     val photoUrls: List<String> = emptyList(),
 )
 
-/** .../records/{id}/comments/{id} */
+/**
+ * A short note by a member. Lives in two places:
+ * `.../days/{date}/comments/{id}` with [stopId] = the planned stop it hangs under (3장 말풍선, written
+ * while planning or on the road), and `.../records/{id}/comments/{id}` for 14장 photo records.
+ */
 data class Comment(
     @DocumentId val id: String = "",
     val uid: String = "",
     val text: String = "",
+    /** The stop this comment belongs to (day comments only). */
+    val stopId: String? = null,
     @ServerTimestamp val createdAt: Timestamp? = null,
 )
 

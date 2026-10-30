@@ -4,6 +4,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.WriteBatch
+import com.htb.carplan.shared.model.Comment
 import com.htb.carplan.shared.model.DayStatus
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Stop
@@ -104,6 +105,26 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
             )
             batch.bumpDay(groupId, eventId, date, byUid)
         }.await()
+    }
+
+    /** Every comment of the day, oldest first; the UI groups them by [Comment.stopId]. */
+    fun observeDayComments(groupId: String, eventId: String, date: String): Flow<List<Comment>> = callbackFlow {
+        val reg = db.collection(FirestorePaths.dayComments(groupId, eventId, date))
+            .orderBy("createdAt")
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    close(err)
+                    return@addSnapshotListener
+                }
+                trySend(snap?.toObjects(Comment::class.java).orEmpty())
+            }
+        awaitClose { reg.remove() }
+    }
+
+    /** A member's note under [stopId] ("여기서 뭐 먹을까?"). Does not bump the day version: the route is unchanged. */
+    suspend fun addComment(groupId: String, eventId: String, date: String, stopId: String, text: String, byUid: String) {
+        db.collection(FirestorePaths.dayComments(groupId, eventId, date))
+            .add(Comment(uid = byUid, text = text.trim(), stopId = stopId)).await()
     }
 
     /** The car reached (or skipped) a stop (9장). Does not bump the version: the itinerary itself did not change. */
