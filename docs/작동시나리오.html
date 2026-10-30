@@ -275,7 +275,7 @@
     <div class="step"><div class="step-n">·</div><div class="step-t">기본 캘린더 틀: <b>월 보기</b> + 날짜 누르면 <b>그날 일정 목록</b> <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">카테고리 기본 3개: <b>여행 · 차량 관리 · 다른 일정</b>. 사용자가 더 추가(출퇴근, 여가…) <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">일정은 <b>각 유저의 캘린더에 담긴다</b> — 그룹 일정도 멤버 각자 캘린더에 보임 <span class="decided">정함</span></div></div>
-    <div class="step"><div class="step-n">·</div><div class="step-t">하단 바: <b>캘린더 · 그룹 · 기록 · 차량 · 설정</b> — 시스템식 평면 바(아이콘+글자, 위에 구분선). 떠 있는 둥근 바는 디자인 규칙(2026-10-30)으로 뺌 <span class="decided">정함</span></div></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">하단 바: <b>캘린더 · 그룹 · 기록 · 차량 · 설정</b> — 시스템식 평면 바(아이콘+글자, 위에 구분선). 떠 있는 둥근 바는 디자인 규칙(2026-10-30)으로 뺌 <span class="decided">정함</span>. 설정 탭(2026-10-30 구현) = 이름 바꾸기 · 내 친구 코드 · 일정 알림 켜기/끄기 · 연결된 차 + 주유 알림 기준(12장) · 계정(익명, 로그인은 1장) · 버전. 일정 [알림] 칩은 폰 로컬 알람(2주 안, 반복 일정 포함, 하루 종일 일정은 09:00 기준)으로 실제로 울림</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">화면 = <b>A안 "오늘 카드 + 월 보기"</b> <span class="decided">정함</span> 2026-10-30: 맨 위 <b>오늘 헤더</b>(흰 바탕 평면, 이모지 없음: 다음 목적지·시간, 연료·주행가능거리, 다가오는 차량 관리 "정비 ○○ n일 남음") → 아래 월 보기(하루 일정은 점, 장소 있는 일정은 청록 점, <b>여러 날 여행만 막대</b>, 차량 관리는 🔧) → 날짜를 누르면 <b>그날 동선</b>(레일 타임라인, 장소 사이 "이동 약 ○분"; 넓은 화면은 오른쪽, 폰은 가운데 대화창 — 바텀 시트 안 씀). "캘린더 예시" 이미지는 입력 칸 참고용일 뿐 화면을 따라 하지 않음</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t">공휴일: 2026–2027 목록을 앱에 넣어 둠. 나중에 공공데이터 특일 API로 교체 <span class="suggest">Claude 제안</span></div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t"><b>+ 버튼</b> → 일정 만들기(3장). 카테고리를 먼저 고름</div></div>
@@ -515,7 +515,7 @@
       <div class="sb-row">연료량(안드로이드 표준 FUEL_LEVEL) 또는 주행가능거리를 <b>남은 경로 거리</b>와 비교 → 부족해 보이면 TTS로 알림</div>
       <div class="sb-row">가는 길 <b>최저가 주유소</b>: 오피넷(전국, 고속도로 휴게소 주유소 포함). 한국도로공사 휴게소 API는 오피넷과 겹쳐 안 씀 <span class="decided">정함</span> 2026-10-30. 내비 검색엔 가격 없음</div>
       <div class="sb-row">"갈까요?" → "응" → 그 주유소를 경유지로 추가</div>
-      <div class="sb-row">알림 기준은 설정에서 바꿈, 기본값은 우리가 정함 <span class="decided">정함</span></div>
+      <div class="sb-row">알림 기준은 설정에서 바꿈(폰 설정 탭 10/15/20/30%, <code>cars/{id}.fuelAlertPercent</code>, 차주만), 기본값 20% <span class="decided">정함</span> 2026-10-30 구현</div>
       <div class="sb-row">전기차: 내비가 도착 시 예상 배터리(%)를 줌 → 같은 방식으로 충전소(내비 주변 충전소 화면)</div>
     </div>
     <div class="warn-in wide"><b>에뮬 제약</b>: 에뮬레이터는 전기차 설정, 연료량은 고정값 → 주유 장면은 앱에서 연료 값을 임시로 넣거나 충전 장면으로 <span class="cant">에뮬 제약</span></div>
@@ -690,7 +690,7 @@
       <div class="sb-t">👤 사람 · 차</div>
       <div class="sb-row"><code>users/{uid}</code> 이름, 사진, fcmTokens[], <b>soloGroupId</b>, carId?</div>
       <div class="sb-row"><code>users/{uid}/categories/{id}</code> 사용자가 추가한 카테고리: 이름, 색 (기본 3개는 앱에 고정)</div>
-      <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 쓰는 일정 {groupId, eventId}, <b>state</b>{기어, 주행제한, 위치, updatedAt}</div>
+      <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 쓰는 일정 {groupId, eventId}, <b>state</b>{기어, 주행제한, 위치, updatedAt}, fuelAlertPercent(주유 알림 기준 %, 설정 탭)</div>
     </div>
     <div class="sub-block wide">
       <div class="sb-t">👥 그룹 · 일정</div>

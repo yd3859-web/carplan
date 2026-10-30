@@ -97,6 +97,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 16장 코드 완료(shared `Repeat`·`Commute` + 테스트, 반복 일정 펼치기, 차 "회사로 갈까요?", 폰 학습 띠). 에뮬 확인은 체크리스트 F7.
 - 17장 코드 완료(`functions/index.js` 5개 트리거, 폰 `push/CarplanMessagingService` + 토큰 등록). **Blaze 전환 뒤** `firebase deploy --only functions,storage`.
 - 폰 알림 탭 딥링크 `carplan://trip/{gid}/{eid}/{date}` 처리됨(`InviteInbox.offerTrip` → `AppRoot`가 그날 레일을 전체 화면으로). `hosting/public/.well-known/assetlinks.json`에 release·debug 키 SHA-256 들어감(release 키 `~/carplan-keys/carplan-release.jks`).
+- 설정 탭 완료(`phone/settings/SettingsTab.kt`: 이름·친구 코드·일정 알림 스위치·주유 알림 기준 `cars.fuelAlertPercent`·계정·버전). 일정 [알림] 칩은 `phone/push/Reminders.kt`(AlarmManager, 2주, 반복 포함)로 실제로 울림. 11장 픽업 순서(총 시간)·지도 경로선·ETA, 17장 "곧 도착"·"주차장" 푸시까지 코드 완료.
 - 18장 보안 규칙 초안 = `firestore.prod.rules`(아직 미배포, dev 규칙 사용 중). 제출 전 `firestore.rules`로 바꿔 `firebase deploy --only firestore:rules`.
 - 다음: 제출물(기획서 DOCX·시연 영상·release APK·Firestore/Storage 규칙 18장·assetlinks·README), 1장 로그인은 그 뒤 → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
 - Firestore 규칙은 아직 dev(로그인만 하면 읽기·쓰기). 1차 제출 전 18장 규칙으로 바꾼다.

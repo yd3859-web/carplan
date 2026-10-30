@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- 17장: push (Q02: asked at first start) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 2장 일정 "n분 전" 알림: 캘린더 앱의 정확한 알람 (33+ 자동 허용, 31–32는 사용자 허용 없으면 대략 시각) -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
 
     <application
         android:allowBackup="false"
@@ -46,6 +49,7 @@
             </intent-filter>
         </activity>
         <!-- 17장: FCM token + foreground notifications -->
+        <receiver android:name=".push.ReminderReceiver" android:exported="false" />
         <service android:name=".push.CarplanMessagingService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

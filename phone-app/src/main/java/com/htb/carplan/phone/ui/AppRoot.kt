@@ -43,6 +43,7 @@ import com.htb.carplan.phone.trip.TripDayScreen
 import com.htb.carplan.phone.trip.TripRef
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.htb.carplan.phone.record.RecordTab
+import com.htb.carplan.phone.settings.SettingsTab
 
 /** 하단 바 (2장): 캘린더 · 그룹 · 기록 · 차량 · 설정. */
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -70,7 +71,7 @@ fun AppRoot() {
                 Tab.GROUP -> GroupTab(groupVm)
                 Tab.RECORD -> RecordTab()
                 Tab.CAR -> CarTab()
-                else -> ComingSoon(tab)
+                Tab.SETTINGS -> SettingsTab()
             }
         }
         TabBar(selected = tab, onSelect = { tab = it })
@@ -98,12 +99,5 @@ private fun TabBar(selected: Tab, onSelect: (Tab) -> Unit) {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ComingSoon(tab: Tab) {
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("${tab.label} · 준비 중", color = Palette.TextSoft)
     }
 }

@@ -84,6 +84,8 @@ data class Car(
     val state: CarState = CarState(),
     /** 15장 Q42: per-item overrides of the default service intervals, item name → {km, days}. */
     val intervals: Map<String, Map<String, Long>> = emptyMap(),
+    /** 12장: "주유소 들를까요?" when the tank/battery is at or under this (%), set in the phone's 설정 tab. */
+    val fuelAlertPercent: Int = 20,
 )
 
 // ---------- Groups & calendar events ----------

@@ -103,6 +103,8 @@ class TripNavigator(
     private var routedPickups: List<String> = emptyList()
     private var fuelAtPark: Double? = null
     private var fueledAsked = false
+    /** 12장 설정: cars/{id}.fuelAlertPercent (default 20); the range threshold scales with it (20% → 50 km). */
+    private var fuelAlertPercent = LOW_FUEL_PERCENT
 
     private val carId = MutableStateFlow<String?>(null)
     private val _prompt = MutableStateFlow<NextPrompt?>(null)
@@ -193,6 +195,7 @@ class TripNavigator(
             }
         })
         scope.launch { guiding.collect { on -> if (on) startEtaLoop() else etaJob?.cancel() } }
+        scope.launch { carId.filterNotNull().flatMapLatest { calendar.observeCar(it) }.catch { }.collect { fuelAlertPercent = it?.fuelAlertPercent?.toDouble() ?: LOW_FUEL_PERCENT } }
         scope.launch {
             trip.filterNotNull().collect { t ->
                 // 9장 1: ask once when the app starts and today has stops left.
@@ -313,7 +316,7 @@ class TripNavigator(
         val remainingKm = t?.remaining?.let { remainingKm(it) }
         val need = when {
             _guiding.value && range != null && remainingKm != null -> range < remainingKm + ROUTE_MARGIN_KM
-            else -> fuel <= LOW_FUEL_PERCENT || (range != null && range < LOW_RANGE_KM)
+            else -> fuel <= fuelAlertPercent || (range != null && range < LOW_RANGE_KM * fuelAlertPercent / LOW_FUEL_PERCENT)
         }
         if (!need) return
         if (_prompt.value != null) return

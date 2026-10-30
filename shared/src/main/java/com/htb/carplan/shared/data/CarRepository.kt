@@ -67,5 +67,10 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
         db.document(FirestorePaths.car(carId)).update("intervals.${item.name}", value).await()
     }
 
+    /** 12장 설정: the owner's low-fuel threshold (%). */
+    suspend fun setFuelAlert(carId: String, percent: Int) {
+        db.document(FirestorePaths.car(carId)).set(mapOf("fuelAlertPercent" to percent), com.google.firebase.firestore.SetOptions.merge()).await()
+    }
+
     private fun newCode() = (1..6).joinToString("") { Random.nextInt(10).toString() }
 }

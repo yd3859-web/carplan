@@ -62,6 +62,11 @@ class SessionRepository(
         session
     }
 
+    /** 설정 탭: the display name other members see (until login brings a real one, 1장). */
+    suspend fun updateName(uid: String, name: String) {
+        db.document(FirestorePaths.user(uid)).set(mapOf("name" to name.trim().take(20)), com.google.firebase.firestore.SetOptions.merge()).await()
+    }
+
     /** 17장: keeps this device's push token on the user (arrayUnion, so several phones work). */
     suspend fun registerFcmToken(uid: String, token: String) {
         db.document(FirestorePaths.user(uid)).set(mapOf("fcmTokens" to com.google.firebase.firestore.FieldValue.arrayUnion(token)), com.google.firebase.firestore.SetOptions.merge()).await()

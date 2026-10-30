@@ -90,6 +90,9 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val selected by vm.selected.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
     val upcoming by vm.upcoming.collectAsStateWithLifecycle()
+    // 2장 [알림] 칩: keep the phone's local reminders in step with the upcoming events.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(upcoming) { com.htb.carplan.phone.push.Reminders.schedule(context, upcoming) }
     val car by vm.car.collectAsStateWithLifecycle()
     val categories by vm.customCategories.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
