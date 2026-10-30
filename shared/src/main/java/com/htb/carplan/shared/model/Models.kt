@@ -177,6 +177,8 @@ data class TripDay(
     val holdByDriver: Boolean = false,
     /** "HH:mm" the navigation expects to reach the next stop; written by the car after routing. */
     val etaNext: String? = null,
+    /** 11장 Q27: the driver agreed to share the car's position while picking people up. */
+    val pickupSharing: Boolean = false,
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 
@@ -206,6 +208,9 @@ data class Pickup(
     val order: Int = 0,
     val status: PickupStatus = PickupStatus.WAITING,
     val etaSeconds: Long? = null,
+    /** When the car reached this pickup; sharing for this person ends 10 min later (11장 7). */
+    val arrivedAt: Timestamp? = null,
+    val name: String = "",
 )
 
 /** .../days/{date}/records/{id} — created when the car parks (13장). */

@@ -11,6 +11,9 @@ import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.GroupRepository
 import com.htb.carplan.shared.data.MaintenanceRepository
+import com.htb.carplan.shared.data.PickupRepository
+import com.htb.carplan.shared.model.Pickup
+import com.htb.carplan.shared.model.PickupStatus
 import com.htb.carplan.shared.model.MaintenanceItem
 import com.htb.carplan.shared.data.RecordRepository
 import com.htb.carplan.shared.calendar.RouteMath
@@ -48,13 +51,15 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 /** Today's trip as the car sees it: the event, its day document and the stops in route order (deleted ones removed). */
-data class TodayTrip(val groupId: String, val eventId: String, val title: String, val date: String, val stops: List<Stop>, val day: TripDay?) {
+data class TodayTrip(val groupId: String, val eventId: String, val title: String, val date: String, val stops: List<Stop>, val day: TripDay?, val pickups: List<Pickup> = emptyList()) {
     val remaining: List<Stop> get() = stops.filterNot { it.visited }
+    /** People still to collect, in pickup order (11장): they go in front of the stops. */
+    val waitingPickups: List<Pickup> get() = pickups.filter { it.status == PickupStatus.WAITING && it.place.hasCoords() }
     val next: Stop? get() = remaining.firstOrNull()
     val version: Long get() = day?.version ?: 0
 }
 
-enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED }
+enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP }
 
 /**
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
@@ -83,6 +88,10 @@ class TripNavigator(
     private val groups = GroupRepository()
     private val opinet = OpinetApi(BuildConfig.OPINET_KEY)
     private val maintenance = MaintenanceRepository()
+    private val pickupsRepo = PickupRepository()
+    private var shareJob: Job? = null
+    /** Pickup uids currently in the navigation route (in front of [routed] stops). */
+    private var routedPickups: List<String> = emptyList()
     private var fuelAtPark: Double? = null
     private var fueledAsked = false
 
@@ -150,7 +159,8 @@ class TripNavigator(
                     else combine(
                         trips.observeStops(ev.groupId, ev.event.id, today),
                         trips.observeDay(ev.groupId, ev.event.id, today),
-                    ) { stops, day -> TodayTrip(ev.groupId, ev.event.id, ev.event.title, today, stops.filterNot { it.deleted }, day) }
+                        pickupsRepo.observe(ev.groupId, ev.event.id, today).catch { emit(emptyList()) },
+                    ) { stops, day, pickups -> TodayTrip(ev.groupId, ev.event.id, ev.event.title, today, stops.filterNot { it.deleted }, day, pickups) }
                 }
         }
         .catch { _error.value = it.message; emit(null) }
@@ -180,7 +190,7 @@ class TripNavigator(
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
-                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
+                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
         }
     }
@@ -327,6 +337,48 @@ class TripNavigator(
         }
     }
 
+    /** 11장 Q27: pickups exist → one question that both starts the route and turns sharing on. */
+    private fun askPickup(t: TodayTrip) {
+        val names = t.waitingPickups.joinToString(", ") { it.name.ifBlank { "일행" } }
+        val message = "$names 태우러 가요. 위치를 일행에게 보여 줄까요?"
+        askJob?.cancel()
+        _prompt.value = NextPrompt(t.next ?: Stop(place = t.waitingPickups.first().place), PromptReason.PICKUP, message = message)
+        askJob = scope.launch {
+            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
+            when (answer) {
+                VoicePrompt.Answer.YES -> go()
+                VoicePrompt.Answer.NO -> later()
+                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
+            }
+        }
+    }
+
+    /** Sharing loop: every 5 s ask the navigation for the position and publish it, until nobody is waiting. */
+    private fun startSharing(t: TodayTrip) {
+        shareJob?.cancel()
+        shareJob = scope.launch {
+            runCatching { pickupsRepo.setSharing(t.groupId, t.eventId, t.date, true) }
+            while (true) {
+                router.requestCurrentLocation()
+                delay(SHARE_INTERVAL_MS)
+                val cur = trip.value ?: break
+                val open = cur.pickups.filter { it.status != PickupStatus.DONE }
+                // 11장 7: 10 minutes after the car arrived, that pickup is over.
+                open.filter { it.status == PickupStatus.WAITING && it.arrivedAt != null && System.currentTimeMillis() - it.arrivedAt!!.toDate().time > PICKUP_DONE_MS }
+                    .forEach { p -> runCatching { pickupsRepo.setStatus(cur.groupId, cur.eventId, cur.date, p.uid, PickupStatus.DONE) } }
+                if (open.none { it.status == PickupStatus.WAITING }) break
+                lastLocation?.let { (la, lo) -> carId.value?.let { id -> runCatching { cars.updateLocation(id, la, lo) } } }
+            }
+            stopSharing(trip.value)
+        }
+    }
+
+    private suspend fun stopSharing(t: TodayTrip?) {
+        if (t != null) runCatching { pickupsRepo.setSharing(t.groupId, t.eventId, t.date, false) }
+        carId.value?.let { id -> runCatching { cars.updateLocation(id, null, null) } }
+        _notice.value = "픽업 끝 · 위치 공유 껐어요"
+    }
+
     /** "응" to the station question: Opinet cheapest list (fuel car + key), else the navigation's own search. */
     private fun findStation() {
         val ev = carState.isEv == true
@@ -377,12 +429,30 @@ class TripNavigator(
     fun playFakeDrive(stepMs: Long = 6_000) {
         fakeDrive?.cancel()
         fakeDrive = scope.launch {
-            while (trip.value?.next != null) {
-                delay(stepMs)
-                val next = trip.value?.next ?: break
-                if (next.place.hasCoords()) lastLocation = next.place.lat to next.place.lng
-                parkedRecord = null
-                confirmArrival(reason = "가짜 주행", assumeAtNext = true)
+            // Pickups first (11장 Q28): glide to each waiting pickup, then the planned stops.
+            while (true) {
+                val t = trip.value ?: break
+                val target = t.waitingPickups.firstOrNull()?.place ?: t.next?.place ?: break
+                val isPickup = t.waitingPickups.isNotEmpty()
+                val from = lastLocation ?: (target.lat + 0.02 to target.lng - 0.02)
+                val steps = (stepMs / 1000).toInt().coerceAtLeast(3)
+                for (i in 1..steps) {
+                    delay(1000)
+                    val f = i.toDouble() / steps
+                    lastLocation = (from.first + (target.lat - from.first) * f) to (from.second + (target.lng - from.second) * f)
+                    if (t.day?.pickupSharing == true) carId.value?.let { id -> runCatching { cars.updateLocation(id, lastLocation!!.first, lastLocation!!.second) } }
+                }
+                if (isPickup) {
+                    val uid = t.waitingPickups.first().uid
+                    runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
+                    _notice.value = "픽업 장소 도착 (가짜 주행)"
+                    // demo: the passenger "boards" after a moment
+                    delay(3000)
+                    runCatching { pickupsRepo.setStatus(t.groupId, t.eventId, t.date, uid, PickupStatus.ON_BOARD) }
+                } else {
+                    parkedRecord = null
+                    confirmArrival(reason = "가짜 주행", assumeAtNext = true)
+                }
             }
             _notice.value = "가짜 주행 끝"
         }
@@ -391,7 +461,9 @@ class TripNavigator(
     fun stopFakeDrive() { fakeDrive?.cancel(); fakeDrive = null }
 
     private fun ask(reason: PromptReason) {
-        val next = trip.value?.next ?: return
+        val t = trip.value ?: return
+        if (t.waitingPickups.isNotEmpty() && t.day?.pickupSharing != true) { askPickup(t); return }
+        val next = t.next ?: return
         askJob?.cancel()
         _prompt.value = NextPrompt(next, reason)
         askJob = scope.launch {
@@ -414,7 +486,9 @@ class TripNavigator(
         if (_prompt.value?.reason == PromptReason.FUELED) {
             askJob?.cancel(); _prompt.value = null; logFuel(); return
         }
+        val wasPickup = _prompt.value?.reason == PromptReason.PICKUP
         val t = trip.value ?: return
+        if (wasPickup) startSharing(t)
         askJob?.cancel()
         val wasChange = _prompt.value?.reason == PromptReason.ROUTE_CHANGE
         _prompt.value = null
@@ -437,6 +511,12 @@ class TripNavigator(
         askJob?.cancel()
         if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.FUELED) { _prompt.value = null; return }
+        if (_prompt.value?.reason == PromptReason.PICKUP) {
+            // "아니": still drive to the pickups, just without sharing the position.
+            _prompt.value = null
+            trip.value?.let { sendRoute(it); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
+            return
+        }
         val t = trip.value
         if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE && t != null) {
             pendingChange = true
@@ -509,21 +589,24 @@ class TripNavigator(
         withTimeoutOrNull(3_000) { calendar.observeUser(uid).first()?.name?.takeIf { it.isNotBlank() } } ?: "일행"
 
     private fun sendRoute(t: TodayTrip) {
-        val batch = t.remaining.take(MAX_PLACES)
+        val pick = t.waitingPickups.take(MAX_PLACES)
+        val batch = t.remaining.take((MAX_PLACES - pick.size).coerceAtLeast(0))
         routedPlan = t.remaining
         routedVersion = t.version
-        if (batch.isEmpty()) {
+        routedPickups = pick.map { it.uid }
+        if (batch.isEmpty() && pick.isEmpty()) {
             routed = emptyList()
             _guiding.value = false
             return
         }
         val withCoords = batch.filter { it.place.hasCoords() }
-        if (withCoords.isEmpty()) {
+        if (withCoords.isEmpty() && pick.isEmpty()) {
             // Name-only stops (no Kakao key yet): hand the name to the navigation's own search.
             router.search(batch.first().place.name)
             routed = listOf(batch.first().id)
         } else {
-            router.route(withCoords.map { it.place })
+            // 11장 3: pickups ride in front of the planned stops.
+            router.route(pick.map { it.place } + withCoords.map { it.place })
             routed = withCoords.map { it.id }
             router.openNavigation()
         }
@@ -545,6 +628,15 @@ class TripNavigator(
     /** One place reached: mark it visited, then top the route up while more stops remain (Q22). */
     private fun onArrived() {
         val t = trip.value ?: return
+        // A pickup place comes before the stops: mark the car there and keep the rest of the route.
+        routedPickups.firstOrNull()?.let { uid ->
+            routedPickups = routedPickups.drop(1)
+            scope.launch {
+                runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
+                _notice.value = "픽업 장소 도착 · ${t.pickups.firstOrNull { it.uid == uid }?.name ?: "일행"}"
+            }
+            return
+        }
         val reached = routed.firstOrNull()?.let { id -> t.stops.firstOrNull { it.id == id } } ?: t.next ?: return
         routed = routed.drop(1)
         scope.launch {
@@ -582,6 +674,10 @@ class TripNavigator(
         private const val ROUTE_MARGIN_KM = 30.0
         private const val LOW_FUEL_PERCENT = 20.0
         private const val LOW_RANGE_KM = 50.0
+        /** Q26 */
+        private const val SHARE_INTERVAL_MS = 5_000L
+        /** 11장 7 */
+        private const val PICKUP_DONE_MS = 10 * 60_000L
 
         /** "해운대로" / "광안리로" / "감천문화마을로" — picks 로/으로 by the last syllable's final consonant. */
         fun withRo(name: String): String {

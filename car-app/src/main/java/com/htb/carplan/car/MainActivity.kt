@@ -238,8 +238,9 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val change = p.reason == PromptReason.ROUTE_CHANGE
-        val fuel = p.reason == PromptReason.FUEL || p.reason == PromptReason.FUELED
+        val fuel = p.reason == PromptReason.FUEL || p.reason == PromptReason.FUELED || p.reason == PromptReason.PICKUP
         val fueled = p.reason == PromptReason.FUELED
+        val pickup = p.reason == PromptReason.PICKUP
         Column(Modifier.weight(1f)) {
             Text(
                 when { fuel -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" },
@@ -255,10 +256,10 @@ private fun NextPromptBar(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) 
             )
         }
         Button(onClick = onGo, modifier = Modifier.height(80.dp).width(190.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink)) {
-            Text(when { fueled -> "네"; fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(when { pickup -> "네, 출발"; fueled -> "네"; fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         Button(onClick = onLater, modifier = Modifier.height(80.dp).width(190.dp).border(1.dp, Color(0xFF55595E), Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White)) {
-            Text(when { fuel -> "아니요"; change -> "그대로"; else -> "나중에" }, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text(when { pickup -> "공유 없이 출발"; fuel -> "아니요"; change -> "그대로"; else -> "나중에" }, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

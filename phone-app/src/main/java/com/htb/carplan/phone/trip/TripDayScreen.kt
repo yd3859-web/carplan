@@ -151,6 +151,8 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     var placeFor by remember { mutableStateOf<Record?>(null) }
     var manualRecord by remember { mutableStateOf(false) }
     var voteOpen by remember { mutableStateOf(false) }
+    var pickupOpen by remember { mutableStateOf(false) }
+    val pickups by vm.pickups.collectAsStateWithLifecycle()
     var dartOpen by remember { mutableStateOf(false) }
     var placePicker by remember { mutableStateOf<((Place) -> Unit)?>(null) }
     val context = LocalContext.current
@@ -189,6 +191,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             }
             if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
             if (!locked) {
+                TextButton(onClick = { pickupOpen = true }) { Text(if (pickups.isEmpty()) "픽업" else "픽업 ${pickups.size}", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 TextButton(onClick = { voteOpen = true }) { Text("투표", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 TextButton(onClick = { dartOpen = true }) { Text("다트", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
             }
@@ -340,6 +343,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     editing?.let { stop ->
         StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null })
     }
+    if (pickupOpen) PickupSheet(vm, onDismiss = { pickupOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false })
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
     placePicker?.let { cb -> PlaceSearchSheet(vm = vm, onPick = { cb(it); placePicker = null }, onDismiss = { placePicker = null }) }

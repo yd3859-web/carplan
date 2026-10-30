@@ -9,6 +9,9 @@ import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.GroupRepository
 import com.htb.carplan.shared.data.RecordRepository
+import com.htb.carplan.shared.data.PickupRepository
+import com.htb.carplan.shared.model.Pickup
+import com.htb.carplan.shared.model.PickupStatus
 import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.data.SessionRepository
@@ -100,6 +103,27 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
 
     private val groups = GroupRepository()
     private val recordsRepo = RecordRepository()
+    private val pickupsRepo = PickupRepository()
+
+    /** 11장: who wants to be picked up today, in pickup order. */
+    val pickups: StateFlow<List<Pickup>> = _date
+        .flatMapLatest { pickupsRepo.observe(groupId, eventId, it) }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The trip's car (for the map dot while pickup sharing is on). */
+    val tripCar: StateFlow<com.htb.carplan.shared.model.Car?> = event
+        .flatMapLatest { e -> e?.carId?.let { calendar.observeCar(it) } ?: flowOf(null) }
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setMyPickup(place: Place) = write {
+        val u = me(); val name = _names.value[u]?.ifBlank { null } ?: "나"
+        pickupsRepo.setMine(groupId, eventId, _date.value, u, name, place)
+    }
+    fun removeMyPickup() = write { pickupsRepo.remove(groupId, eventId, _date.value, me()) }
+    fun boarded() = write { pickupsRepo.setStatus(groupId, eventId, _date.value, me(), PickupStatus.ON_BOARD) }
+    fun setPickupOrder(uids: List<String>) = write { pickupsRepo.setOrder(groupId, eventId, _date.value, uids) }
 
     /** 13장: what the car actually did today — records linked to stops and unplanned ones. */
     val records: StateFlow<List<Record>> = _date
