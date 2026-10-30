@@ -1,19 +1,15 @@
 package com.htb.carplan.phone.calendar
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,7 +21,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 
-/** 오늘 카드: where the car goes next, how the car is, and the next car-care item. */
+/** 오늘: where the car goes next, how the car is, and the next car-care item. A flat header, not a box. */
 @Composable
 fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Modifier) {
     val today = LocalDate.now()
@@ -34,31 +30,31 @@ fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Mod
         .filter { it.event.categoryId == BuiltInCategory.CAR.id && LocalDate.parse(it.event.startDate) >= today }
         .minByOrNull { it.event.startDate }
 
-    Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(listOf(Palette.Navy, Palette.NavySoft)))
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("오늘  ${dayTitle(today)}", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+    Column(modifier.fillMaxWidth().padding(top = 8.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("오늘  ${dayTitle(today)}", color = Palette.TextSoft, fontSize = 13.sp)
         if (next != null) {
             val e = next.event
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("다음 ▶ ", color = Palette.Teal, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text(e.place?.name?.takeIf { it.isNotBlank() } ?: e.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
-                e.startTime?.let { Text("  $it", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp) }
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("다음 목적지", color = Palette.Teal, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 10.dp, bottom = 3.dp))
+                Text(e.place?.name?.takeIf { it.isNotBlank() } ?: e.title, color = Palette.TextStrong, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
+                e.startTime?.let { Text("  $it", color = Palette.ChipText, fontSize = 15.sp, modifier = Modifier.padding(bottom = 3.dp)) }
             }
-            if (e.place != null && e.title != e.place?.name) Text(e.title, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
+            if (e.place != null && e.title != e.place?.name) Text(e.title, color = Palette.TextSoft, fontSize = 13.sp)
         } else {
-            Text("오늘은 차로 갈 일정이 없어요", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text("오늘은 차로 갈 일정이 없어요", color = Palette.TextStrong, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
-        Text(carLine(car), color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
-        care?.let {
-            val days = ChronoUnit.DAYS.between(today, LocalDate.parse(it.event.startDate))
-            val what = it.event.maintenance?.item?.label ?: it.event.title
-            Text("🔧 $what " + if (days == 0L) "오늘" else "${days}일 남음", color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp)
-        }
+        Text(
+            listOfNotNull(carLine(car), care?.let { careLine(it, today) }).joinToString("    "),
+            color = Palette.ChipText, fontSize = 13.sp,
+        )
     }
+    HorizontalDivider(color = Palette.Line)
+}
+
+private fun careLine(it: CalendarEvent, today: LocalDate): String {
+    val days = ChronoUnit.DAYS.between(today, LocalDate.parse(it.event.startDate))
+    val what = it.event.maintenance?.item?.label ?: it.event.title
+    return "정비  $what " + if (days == 0L) "오늘" else "${days}일 남음"
 }
 
 /** Today's next event with a place (or any timed event), skipping ones already past. */
@@ -72,10 +68,10 @@ private fun nextDestination(upcoming: List<CalendarEvent>, today: LocalDate): Ca
 }
 
 private fun carLine(car: Car?): String {
-    val s = car?.state ?: return "🚗 차를 연결하면 연료·주행가능거리가 보여요"
+    val s = car?.state ?: return "차를 연결하면 연료와 주행가능거리가 보여요"
     val parts = listOfNotNull(
         s.fuelPercent?.let { "연료 ${it.toInt()}%" },
-        s.rangeKm?.let { "${it.toInt()}km 갈 수 있어요" },
+        s.rangeKm?.let { "주행가능 ${it.toInt()}km" },
     )
-    return "🚗 " + if (parts.isEmpty()) "차 연결됨" else parts.joinToString(" · ")
+    return if (parts.isEmpty()) "차 연결됨" else parts.joinToString(" · ")
 }

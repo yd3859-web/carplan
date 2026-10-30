@@ -47,7 +47,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
+import androidx.compose.material3.HorizontalDivider
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.net.KakaoCategory
 import kotlinx.coroutines.Dispatchers
@@ -113,7 +115,8 @@ fun PlaceSearchSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Panel,
+        containerColor = Palette.Background,
+        shape = Corner,
     ) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding().height(560.dp)) {
             TextField(
@@ -123,7 +126,8 @@ fun PlaceSearchSheet(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { runSearch() }),
-                colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                shape = Corner,
+                colors = TextFieldDefaults.colors(focusedContainerColor = Palette.InputBg, unfocusedContainerColor = Palette.InputBg, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -142,6 +146,7 @@ fun PlaceSearchSheet(
                             }
                         },
                         label = { Text(c.label) },
+                        shape = Corner,
                     )
                 }
             }
@@ -154,7 +159,7 @@ fun PlaceSearchSheet(
             message?.let { Text(it, fontSize = 13.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 8.dp)) }
             if (loading) Text("찾는 중…", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
 
-            LazyColumn(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
                 items(results, key = { it.kakaoId ?: it.name + it.lat }) { p -> PlaceRow(p) { onPick(p) } }
             }
 
@@ -170,10 +175,11 @@ fun PlaceSearchSheet(
 @Composable
 private fun PlaceRow(p: Place, onClick: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.White).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
     ) {
         Text(p.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
         if (p.address.isNotBlank()) Text(p.address, fontSize = 12.sp, color = Palette.TextSoft)
+        HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))
     }
 }
 

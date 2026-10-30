@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
@@ -43,7 +45,7 @@ import java.util.Locale
 
 /**
  * 그날 동선: the day's events as a vertical route. Between two events that both have
- * a place, a 🚗 leg is drawn (travel time comes from Kakao Mobility later).
+ * a place, a drive leg is drawn (travel time comes from Kakao Mobility later).
  */
 @Composable
 fun DayRoutePanel(
@@ -83,10 +85,10 @@ fun DayRoutePanel(
         }
         Button(
             onClick = onAdd,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = Corner,
             colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-        ) { Text("+ 일정 추가", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+        ) { Text("일정 추가", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
     }
 }
 
@@ -94,37 +96,33 @@ fun DayRoutePanel(
 @Composable
 private fun TripBlock(trip: CalendarEvent, stops: List<Stop>, categories: List<CustomCategory>, onOpen: () -> Unit) {
     val color = argb(CategoryColors.of(trip.event.categoryId, categories))
-    Column(
-        Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = 0.12f)).clickable(onClick = onOpen).padding(12.dp),
-    ) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+            Box(Modifier.width(3.dp).height(16.dp).background(color))
             Spacer(Modifier.width(8.dp))
-            Text(trip.event.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            Text("편집 ›", fontSize = 12.sp, color = Palette.Teal)
+            Text(trip.event.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+            Text("편집", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal)
         }
         if (stops.isEmpty()) {
             Text("이날 장소 칸이 아직 없어요 · 눌러서 짜기", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
         }
         stops.forEachIndexed { i, s ->
-            Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(18.dp).clip(CircleShape).background(Palette.Teal), contentAlignment = Alignment.Center) {
-                    Text("${i + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
-                }
-                Spacer(Modifier.width(8.dp))
+            Row(Modifier.padding(top = 6.dp, start = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("${i + 1}", Modifier.width(18.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
                 s.time?.let { Text(it, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, modifier = Modifier.width(44.dp)) }
                 Text(s.place.name, fontSize = 14.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             }
-            if (s.memo.isNotBlank()) Text(s.memo, fontSize = 12.sp, color = Palette.ChipText, modifier = Modifier.padding(start = 26.dp))
+            if (s.memo.isNotBlank()) Text(s.memo, fontSize = 12.sp, color = Palette.ChipText, modifier = Modifier.padding(start = 29.dp))
         }
+        HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 12.dp))
     }
 }
 
 @Composable
 private fun AllDayRow(item: CalendarEvent, categories: List<CustomCategory>) {
     val color = argb(CategoryColors.of(item.event.categoryId, categories))
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.14f)).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(3.dp).height(16.dp).background(color))
         Spacer(Modifier.width(8.dp))
         Text(item.event.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
         Text("하루 종일", fontSize = 12.sp, color = Palette.TextSoft)
@@ -146,11 +144,11 @@ private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isL
             val meta = listOfNotNull(
                 e.title.takeIf { e.place != null && it != e.place?.name },
                 CategoryColors.label(e.categoryId, categories),
-                e.reminderMinutes?.let { "🔔 ${reminderLabel(it)}" },
+                e.reminderMinutes?.let { "알림 ${reminderLabel(it)}" },
             ).joinToString("  ·  ")
             Text(meta, fontSize = 12.sp, color = Palette.TextSoft)
             if (e.memo.isNotBlank()) Text(e.memo, fontSize = 13.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
-            e.checklist.forEach { c -> Text((if (c.done) "☑ " else "☐ ") + c.text, fontSize = 13.sp, color = Palette.ChipText) }
+            e.checklist.forEach { c -> Text((if (c.done) "✓ " else "– ") + c.text, fontSize = 13.sp, color = if (c.done) Palette.TextSoft else Palette.ChipText) }
         }
     }
 }
@@ -163,7 +161,7 @@ private fun Leg(drive: Boolean) {
         Box(Modifier.width(20.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
             Box(Modifier.width(2.dp).fillMaxHeight().background(if (drive) Palette.Teal.copy(alpha = 0.5f) else Palette.Line))
         }
-        if (drive) Text("🚗 차로 이동", Modifier.padding(start = 8.dp).align(Alignment.CenterVertically), fontSize = 12.sp, color = Palette.Teal)
+        if (drive) Text("차로 이동", Modifier.padding(start = 8.dp).align(Alignment.CenterVertically), fontSize = 12.sp, color = Palette.Teal)
     }
 }
 

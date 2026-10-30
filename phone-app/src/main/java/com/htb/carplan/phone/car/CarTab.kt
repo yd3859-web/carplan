@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
@@ -82,19 +85,18 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
             Text("차 화면에 뜬 6자리 코드를 입력하면 이 차의 호스트가 돼요.", color = Palette.TextSoft)
             OutlinedTextField(
                 code, { code = it.filter(Char::isDigit).take(6) }, label = { Text("차 연결 코드") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), shape = Corner,
             )
-            Button(onClick = { vm.link(code) }, enabled = code.length == 6, modifier = Modifier.fillMaxWidth()) { Text("연결") }
+            Button(onClick = { vm.link(code) }, enabled = code.length == 6, modifier = Modifier.fillMaxWidth().height(50.dp), shape = Corner) { Text("연결", fontWeight = FontWeight.SemiBold) }
         } else {
             val s = car!!.state
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Palette.Panel).padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text("🚗 내 차 (호스트)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            HorizontalDivider(color = Palette.Line)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("내 차 · 호스트", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("연료 " + (s.fuelPercent?.let { "${it.toInt()}%" } ?: "—") + "  ·  주행가능 " + (s.rangeKm?.let { "${it.toInt()}km" } ?: "—"))
                 Text("기어 ${s.gear.name}" + if (s.drivingRestricted) "  ·  주행 중" else "")
             }
+            HorizontalDivider(color = Palette.Line)
             Text("차량 관리 기록은 15장에서 여기에 붙어요.", color = Palette.TextSoft, fontSize = 13.sp)
         }
         message?.let { Text(it, color = Palette.Teal) }

@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.model.Place
@@ -60,13 +61,14 @@ fun StopEditSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Panel,
+        containerColor = Palette.Background,
+        shape = Corner,
     ) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding()) {
             Text(if (existing == null) "장소 칸 추가" else "장소 칸 고치기", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
 
             Field(label = "장소", modifier = Modifier.padding(top = 14.dp)) {
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.White).clickable { searchOpen = true }.padding(12.dp)) {
+                Column(Modifier.fillMaxWidth().clip(Corner).background(Palette.InputBg).clickable { searchOpen = true }.padding(12.dp)) {
                     Text(place?.name?.ifBlank { null } ?: "눌러서 장소 고르기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = if (place == null) Palette.TextSoft else Palette.TextStrong)
                     place?.let { p ->
                         val sub = when {
@@ -89,7 +91,8 @@ fun StopEditSheet(
             Field(label = "메모 (선택)", modifier = Modifier.padding(top = 4.dp)) {
                 TextField(
                     memo, { memo = it }, placeholder = { Text("뭐 먹을지, 뭐 할지") }, modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+                    shape = Corner,
+                    colors = TextFieldDefaults.colors(focusedContainerColor = Palette.InputBg, unfocusedContainerColor = Palette.InputBg, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Color.Transparent),
                 )
             }
 
@@ -97,8 +100,8 @@ fun StopEditSheet(
             Button(
                 onClick = { place?.let { onSave(it, time, memo.trim()) } },
                 enabled = place != null && place!!.name.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
             ) { Text(if (existing == null) "칸 추가" else "저장", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
         }
@@ -118,6 +121,8 @@ fun StopEditSheet(
         val state = rememberTimePickerState(initialHour = parts?.get(0) ?: 10, initialMinute = parts?.get(1) ?: 0, is24Hour = true)
         AlertDialog(
             onDismissRequest = { timePicker = false },
+            shape = Corner,
+            containerColor = Palette.Background,
             title = { Text("도착 시각") },
             text = { TimeInput(state) },
             confirmButton = { TextButton(onClick = { time = "%02d:%02d".format(state.hour, state.minute); timePicker = false }) { Text("확인") } },

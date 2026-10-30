@@ -1,25 +1,25 @@
 package com.htb.carplan.phone.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,9 +28,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.htb.carplan.phone.calendar.CalendarScreen
 import com.htb.carplan.phone.car.CarTab
 
@@ -46,34 +47,34 @@ enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 fun AppRoot() {
     var tab by rememberSaveable { mutableStateOf(Tab.CALENDAR) }
-    Box(Modifier.fillMaxSize().background(Palette.Background)) {
-        when (tab) {
-            Tab.CALENDAR -> CalendarScreen()
-            Tab.CAR -> CarTab()
-            else -> ComingSoon(tab)
+    Column(Modifier.fillMaxSize().background(Palette.Background)) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (tab) {
+                Tab.CALENDAR -> CalendarScreen()
+                Tab.CAR -> CarTab()
+                else -> ComingSoon(tab)
+            }
         }
-        FloatingTabBar(
-            selected = tab,
-            onSelect = { tab = it },
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp),
-        )
+        TabBar(selected = tab, onSelect = { tab = it })
     }
 }
 
+/** Flat system-style bar: hairline on top, icon + label, selected in black. */
 @Composable
-private fun FloatingTabBar(selected: Tab, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
-    Surface(modifier, shape = RoundedCornerShape(32.dp), shadowElevation = 8.dp, color = Palette.Background) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun TabBar(selected: Tab, onSelect: (Tab) -> Unit) {
+    Column(Modifier.fillMaxWidth().background(Palette.Background).navigationBarsPadding()) {
+        HorizontalDivider(color = Palette.Line)
+        Row(Modifier.fillMaxWidth().height(60.dp)) {
             Tab.entries.forEach { t ->
                 val active = t == selected
-                IconButton(
-                    onClick = { onSelect(t) },
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(if (active) Palette.InputBg else Palette.Background),
+                val tint = if (active) Palette.TextStrong else Palette.TextSoft
+                Column(
+                    Modifier.weight(1f).fillMaxSize().clickable { onSelect(t) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(t.icon, contentDescription = t.label, tint = if (active) Palette.TextStrong else Palette.TextSoft)
+                    Icon(t.icon, contentDescription = t.label, tint = tint, modifier = Modifier.size(22.dp))
+                    Text(t.label, fontSize = 11.sp, color = tint, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(top = 3.dp))
                 }
             }
         }
@@ -83,6 +84,6 @@ private fun FloatingTabBar(selected: Tab, onSelect: (Tab) -> Unit, modifier: Mod
 @Composable
 private fun ComingSoon(tab: Tab) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("${tab.label} — 준비 중", color = Palette.TextSoft)
+        Text("${tab.label} · 준비 중", color = Palette.TextSoft)
     }
 }

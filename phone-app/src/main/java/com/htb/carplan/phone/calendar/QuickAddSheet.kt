@@ -1,5 +1,6 @@
 package com.htb.carplan.phone.calendar
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
@@ -141,7 +143,8 @@ fun QuickAddSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Panel,
+        containerColor = Palette.Background,
+        shape = Corner,
     ) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).imePadding()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -160,7 +163,7 @@ fun QuickAddSheet(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = ::save, enabled = title.isNotBlank()) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Teal else Palette.TextSoft)
+                    Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Navy else Palette.TextSoft)
                 }
             }
 
@@ -174,7 +177,7 @@ fun QuickAddSheet(
                         if (time != null) DropdownMenuItem({ Text("하루 종일로") }, onClick = { dateMenu = false; time = null })
                         HorizontalDivider()
                         Repeat.entries.forEach { r ->
-                            DropdownMenuItem({ Text((if (r == repeat) "✓ " else "   ") + r.label) }, onClick = { dateMenu = false; repeat = r })
+                            DropdownMenuItem({ Text(r.label, fontWeight = if (r == repeat) FontWeight.Bold else FontWeight.Normal) }, onClick = { dateMenu = false; repeat = r })
                         }
                     }
                 }
@@ -255,12 +258,12 @@ fun QuickAddSheet(
 
 @Composable
 private fun Chip(icon: ImageVector, label: String?, active: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = if (active) Color.White else Color.Transparent) {
+    Surface(onClick = onClick, shape = Corner, color = Color.Transparent, border = BorderStroke(1.dp, if (active) Palette.Navy else Palette.Line)) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = if (active) Palette.Teal else Palette.TextSoft, modifier = Modifier.size(22.dp))
+            Icon(icon, null, tint = if (active) Palette.Navy else Palette.TextSoft, modifier = Modifier.size(20.dp))
             label?.let {
                 Spacer(Modifier.size(6.dp))
-                Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Navy)
+                Text(it, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
             }
         }
     }
@@ -268,11 +271,11 @@ private fun Chip(icon: ImageVector, label: String?, active: Boolean, onClick: ()
 
 @Composable
 private fun CategoryChip(label: String, color: Color, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = Color.White) {
-        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+    Surface(onClick = onClick, shape = Corner, color = Color.Transparent, border = BorderStroke(1.dp, Palette.Line)) {
+        Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(Corner).background(color))
             Spacer(Modifier.size(6.dp))
-            Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Navy)
+            Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
             Icon(Icons.Filled.ArrowDropDown, null, tint = Palette.Navy)
         }
     }
@@ -283,7 +286,8 @@ private fun SmallField(value: String, onChange: (String) -> Unit, hint: String, 
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextField(
             value, onChange, placeholder = { Text(hint) }, singleLine = true, modifier = Modifier.weight(1f),
-            colors = TextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White),
+            shape = Corner,
+            colors = TextFieldDefaults.colors(focusedContainerColor = Palette.InputBg, unfocusedContainerColor = Palette.InputBg, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Color.Transparent),
         )
         IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "지우기", tint = Palette.TextSoft) }
     }

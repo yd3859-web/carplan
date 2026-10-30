@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
@@ -52,7 +53,7 @@ fun CategorySheet(
 ) {
     var editing by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Palette.Background) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Palette.Background, shape = Corner) {
         Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("카테고리 선택", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -79,15 +80,15 @@ fun CategorySheet(
 @Composable
 private fun CategoryCard(name: String, color: Color, selected: Boolean, onClick: () -> Unit) {
     Column(
-        Modifier.size(width = 96.dp, height = 96.dp).clip(RoundedCornerShape(16.dp)).background(Palette.Panel)
-            .then(if (selected) Modifier.border(2.dp, color, RoundedCornerShape(16.dp)) else Modifier)
+        Modifier.size(width = 96.dp, height = 88.dp).clip(Corner)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Palette.TextStrong else Palette.Line, Corner)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(Modifier.size(18.dp).clip(CircleShape).background(color))
+        Box(Modifier.size(14.dp).clip(Corner).background(color))
         Spacer(Modifier.height(10.dp))
-        Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = color.copy(alpha = 0.9f).compositeOverDark())
+        Text(name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
     }
 }
 
@@ -101,10 +102,12 @@ private fun NewCategoryDialog(onConfirm: (String, Long) -> Unit, onDismiss: () -
     var color by remember { mutableStateOf(CategoryColors.PALETTE.first()) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = Corner,
+        containerColor = Palette.Background,
         title = { Text("새 카테고리") },
         text = {
             Column {
-                OutlinedTextField(name, { name = it }, singleLine = true, placeholder = { Text("예: 출퇴근, 여가") })
+                OutlinedTextField(name, { name = it }, singleLine = true, placeholder = { Text("예: 출퇴근, 여가") }, shape = Corner)
                 Spacer(Modifier.height(16.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     CategoryColors.PALETTE.forEach { c ->

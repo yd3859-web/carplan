@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,7 +25,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
@@ -39,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.htb.carplan.phone.trip.TripDayScreen
 import com.htb.carplan.phone.trip.TripRef
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
@@ -73,7 +79,7 @@ private val TripRefSaver = Saver<TripRef?, List<String>>(
 
 /**
  * 2장 캘린더 메인 (A안): 오늘 카드 on top, a light month view below
- * (dots for one-day events, bars only for multi-day trips, 🔧 for car care),
+ * (dots for one-day events, bars only for multi-day trips, a wrench for car care),
  * and tapping a day opens 그날 동선.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,16 +105,18 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
         val wide = maxWidth >= 720.dp
         Row(Modifier.fillMaxSize()) {
-            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            // The month fills the height: week rows share the space left under the header (like the system calendar).
+            Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 16.dp)) {
                 Spacer(Modifier.height(12.dp))
                 TodayCard(upcoming, car)
                 error?.let { Text("오류: $it", color = Palette.Sunday, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
+                Spacer(Modifier.height(4.dp))
                 MonthHeader(month, onPrev = { vm.showMonth(month.minusMonths(1)) }, onNext = { vm.showMonth(month.plusMonths(1)) })
-                MonthGridView(month, selected, events, categories) { date ->
+                MonthGridView(month, selected, events, categories, Modifier.weight(1f)) { date ->
                     vm.select(date)
                     if (!wide) daySheetOpen = true
                 }
-                Spacer(Modifier.height(110.dp)) // room for the floating tab bar
+                Spacer(Modifier.height(12.dp))
             }
             if (wide) {
                 DayRoutePanel(
@@ -116,7 +124,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     events = MonthGrid.eventsOn(selected, events),
                     categories = categories,
                     onAdd = { quickAddDate = selected },
-                    modifier = Modifier.width(360.dp).fillMaxHeight().background(Palette.Panel),
+                    modifier = Modifier.width(360.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) },
                     tripStops = tripStops,
                     onOpenTrip = { openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
                 )
@@ -171,16 +179,18 @@ private fun MonthGridView(
     selected: LocalDate,
     events: List<CalendarEvent>,
     categories: List<CustomCategory>,
+    modifier: Modifier = Modifier,
     onDayClick: (LocalDate) -> Unit,
 ) {
     val multiDay = events.filter { it.event.endDate.isNotEmpty() && it.event.endDate != it.event.startDate }
     val singleDay = events - multiDay.toSet()
-    Column {
+    Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             WEEKDAYS.forEach { Text(it, Modifier.weight(1f), textAlign = TextAlign.Center, color = Palette.TextSoft, fontSize = 12.sp) }
         }
         MonthGrid.weeks(month).forEach { weekStart ->
-            WeekRow(month, weekStart, selected, multiDay, singleDay, categories, onDayClick)
+            HorizontalDivider(color = Palette.Line)
+            WeekRow(month, weekStart, selected, multiDay, singleDay, categories, Modifier.weight(1f), onDayClick)
         }
     }
 }
@@ -193,12 +203,13 @@ private fun WeekRow(
     multiDay: List<CalendarEvent>,
     singleDay: List<CalendarEvent>,
     categories: List<CustomCategory>,
+    modifier: Modifier,
     onDayClick: (LocalDate) -> Unit,
 ) {
     val bars = MonthGrid.bars(weekStart, multiDay)
     val lanes = minOf(MAX_LANES, (bars.maxOfOrNull { it.lane } ?: -1) + 1)
     val barsHeight = (BAR_HEIGHT + BAR_GAP) * lanes
-    BoxWithConstraints(Modifier.fillMaxWidth().height(DATE_AREA + barsHeight + MARK_AREA + 6.dp)) {
+    BoxWithConstraints(modifier.fillMaxWidth().heightIn(min = DATE_AREA + barsHeight + MARK_AREA + 6.dp)) {
         val colW: Dp = maxWidth / 7
         Row(Modifier.fillMaxSize()) {
             (0..6).forEach { i ->
@@ -247,9 +258,9 @@ private fun DayCell(
         MonthGrid.isSaturday(date) -> Palette.Saturday
         else -> Palette.TextStrong
     }
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.padding(horizontal = 2.dp), horizontalAlignment = Alignment.Start) {
         Box(
-            Modifier.padding(top = 3.dp).size(24.dp).clip(CircleShape).background(
+            Modifier.padding(top = 4.dp, start = 2.dp).size(22.dp).clip(Corner).background(
                 when {
                     isToday -> Palette.Navy
                     selected -> Palette.InputBg
@@ -259,7 +270,7 @@ private fun DayCell(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "${date.dayOfMonth}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                "${date.dayOfMonth}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                 color = when {
                     isToday -> Color.White
                     inMonth -> base
@@ -272,11 +283,11 @@ private fun DayCell(
     }
 }
 
-/** Dots for one-day events (teal when it has a place = the car goes there), 🔧 for car care. */
+/** Dots for one-day events (accent when it has a place = the car goes there), a wrench for car care. */
 @Composable
 private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: List<CustomCategory>, holiday: String?) {
-    Row(Modifier.height(MARK_AREA), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (marks.any { it.event.categoryId == BuiltInCategory.CAR.id }) Text("🔧", fontSize = 9.sp)
+    Row(Modifier.height(MARK_AREA).padding(start = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (marks.any { it.event.categoryId == BuiltInCategory.CAR.id }) Icon(Icons.Filled.Build, "차량 관리", tint = Palette.ChipText, modifier = Modifier.size(9.dp))
         marks.filter { it.event.categoryId != BuiltInCategory.CAR.id }.take(3).forEach {
             val c = if (it.event.place != null) Palette.Teal else argb(CategoryColors.of(it.event.categoryId, categories))
             Box(Modifier.size(5.dp).clip(CircleShape).background(c))
@@ -290,7 +301,7 @@ private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: Li
 /** A multi-day trip as one continuous bar. */
 @Composable
 private fun TripBar(label: String, color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.clip(RoundedCornerShape(8.dp)).background(color), contentAlignment = Alignment.CenterStart) {
-        Text(label, Modifier.padding(horizontal = 6.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Box(modifier.clip(Corner).background(color.copy(alpha = 0.16f)).drawBehind { drawRect(color, size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)) }, contentAlignment = Alignment.CenterStart) {
+        Text(label, Modifier.padding(start = 7.dp, end = 4.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

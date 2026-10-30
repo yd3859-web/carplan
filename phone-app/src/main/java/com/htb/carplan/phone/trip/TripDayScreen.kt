@@ -1,7 +1,9 @@
 package com.htb.carplan.phone.trip
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -53,6 +55,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.model.Stop
@@ -97,9 +100,10 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             if (busy) Text("저장 중", fontSize = 12.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
         }
 
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             dates.forEachIndexed { i, d -> DateTab(d, i + 1, selected = d == date) { vm.showDate(d) } }
         }
+        HorizontalDivider(color = Palette.Line)
 
         error?.let {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -139,27 +143,28 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                             "${vm.whoDid(stop.updatedBy)} ${stop.place.name}를(을) 뺐어요",
                             fontSize = 13.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Teal) }
+                        TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                     }
                 }
             }
             item { Spacer(Modifier.height(12.dp)) }
         }
 
-        // Bottom padding keeps the buttons above the floating tab bar (AppRoot draws it over everything).
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HorizontalDivider(color = Palette.Line)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = vm::sortShortest,
                 enabled = stops.count { it.place.hasCoords() } >= 3,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-            ) { Text("동선 최소로 정렬" + if (vm.kakaoAvailable) "" else " (직선거리 기준)", color = Palette.Navy) }
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = Corner,
+                border = BorderStroke(1.dp, Palette.Line),
+            ) { Text(if (vm.kakaoAvailable) "동선 최소로 정렬" else "동선 정렬 (직선)", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
             Button(
                 onClick = { adding = true },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-            ) { Text("+ 장소 칸 추가", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+            ) { Text("장소 칸 추가", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
 
@@ -183,11 +188,11 @@ private fun recentEditor(stop: Stop, me: String?, nameOf: (String?) -> String): 
 @Composable
 private fun DateTab(date: String, dayNo: Int, selected: Boolean, onClick: () -> Unit) {
     val d = LocalDate.parse(date)
-    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = if (selected) Palette.Navy else Palette.InputBg) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("${dayNo}일차", fontSize = 11.sp, color = if (selected) Color.White.copy(alpha = 0.7f) else Palette.TextSoft)
-            Text("${d.monthValue}/${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (selected) Color.White else Palette.TextStrong)
-        }
+    // Underline tabs like the system settings pages: text only, a 2dp bar under the selected one.
+    Column(Modifier.clickable(onClick = onClick).padding(horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("${dayNo}일차", fontSize = 11.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+        Text("${d.monthValue}/${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (selected) Palette.TextStrong else Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) Palette.TextStrong else Color.Transparent))
     }
 }
 
@@ -196,20 +201,18 @@ private fun StopRow(index: Int, stop: Stop, editedBy: String?, dragging: Boolean
     Row(
         modifier
             .fillMaxWidth()
-            .shadow(if (dragging) 8.dp else 0.dp, RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (dragging) Color.White else Palette.Panel)
+            .shadow(if (dragging) 6.dp else 0.dp, Corner)
+            .clip(Corner)
+            .background(if (dragging) Palette.InputBg else Palette.Background)
             .clickable(onClick = onClick)
-            .padding(start = 12.dp, top = 10.dp, bottom = 10.dp)
+            .padding(start = 4.dp, top = 12.dp, bottom = 12.dp)
             .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(26.dp).clip(CircleShape).background(if (stop.place.hasCoords()) Palette.Teal else Palette.TextSoft), contentAlignment = Alignment.Center) {
-            Text("${index + 1}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        }
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+        Text("${index + 1}", Modifier.width(28.dp), color = if (stop.place.hasCoords()) Palette.Teal else Palette.TextSoft, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Column(Modifier.weight(1f).padding(start = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                stop.time?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, modifier = Modifier.padding(end = 8.dp)) }
+                stop.time?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Palette.ChipText, modifier = Modifier.padding(end = 8.dp)) }
                 Text(stop.place.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             }
             val sub = listOfNotNull(
@@ -227,17 +230,17 @@ private fun StopRow(index: Int, stop: Stop, editedBy: String?, dragging: Boolean
 /** The drive between two stops; Kakao time when there is a key, a straight-line guess otherwise. */
 @Composable
 private fun LegRow(leg: LegInfo?) {
-    Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
-        Spacer(Modifier.width(12.dp))
-        Box(Modifier.width(26.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            Box(Modifier.width(2.dp).fillMaxHeight().background(Palette.Teal.copy(alpha = 0.4f)))
+    Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.width(4.dp))
+        Box(Modifier.width(28.dp).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+            Box(Modifier.padding(start = 5.dp).width(1.dp).fillMaxHeight().background(Palette.Line))
         }
         val label = when {
-            leg == null -> "🚗 이동"
-            leg.exact -> "🚗 ${minutes(leg.seconds)} · ${km(leg.meters)}"
-            else -> "🚗 약 ${minutes(leg.seconds)} · ${km(leg.meters)} (직선)"
+            leg == null -> "이동"
+            leg.exact -> "이동 ${minutes(leg.seconds)} · ${km(leg.meters)}"
+            else -> "이동 약 ${minutes(leg.seconds)} · ${km(leg.meters)} (직선)"
         }
-        Text(label, Modifier.padding(start = 12.dp), fontSize = 12.sp, color = Palette.Teal)
+        Text(label, Modifier.padding(start = 4.dp), fontSize = 12.sp, color = Palette.TextSoft)
     }
 }
 
