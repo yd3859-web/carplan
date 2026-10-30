@@ -1,11 +1,61 @@
 rules_version = '2';
 
-// DEV RULES (뼈대 단계): any signed-in user may read/write.
-// Replace with the 18장 rules (group members only, car owner only) before 1차 제출.
+// 18장 보안 규칙. 개발용 "로그인만 하면 전부"는 firestore.dev.rules.
+// 폰 = 사람 계정(uid가 그룹 memberIds에 있음).
+// 차 = 차 계정(uid = cars/{carId} 문서 id). 차는 차주(ownerUid) 권한으로 차주의 그룹을 읽고 쓴다.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isCar() { return exists(/databases/$(database)/documents/cars/$(me())); }
+    function carOwner() { return get(/databases/$(database)/documents/cars/$(me())).data.ownerUid; }
+    // I may act on a group with these members: as myself, or as the car of one of them.
+    function canAct(members) { return me() in members || (isCar() && carOwner() in members); }
+    function groupMembers(gid) { return get(/databases/$(database)/documents/groups/$(gid)).data.memberIds; }
+
+    // ---------- 사람 ----------
+    match /users/{uid} {
+      allow read: if signedIn();                      // 이름·친구 코드 조회(초대·멤버 목록)
+      allow create, update: if signedIn() && (me() == uid || (isCar() && carOwner() == uid));
+      allow delete: if signedIn() && me() == uid;
+      match /categories/{id} { allow read, write: if signedIn() && me() == uid; }
+      // 친구는 양쪽에 같이 쓴다(Q10): 내 목록은 나만, 상대 목록의 "나" 문서는 내가 쓸 수 있음
+      match /friends/{fid} {
+        allow read: if signedIn() && me() == uid;
+        allow write: if signedIn() && (me() == uid || me() == fid);
+      }
+    }
+
+    // ---------- 차 ----------
+    match /cars/{carId} {
+      allow read: if signedIn();                      // 폰이 상태·위치·주행거리 표시
+      allow create, delete: if signedIn() && me() == carId;
+      // 차 자신 / 차주 / 아직 주인 없는 차(7장 6자리 코드로 연결하는 순간)
+      allow update: if signedIn() && (me() == carId || resource.data.ownerUid == me()
+        || !('ownerUid' in resource.data) || resource.data.ownerUid == null);
+    }
+
+    // ---------- 그룹과 그 안의 모든 것 ----------
+    match /groups/{gid} {
+      allow read: if signedIn();                      // 초대 코드 조회·그룹 이름 표시. 하위(일정 등)는 멤버만
+      allow create: if signedIn() && canAct(request.resource.data.memberIds);
+      allow delete: if signedIn() && resource.data.ownerUid == me();
+      allow update: if signedIn() && (
+        // 멤버(또는 멤버의 차): 이름 바꾸기, 친구 초대(추가), 나가기(나만 빼기), 그룹장은 내보내기(Q11)
+        (canAct(resource.data.memberIds) && (
+          request.resource.data.memberIds.hasAll(resource.data.memberIds)
+          || resource.data.ownerUid == me()
+          || resource.data.memberIds.removeAll(request.resource.data.memberIds).hasOnly([me()])))
+        // 멤버가 아닌 사람: 초대 코드·링크·QR로 참여 = memberIds에 "나"만 더하는 변경
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+          && request.resource.data.memberIds.hasAll(resource.data.memberIds)
+          && request.resource.data.memberIds.hasOnly(resource.data.memberIds.concat([me()])))
+      );
+      // 일정·날·칸·코멘트·기록·픽업·투표·다트: 멤버와 멤버의 차만
+      // ({document=**}만 쓰면 v2에선 그룹 문서 자체(0단계)까지 걸려 위 update 규칙이 무력해진다 → 하위 컬렉션 한 단계를 먼저 받음)
+      match /{sub}/{document=**} {
+        allow read, write: if signedIn() && canAct(groupMembers(gid));
+      }
     }
   }
 }

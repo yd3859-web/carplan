@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// DEV RULES (뼈대 단계): any signed-in user may read/write.
+// Replace with the 18장 rules (group members only, car owner only) before 1차 제출.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
