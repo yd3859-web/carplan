@@ -1,0 +1,377 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>차량용 캘린더 한눈에</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 레이아웃: 하루를 도로 한 줄로 보고, 정류장(장면)마다 기능을 붙인다. 폰·차 두 화면은 칩으로 구분 */
+:root{
+  --bg:#f2f4f6; --paper:#ffffff; --ink:#15212e; --ink-2:#4a5866; --ink-3:#7d8a97;
+  --line:#d9dfe5; --road:#2b3a49; --lane:#f0b429; --phone:#2f6fb3; --car:#1f8a70;
+  --soft:#e8edf2;
+  --f-display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f161d; --paper:#17212b; --ink:#e7edf2; --ink-2:#aeb9c4; --ink-3:#7f8c98;
+  --line:#2a3744; --road:#0a1016; --lane:#f3c14b; --phone:#6ea6e6; --car:#4cc3a2; --soft:#1d2934; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161d; --paper:#17212b; --ink:#e7edf2; --ink-2:#aeb9c4; --ink-3:#7f8c98;
+  --line:#2a3744; --road:#0a1016; --lane:#f3c14b; --phone:#6ea6e6; --car:#4cc3a2; --soft:#1d2934; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto;padding-block:40px 64px;display:grid;gap:56px}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(2.6rem,7vw,4.2rem);line-height:1.05;letter-spacing:-.01em}
+h2{font-family:var(--f-display);font-weight:400;font-size:clamp(1.7rem,4vw,2.2rem);line-height:1.15}
+h3{font-size:1.08rem;font-weight:700}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:.78rem;letter-spacing:.08em;color:var(--ink-3);text-transform:uppercase}
+.lead{font-size:1.15rem;color:var(--ink-2);max-width:40em}
+section{display:grid;gap:20px}
+.sec-head{display:grid;gap:8px}
+.sec-head p{color:var(--ink-2);max-width:42em}
+
+/* 칩 */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;padding:2px 9px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap;line-height:1.5}
+.chip.phone{color:var(--phone)} .chip.car{color:var(--car)}
+.chip.gear{color:var(--ink-2);font-family:var(--f-mono)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* 히어로 */
+.hero{display:grid;gap:22px}
+.hero .name-note{font-size:.9rem;color:var(--ink-3)}
+.pillars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pillar{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:6px;align-content:start}
+.pillar b{font-size:1.02rem}
+.pillar span{color:var(--ink-2);font-size:.94rem}
+
+/* 사람 */
+.people{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.person{border-top:3px solid var(--ink);padding-top:12px;display:grid;gap:6px;align-content:start}
+.person p{color:var(--ink-2);font-size:.95rem}
+
+/* 연결 그림 */
+.link-fig{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:22px;display:grid;gap:18px}
+.nodes{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:10px}
+.node{border:1.5px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:4px;text-align:center;min-width:0}
+.node b{font-size:.98rem}
+.node small{color:var(--ink-3);font-size:.8rem;line-height:1.4}
+.node.phone{border-color:var(--phone)} .node.car{border-color:var(--car)}
+.node.navi{background:var(--road);border-color:var(--road);color:#fff}
+.node.navi small{color:#c9d3dc}
+.arrow{font-family:var(--f-mono);color:var(--ink-3);font-size:1.1rem}
+.fig-note{color:var(--ink-2);font-size:.95rem;border-left:3px solid var(--lane);padding-left:12px}
+
+/* 하루 도로 */
+.road{position:relative;display:grid;gap:0}
+.stop{display:grid;grid-template-columns:72px minmax(0,1fr);gap:18px;position:relative;padding-bottom:28px}
+.stop:last-child{padding-bottom:0}
+.rail{position:relative;display:flex;justify-content:center}
+.rail::before{content:"";position:absolute;top:0;bottom:-28px;width:22px;background:var(--road);border-radius:2px}
+.stop:last-child .rail::before{bottom:0;border-radius:2px 2px 11px 11px}
+.stop:first-child .rail::before{border-radius:11px 11px 2px 2px}
+.rail::after{content:"";position:absolute;top:0;bottom:-28px;width:0;border-left:2px dashed var(--lane)}
+.stop:last-child .rail::after{bottom:14px}
+.marker{position:relative;z-index:1;margin-top:6px;width:44px;height:44px;border-radius:50%;background:var(--lane);color:#15212e;
+  display:grid;place-items:center;font-family:var(--f-mono);font-weight:500;font-size:.95rem;border:3px solid var(--bg)}
+.stop-body{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;gap:12px;min-width:0}
+.stop-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}
+.stop-top .when{font-family:var(--f-mono);font-size:.8rem;color:var(--ink-3)}
+.stop-body ul{margin:0;padding-left:1.1em;display:grid;gap:4px}
+.stop-body li{color:var(--ink)}
+.stop-body li span{color:var(--ink-2)}
+.base{margin-top:4px;background:var(--soft);border-radius:12px;padding:16px 20px;display:grid;gap:6px}
+.base p{color:var(--ink-2)}
+
+/* 기능 묶음 */
+.groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.group{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;gap:12px;align-content:start;min-width:0}
+.group-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.feat{display:grid;gap:2px;padding-top:10px;border-top:1px solid var(--line)}
+.feat:first-of-type{border-top:0;padding-top:0}
+.feat b{font-size:.97rem}
+.feat p{color:var(--ink-2);font-size:.93rem}
+
+/* 표 */
+.table-box{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.94rem}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+thead th{font-size:.8rem;color:var(--ink-3);font-weight:700;letter-spacing:.04em;background:var(--soft)}
+td:first-child{font-weight:700;white-space:nowrap}
+td.none{color:var(--ink-3)}
+th.phone{color:var(--phone)} th.car{color:var(--car)}
+
+/* 시나리오 */
+.story{display:grid;gap:0;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.story-head{padding:14px 20px;background:var(--soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.story-head span{color:var(--ink-3);font-size:.85rem}
+.beat{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:14px;padding:12px 20px;border-top:1px solid var(--line);align-items:baseline}
+.beat time{font-family:var(--f-mono);font-size:.9rem;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.beat p{color:var(--ink)}
+
+/* 안 하는 것 */
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.plain{display:grid;gap:8px;align-content:start}
+.plain ul{margin:0;padding-left:1.1em;display:grid;gap:4px;color:var(--ink-2)}
+footer{color:var(--ink-3);font-size:.85rem;border-top:1px solid var(--line);padding-top:16px}
+
+@media (max-width:760px){
+  .pillars,.people,.groups,.two{grid-template-columns:1fr}
+  .nodes{grid-template-columns:1fr;justify-items:stretch}
+  .arrow{transform:rotate(90deg);justify-self:center}
+  .stop{grid-template-columns:48px minmax(0,1fr);gap:12px}
+  .rail::before{width:16px}
+  .marker{width:36px;height:36px;font-size:.82rem}
+  .beat{grid-template-columns:54px minmax(0,1fr)}
+  .beat .chips{grid-column:2}
+}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <p class="eyebrow">현대자동차그룹 차량용 앱 공모전 · 대학생 부문</p>
+  <h1>차량용 캘린더</h1>
+  <p class="lead">캘린더가 메인인 차량용 앱입니다. 일행과 함께 짠 일정이 그대로 차의 내비 경로가 되고, 차를 세울 때마다 그날의 기록이 한 칸씩 쌓입니다.</p>
+  <p class="name-note">"차량용 캘린더"는 앱 이름이 아니라 캘린더가 중심이라는 뜻입니다. 이름은 아직 정하지 않았습니다.</p>
+  <div class="pillars">
+    <div class="pillar"><b>일정을 정리하고 공유한다</b><span>기본 캘린더 틀 위에 여행, 차량 관리, 다른 일정이 들어갑니다. 카테고리는 사용자가 더 만들 수 있습니다.</span></div>
+    <div class="pillar"><b>일정이 곧 경로가 된다</b><span>하루 일정이 한 번에 내비 경유지로 들어가고, 누가 일정을 바꾸면 경로도 따라 바뀝니다.</span></div>
+    <div class="pillar"><b>멈춘 곳마다 기록이 남는다</b><span>밥집, 카페, 휴게소처럼 차를 세운 곳마다 칸이 생기고, 하루가 타임라인이 됩니다.</span></div>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">누가 쓰나</p>
+    <h2>세 사람의 자리</h2>
+  </div>
+  <div class="people">
+    <div class="person"><h3>운전자</h3><p>차 화면으로 일정표를 보고, "다음 목적지로 갈까요?"에 답해 바로 출발합니다. 운전 중에는 일정을 직접 고치지 않습니다.</p></div>
+    <div class="person"><h3>동승자와 일행</h3><p>폰 앱으로 일정을 같이 짜고, 데리러 오는 차를 지도에서 보고, 이동 중 일정 변경과 기록을 맡습니다.</p></div>
+    <div class="person"><h3>혼자 타는 사람</h3><p>여행이 아니어도 씁니다. 출퇴근 목적지 자동 설정, 주유와 점검 같은 차량 일정, 혼자 남기는 기록.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">어떻게 이어지나</p>
+    <h2>폰 여러 대, 차 한 대</h2>
+    <p>차에 연결되는 폰은 하나뿐이지만 상관없습니다. 일행 모두의 폰과 차 앱이 같은 일정을 함께 보고 있어서, 누가 바꾸든 차가 바로 압니다.</p>
+  </div>
+  <div class="link-fig">
+    <div class="nodes">
+      <div class="node phone"><b>일행의 폰 앱</b><small>일정 짜기 · 투표 · 다트<br>픽업 지도 · 기록</small></div>
+      <div class="arrow">⇄</div>
+      <div class="node"><b>함께 보는 일정</b><small>그룹·일정·기록이<br>모두에게 같게 보임</small></div>
+      <div class="arrow">⇄</div>
+      <div class="node car"><b>차 화면 앱</b><small>캘린더 · 일정표<br>음성 질문 · 차량 정보</small></div>
+      <div class="arrow">→</div>
+      <div class="node navi"><b>현대 내비</b><small>경유지 · 경로 안내<br>도착 시간</small></div>
+    </div>
+    <p class="fig-note">에뮬레이터에서 직접 확인했습니다. 차 앱이 뒤에 있어도 일행이 바꾼 일정으로 내비 경로가 바뀝니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">하루의 흐름</p>
+    <h2>출발 전부터 하루 끝까지</h2>
+    <p>여행 하루를 따라가며 어떤 기능이 어디서 쓰이는지 정리했습니다. 칩은 그 장면에서 쓰는 화면입니다.</p>
+  </div>
+
+  <div class="road">
+    <div class="stop">
+      <div class="rail"><div class="marker">1</div></div>
+      <div class="stop-body">
+        <div class="stop-top"><h3>출발 전 · 여행 계획</h3><span class="when">며칠 전 ~ 전날</span></div>
+        <div class="chips"><span class="chip phone">폰</span><span class="chip car">차 (다트)</span></div>
+        <ul>
+          <li>링크나 친구 추가로 초대해 그룹을 만듭니다. <span>그룹은 남겨 두고 같은 멤버로 다시 씁니다.</span></li>
+          <li>모두가 일정을 편집합니다. <span>한 칸은 장소 + 시간 + 메모. 누가 빼면 알림이 갑니다.</span></li>
+          <li>의견이 갈리면 투표를 엽니다. <span>과반이면 마감, 동점이면 둘 다 후보로.</span></li>
+          <li>갈 곳이 없으면 다트를 던집니다. <span>전국 / 내 위치 100km / 지역 안에서 동네를 뽑고 장소를 추천합니다.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stop">
+      <div class="rail"><div class="marker">2</div></div>
+      <div class="stop-body">
+        <div class="stop-top"><h3>출발 · 픽업</h3><span class="when">당일 아침</span></div>
+        <div class="chips"><span class="chip car">차</span><span class="chip phone">폰 (동승자)</span></div>
+        <ul>
+          <li>내비로 계산해 픽업 순서를 정합니다. <span>기준은 최종 목적지까지 걸리는 총시간입니다.</span></li>
+          <li>동승자는 택시 앱처럼 오는 차를 지도에서 봅니다. <span>남은 시간과 거리도 같이 보입니다.</span></li>
+          <li>차 위치만 실시간이고, 동승자는 정한 장소만 표시됩니다.</li>
+          <li>"탔어요"를 누르거나 도착 후 10분이 지나면 공유가 끝납니다.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stop">
+      <div class="rail"><div class="marker">3</div></div>
+      <div class="stop-body">
+        <div class="stop-top"><h3>이동 중</h3><span class="when">운전하는 동안</span></div>
+        <div class="chips"><span class="chip car">차</span><span class="chip phone">폰 (동승자)</span></div>
+        <ul>
+          <li>"다음 목적지로 갈까요?" 한 마디로 경로 안내가 시작됩니다. <span>하루 일정은 한 번에 경유지로 들어갑니다.</span></li>
+          <li>기름이 부족해 보이면 가는 길의 최저가 주유소를 추천합니다. <span>알림 기준은 설정에서 바꿀 수 있습니다.</span></li>
+          <li>도착이 가까우면 주차장을 고르게 하거나 동승자에게 찾아봐 달라고 합니다.</li>
+          <li>카페에 자리가 없으면 카테고리를 눌러 근처를 추천받습니다.</li>
+          <li>일정 변경은 동승자 폰에서 합니다. <span>바꾸면 내비 경로도 갱신됩니다.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stop">
+      <div class="rail"><div class="marker">P</div></div>
+      <div class="stop-body">
+        <div class="stop-top"><h3>도착 · 기록 칸이 열림</h3><span class="when">차를 세울 때마다</span></div>
+        <div class="chips"><span class="chip phone">폰</span><span class="chip car">차</span><span class="chip gear">P단</span></div>
+        <ul>
+          <li>도착해서 차를 세우면 그 장소의 칸이 생깁니다. <span>사진이나 짧은 글을 남깁니다.</span></li>
+          <li>일정에 없던 휴게소에 들러도 휴게소 칸이 생깁니다.</li>
+          <li>코멘트는 그룹 전체가 함께 보고, 운전자가 아닌 사람은 이동 중에도 씁니다.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stop">
+      <div class="rail"><div class="marker">✓</div></div>
+      <div class="stop-body">
+        <div class="stop-top"><h3>하루 끝 · 타임라인</h3><span class="when">돌아와서</span></div>
+        <div class="chips"><span class="chip phone">폰</span></div>
+        <ul>
+          <li>칸들이 이어져 하루 타임라인이 됩니다.</li>
+          <li>하루 기록을 이미지나 영상 하나로 뽑아 줍니다.</li>
+          <li>일정은 각자의 캘린더에 남고, 그룹은 다음 여행을 위해 남습니다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="base">
+    <h3>여행이 없는 날에도 · 차량 관리</h3>
+    <p>주유, 차량 점검, 공기압, 엔진오일, 타이어 교체, 세차, 보험 갱신이 캘린더에 쌓이고, 다음에 언제 하면 좋을지 알려 줍니다. 자동으로 알 수 있는 건 자동으로 기록하고, 안 되면 주유소에서 차를 세울 때 "주유했어요?"라고 묻습니다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">기능 한눈에</p>
+    <h2>기능을 여섯 묶음으로</h2>
+  </div>
+  <div class="groups">
+    <div class="group">
+      <div class="group-head"><h3>캘린더</h3><div class="chips"><span class="chip phone">폰</span><span class="chip car">차</span></div></div>
+      <div class="feat"><b>카테고리별 일정</b><p>여행, 차량 관리, 다른 일정. 출퇴근, 여가처럼 직접 추가.</p></div>
+      <div class="feat"><b>출퇴근 자동 목적지</b><p>평소 출근하는 시간에 타면 출근지를 바로 목적지로.</p></div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>차량 관리</h3><div class="chips"><span class="chip car">차</span><span class="chip phone">폰</span></div></div>
+      <div class="feat"><b>차량 일정 기록</b><p>주유부터 보험 갱신까지 7가지 항목. 가능한 건 자동 기록.</p></div>
+      <div class="feat"><b>다음 관리 시기 알림</b><p>점검 알림 기준(주행거리 / 날짜)은 만들면서 정합니다.</p></div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>여행 계획</h3><div class="chips"><span class="chip phone">폰</span></div></div>
+      <div class="feat"><b>초대와 그룹</b><p>링크 또는 친구 추가. 그룹은 남겨서 다시 씀.</p></div>
+      <div class="feat"><b>함께 편집하는 일정</b><p>장소 + 시간 + 메모. 누구나 추가·제거.</p></div>
+      <div class="feat"><b>투표 · 다트</b><p>필요할 때 쓰는 투표, 갈 곳이 없을 때 동네 뽑기.</p></div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>픽업</h3><div class="chips"><span class="chip car">차</span><span class="chip phone">폰</span></div></div>
+      <div class="feat"><b>픽업 순서</b><p>최종 목적지까지 총시간이 가장 짧은 순서.</p></div>
+      <div class="feat"><b>오는 차 보기</b><p>경로와 움직이는 차, 남은 시간과 거리.</p></div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>이동 중</h3><div class="chips"><span class="chip car">차</span><span class="chip phone">폰</span></div></div>
+      <div class="feat"><b>"다음 목적지로 갈까요?"</b><p>질문 하나로 경로 안내 시작.</p></div>
+      <div class="feat"><b>주유 추천</b><p>기름양 기준 알림과 가는 길 최저가 주유소.</p></div>
+      <div class="feat"><b>주차 · 근처 추천 · 일정 변경</b><p>변경은 동승자 폰에서, 경로는 자동 갱신.</p></div>
+    </div>
+    <div class="group">
+      <div class="group-head"><h3>기록</h3><div class="chips"><span class="chip phone">폰</span></div></div>
+      <div class="feat"><b>장소마다 칸</b><p>차를 세운 곳마다 사진과 짧은 글. 계획에 없던 곳도.</p></div>
+      <div class="feat"><b>함께 보는 타임라인</b><p>그룹이 같이 쓰고, 이미지나 영상으로 내보내기.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">화면별 역할</p>
+    <h2>폰에서 하는 일, 차에서 하는 일</h2>
+    <p>차 화면은 짧고 단순하게 두는 것이 Pleos 설계 가이드의 방향입니다. 그래서 무언가를 만들고 고치는 일은 폰에서 하고, 차에서는 보고 답하고 출발합니다.</p>
+  </div>
+  <div class="table-box">
+    <table>
+      <thead><tr><th>장면</th><th class="phone">폰 앱</th><th class="car">차 화면</th></tr></thead>
+      <tbody>
+        <tr><td>캘린더</td><td>일정 만들기, 카테고리 추가</td><td>캘린더와 오늘 일정표 보기</td></tr>
+        <tr><td>여행 계획</td><td>초대, 그룹, 일정 편집, 투표</td><td>다같이 다트 던지기</td></tr>
+        <tr><td>픽업</td><td>픽업 장소 고르기, 오는 차 보기, "탔어요"</td><td>정해진 순서로 안내</td></tr>
+        <tr><td>이동 중</td><td>일정 바꾸기, 주차장 찾기, 코멘트</td><td>"다음 목적지로 갈까요?", 주유 추천, 근처 찾기</td></tr>
+        <tr><td>도착과 기록</td><td>사진과 글 남기기, 타임라인, 내보내기</td><td>세운 곳에 칸 열기, "주유했어요?"</td></tr>
+        <tr><td>차량 관리</td><td>기록 보기, 직접 입력</td><td>기름양·주행거리 읽어 자동 기록</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">예시</p>
+    <h2>어느 토요일, 넷이서 경주로</h2>
+    <p>기능이 이어지는 모습을 보여 주려고 만든 예시입니다. 실제 사용자 기록이 아닙니다.</p>
+  </div>
+  <div class="story">
+    <div class="story-head"><b>지민이 운전, 동승자 3명</b><span>예시 시나리오</span></div>
+    <div class="beat"><time>화 21:10</time><p>지민이 그룹 "대학 동기"를 다시 엽니다. 지난 여행 기록은 남아 있고 새 일정은 빈칸입니다.</p><div class="chips"><span class="chip phone">폰</span></div></div>
+    <div class="beat"><time>수 22:30</time><p>갈 곳을 못 정해 "내 위치 100km"로 다트를 던져 경주가 나옵니다. 점심 메뉴는 투표로 정합니다.</p><div class="chips"><span class="chip phone">폰</span></div></div>
+    <div class="beat"><time>토 08:40</time><p>차에 타자 픽업 순서가 나옵니다. 동승자들은 오는 차를 지도에서 보고 "탔어요"를 누릅니다.</p><div class="chips"><span class="chip car">차</span><span class="chip phone">폰</span></div></div>
+    <div class="beat"><time>토 09:25</time><p>"다음 목적지로 갈까요?" "응." 하루 일정이 경유지로 들어가고 안내가 시작됩니다.</p><div class="chips"><span class="chip car">차</span></div></div>
+    <div class="beat"><time>토 10:50</time><p>기름이 부족해 보여 가는 길 최저가 주유소를 추천받습니다. 휴게소에 들르자 휴게소 칸이 생깁니다.</p><div class="chips"><span class="chip car">차</span><span class="chip gear">P단</span></div></div>
+    <div class="beat"><time>토 15:20</time><p>카페에 자리가 없습니다. 뒷자리 동승자가 폰에서 다른 카페로 바꾸자 차 내비 경로가 바뀝니다.</p><div class="chips"><span class="chip phone">폰</span><span class="chip car">차</span></div></div>
+    <div class="beat"><time>토 21:00</time><p>집에 와서 하루 타임라인을 이미지 한 장으로 뽑아 그룹에 공유합니다. 주유 기록은 차량 캘린더에 남아 있습니다.</p><div class="chips"><span class="chip phone">폰</span></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <p class="eyebrow">범위</p>
+    <h2>하지 않는 것과 아직 정할 것</h2>
+  </div>
+  <div class="two">
+    <div class="plain">
+      <h3>하지 않기로 한 것</h3>
+      <ul>
+        <li>다른 사람 폰으로 차 음악 바꾸기</li>
+        <li>목적지 휴무·영업시간 알려 주기</li>
+        <li>도착 단계에 기능 더 넣기</li>
+        <li>동선 최소 순서 강제 (정렬은 사용자가 버튼을 누를 때만)</li>
+      </ul>
+    </div>
+    <div class="plain">
+      <h3>만들면서 정할 것</h3>
+      <ul>
+        <li>앱 이름</li>
+        <li>주유 알림 기본값과 주유소 찾는 범위</li>
+        <li>이동 구간도 타임라인에 넣을지</li>
+        <li>운전 중 일정이 바뀌면 바로 바꿀지, 음성으로 물어볼지</li>
+        <li>2차 시연에서 보여 줄 장면</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>차량용 캘린더 기획 총정리 2판을 바탕으로 기능과 흐름만 추렸습니다. 구현 방법과 기술 확인 결과는 총정리 문서의 09 기술 장에 있습니다. 2026-10-29</footer>
+
+</div>
