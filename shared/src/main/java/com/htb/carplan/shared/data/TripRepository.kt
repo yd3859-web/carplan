@@ -4,6 +4,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.WriteBatch
+import com.htb.carplan.shared.model.DayStatus
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Stop
 import com.htb.carplan.shared.model.TripDay
@@ -103,6 +104,24 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
             )
             batch.bumpDay(groupId, eventId, date, byUid)
         }.await()
+    }
+
+    /** The car reached (or skipped) a stop (9장). Does not bump the version: the itinerary itself did not change. */
+    suspend fun setVisited(groupId: String, eventId: String, date: String, stopId: String, visited: Boolean, nextIndex: Int) {
+        db.runBatch { batch ->
+            batch.update(db.document("${FirestorePaths.stops(groupId, eventId, date)}/$stopId"), "visited", visited)
+            batch.set(
+                db.document(FirestorePaths.day(groupId, eventId, date)),
+                mapOf("currentStopIndex" to nextIndex, "updatedAt" to FieldValue.serverTimestamp()),
+                SetOptions.merge(),
+            )
+        }.await()
+    }
+
+    /** READY → DRIVING when the car starts guiding, → DONE after the last stop (9장). */
+    suspend fun setDayStatus(groupId: String, eventId: String, date: String, status: DayStatus) {
+        db.document(FirestorePaths.day(groupId, eventId, date))
+            .set(mapOf("status" to status.name, "updatedAt" to FieldValue.serverTimestamp()), SetOptions.merge()).await()
     }
 
     private fun WriteBatch.bumpDay(groupId: String, eventId: String, date: String, byUid: String) {

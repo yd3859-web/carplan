@@ -36,6 +36,12 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     private val calendar = CalendarRepository()
     private val cars = CarRepository()
     private val router = CarRuntime.router(app)
+    private val navigator = CarRuntime.navigator(app)
+
+    /** 9장: today's trip, the question on screen, and whether the navigation already has the route. */
+    val trip: StateFlow<TodayTrip?> = navigator.trip
+    val prompt: StateFlow<NextPrompt?> = navigator.prompt
+    val guiding: StateFlow<Boolean> = navigator.guiding
 
     private val carId = MutableStateFlow<String?>(null)
     private val _error = MutableStateFlow<String?>(null)
@@ -98,6 +104,11 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openNavigation() = router.openNavigation()
+
+    fun go() = navigator.go()
+    fun later() = navigator.later()
+    fun askNow() = navigator.askNow()
+    fun debugArrive() = navigator.debugArrive()
 
     /** 차에서 일정 만들기 (Q19), parked only. Goes to the owner's solo group. */
     fun addEvent(event: Event) {

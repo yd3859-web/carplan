@@ -48,5 +48,10 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
         ).await()
     }
 
+    /** Which trip this car is driving today (9장); null clears it. */
+    suspend fun setActiveTrip(carId: String, groupId: String?, eventId: String?) {
+        db.document(FirestorePaths.car(carId)).update(mapOf("activeGroupId" to groupId, "activeEventId" to eventId)).await()
+    }
+
     private fun newCode() = (1..6).joinToString("") { Random.nextInt(10).toString() }
 }

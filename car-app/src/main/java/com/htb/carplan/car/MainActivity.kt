@@ -79,6 +79,9 @@ private fun CarHome(vm: CarHomeViewModel) {
     val vehicle by vm.vehicle.collectAsStateWithLifecycle()
     val week by vm.week.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val trip by vm.trip.collectAsStateWithLifecycle()
+    val prompt by vm.prompt.collectAsStateWithLifecycle()
+    val guiding by vm.guiding.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
@@ -89,19 +92,28 @@ private fun CarHome(vm: CarHomeViewModel) {
             LinkCodeScreen(car?.linkCode)
             return@Column
         }
+        prompt?.let { p ->
+            NextPromptCard(p, onGo = vm::go, onLater = vm::later)
+            Spacer(Modifier.height(16.dp))
+        }
         val today = LocalDate.now()
         val todayEvents = vm.eventsOn(today, week)
         val next = vm.nextDestination(week)
+        val tripNext = trip?.next
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            TodayList(today, todayEvents, next, Modifier.weight(1.2f).fillMaxHeight())
+            TodayList(today, todayEvents, next, trip, Modifier.weight(1.2f).fillMaxHeight())
             WeekList(vm, week, Modifier.weight(1f).fillMaxHeight())
             Column(Modifier.weight(0.8f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                BigButton(
-                    if (next != null) "▶  ${next.event.place?.name}로 안내" else "▶  다음 목적지 없음",
-                    enabled = next != null, primary = true,
-                ) { next?.let(vm::goTo) }
-                BigButton("🎤  말하기", enabled = false) { } // 9장 "다음 목적지로 갈까요?"
+                when {
+                    tripNext != null -> BigButton("▶  ${tripNext.place.name}로 안내", primary = true) { vm.go() }
+                    next != null -> BigButton("▶  ${next.event.place?.name}로 안내", primary = true) { vm.goTo(next) }
+                    else -> BigButton("▶  다음 목적지 없음", enabled = false, primary = true) { }
+                }
+                BigButton("🎤  다음 목적지 묻기", enabled = tripNext != null && prompt == null) { vm.askNow() }
                 BigButton("🧭  내비 열기") { vm.openNavigation() }
+                if (guiding && tripNext != null) {
+                    BigButton("✓  ${tripNext.place.name} 도착 (시연용)") { vm.debugArrive() }
+                }
                 BigButton(
                     if (vehicle.drivingRestricted) "주행 중엔 일정 추가 불가" else "+  일정 추가",
                     enabled = !vehicle.drivingRestricted,
@@ -143,8 +155,36 @@ private fun LinkCodeScreen(code: String?) {
     }
 }
 
+/** 9장: the question, what the mic heard, and the two buttons that always work (Q21). */
 @Composable
-private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: CalendarEvent?, modifier: Modifier) {
+private fun NextPromptCard(p: NextPrompt, onGo: () -> Unit, onLater: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Teal).padding(horizontal = 28.dp, vertical = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Black)
+            Text(
+                when {
+                    p.listening -> "🎤 듣는 중… \"응\" 또는 \"아니\"라고 말해 주세요"
+                    p.heard != null -> "들은 말: \"${p.heard}\" — 버튼으로 골라 주세요"
+                    else -> "말하거나 버튼을 눌러 주세요"
+                },
+                color = Color(0xFFE0FFFA), fontSize = 20.sp,
+            )
+        }
+        Button(onClick = onGo, modifier = Modifier.height(88.dp).width(200.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Bg)) {
+            Text("가기", fontSize = 28.sp, fontWeight = FontWeight.Black)
+        }
+        Button(onClick = onLater, modifier = Modifier.height(88.dp).width(200.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Color.White)) {
+            Text("나중에", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: CalendarEvent?, trip: TodayTrip?, modifier: Modifier) {
     Column(modifier.clip(RoundedCornerShape(20.dp)).background(Card).padding(24.dp).verticalScroll(rememberScrollState())) {
         Text("오늘  ${dayTitle(today)}", color = Soft, fontSize = 20.sp)
         Spacer(Modifier.height(12.dp))
@@ -152,13 +192,30 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
         events.forEach { item ->
             val e = item.event
             val isNext = item == next
-            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(e.startTime ?: "종일", Modifier.width(96.dp), color = if (isNext) Teal else Soft, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            val isTrip = trip != null && e.id == trip.eventId
+            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
+                Text(e.startTime ?: "종일", Modifier.width(96.dp), color = if (isNext || isTrip) Teal else Soft, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Column {
-                    Text(e.title, color = Color.White, fontSize = if (isNext) 30.sp else 26.sp, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal)
-                    e.place?.name?.let { Text("📍 $it", color = if (isNext) Teal else Soft, fontSize = 20.sp) }
+                    Text(e.title, color = Color.White, fontSize = if (isNext || isTrip) 30.sp else 26.sp, fontWeight = if (isNext || isTrip) FontWeight.Bold else FontWeight.Normal)
+                    if (isTrip) TripStops(trip!!) else e.place?.name?.let { Text("📍 $it", color = if (isNext) Teal else Soft, fontSize = 20.sp) }
                 }
             }
+        }
+    }
+}
+
+/** The day's stops in route order: ✓ visited, ▶ next, the rest plain (9장). */
+@Composable
+private fun TripStops(trip: TodayTrip) {
+    val nextId = trip.next?.id
+    if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 — 폰에서 추가", color = Soft, fontSize = 20.sp)
+    trip.stops.forEachIndexed { i, s ->
+        val mark = when { s.visited -> "✓"; s.id == nextId -> "▶"; else -> "${i + 1}" }
+        val color = when { s.visited -> Soft; s.id == nextId -> Teal; else -> Color.White }
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(mark, Modifier.width(36.dp), color = color, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text((s.time?.let { "$it  " } ?: "") + s.place.name, color = color, fontSize = 22.sp, fontWeight = if (s.id == nextId) FontWeight.Bold else FontWeight.Normal)
+            if (s.memo.isNotBlank()) Text("  · ${s.memo}", color = Soft, fontSize = 18.sp, maxLines = 1)
         }
     }
 }

@@ -34,6 +34,8 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 안 된다: 시동 상태, 경로선 좌표, 타이어 공기압(시스템 권한), 내비 검색 결과를 데이터로 받기, 에뮬 GPS로 차 이동, TTS와 STT 동시 사용(말하기 끝난 뒤 듣기).
 - Pleos 권한이 manifest에 빠지면 SDK 호출 순간 앱이 죽는다. 새 SDK 기능을 쓰면 권한부터 확인.
 - 에뮬레이터는 반드시 Cold boot. Virtual Console: `adb forward tcp:8088 tcp:8088` 후 http://127.0.0.1:8088
+- Virtual Console을 curl로 조작하려면 1초마다 `POST /browser/session?client=x` 하트비트를 보내야 켜진다(브라우저 흉내). 그 뒤 `PUT /vehicle/gear?gear=Park|Drive`, 문은 `PUT /vehicle/body?door_fl=true`, 연료·주행거리는 `/vehicle/ev-battery`, `/vehicle/odometer`. 목록은 `GET /vehicle/catalog`. **벨트 신호는 콘솔에 없다**(13장은 P + 운전석 문으로).
+- 에뮬 온디바이스 TTS는 `onDone`이 안 온다 → `VoicePrompt`는 문장 길이만큼 기다렸다 STT로 넘어간다. STT는 마이크 입력이 없어 결과를 못 본다(버튼으로 대신).
 
 ## 비밀값 — 절대 git에 올리지 않는다
 - API 키는 `local.properties`에 넣고 Gradle에서 읽는다. 코드에 직접 쓰지 않는다.
@@ -71,7 +73,8 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 ## 진행 상황 (2026-10-30)
 - 완료: 뼈대·Firebase(`carplan-htb`), shared 데이터 구조, 폰 캘린더 메인(오늘 카드+월 보기+그날 동선, 디자인은 추후), 빠른 일정 입력, 카테고리 추가, 폰 차량 탭(차 연결), 차 첫 화면(상태 띠·오늘·이번 주·큰 버튼), 차에서 일정 추가, 차 상태 Firestore 공유, 이름만 있는 장소는 현대 내비 검색으로, **3장 여행 일정**(여러 날 여행 → 날짜별 장소 칸: 추가·시간·메모·빼기·되살리기·끌어서 순서·직선거리 정렬, 매 변경마다 그날 `version +1`; `docs/다음작업_3장_여행일정.md`는 끝난 메모).
 - 카카오 키는 아직 없음. `local.properties`에 `KAKAO_REST_KEY=`를 넣고 다시 빌드하면 장소 검색·근처 추천·길찾기가 카카오로 바뀐다(없으면 이름 직접 입력·직선거리).
-- 다음: 4장 그룹·초대·QR → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
+- 9장 "다음 목적지로 갈까요?" 완료(차: `TripNavigator`·`VoicePrompt`, 앱 켤 때·P→D 때 묻기, 경유지 2+목적지 → 도착마다 채움, 시연용 도착 버튼). 10장(일정 변경 → 내비 갱신)은 `TripNavigator`가 `TripDay.version`을 보고 묻는 것부터.
+- 다음: 10장 → 4장 그룹·초대·QR → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
 - Firestore 규칙은 아직 dev(로그인만 하면 읽기·쓰기). 1차 제출 전 18장 규칙으로 바꾼다.
 
 ## 에뮬레이터 테스트 요령

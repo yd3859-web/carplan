@@ -7,6 +7,7 @@ import ai.pleos.playground.navi.data.RequestWaypointInfo
 import ai.pleos.playground.navi.data.RouteInfo
 import ai.pleos.playground.navi.data.RouteWithWaypointsRequest
 import ai.pleos.playground.navi.helper.NaviHelper
+import ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
 import android.content.Context
 import android.util.Log
 import com.htb.carplan.shared.model.Place
@@ -66,6 +67,8 @@ class NaviRouter(private val context: Context) {
             context.startActivity(it)
         }
     }
+
+    fun addListener(listener: NaviHelperEventListener) = navi.addListener(listener)
 
     fun release() = navi.release()
 

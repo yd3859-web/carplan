@@ -14,7 +14,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.ensureSignedIn
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -33,9 +38,14 @@ class TripSyncService : LifecycleService() {
                 .onFailure { Log.e(TAG, "sign-in failed", it) }.getOrNull() ?: return@launch
             val cars = CarRepository()
             cars.ensureCar(carId)
+            CarRuntime.navigator(this@TripSyncService).bind(carId)
             monitor.state.debounce(1_000).collect { state ->
                 runCatching { cars.updateState(carId, state) }.onFailure { Log.w(TAG, "state upload failed", it) }
             }
+        }
+        // 9장: P → D asks "다음 목적지로 갈까요?" even while the navigation is in front.
+        lifecycleScope.launch {
+            monitor.state.map { it.gear }.distinctUntilChanged().collect { CarRuntime.navigator(this@TripSyncService).onGear(it) }
         }
     }
 
@@ -73,4 +83,17 @@ object CarRuntime {
     @Synchronized
     fun router(context: Context): NaviRouter =
         router ?: NaviRouter(context.applicationContext).also { it.start(); router = it }
+
+    private var voice: VoicePrompt? = null
+    private var navigator: TripNavigator? = null
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    @Synchronized
+    fun voice(context: Context): VoicePrompt =
+        voice ?: VoicePrompt(context.applicationContext).also { it.start(); voice = it }
+
+    /** 9장 "다음 목적지로 갈까요?" — one per process, shared by the service and the screen. */
+    @Synchronized
+    fun navigator(context: Context): TripNavigator =
+        navigator ?: TripNavigator(router(context), voice(context), scope).also { navigator = it }
 }
