@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// 18장 규칙 초안 (1차 제출 전 firestore.rules로 교체 + firebase deploy --only firestore:rules).
+// 폰 = 사람 계정(uid가 memberIds에 있음), 차 = 차 계정(uid = cars/{carId} 문서 id, ownerUid가 멤버인 그룹을 읽고 씀).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function carOwner() { return get(/databases/$(database)/documents/cars/$(me())).data.ownerUid; }
+    function isCar() { return exists(/databases/$(database)/documents/cars/$(me())); }
+    function memberOf(gid) {
+      let members = get(/databases/$(database)/documents/groups/$(gid)).data.memberIds;
+      return me() in members || (isCar() && carOwner() in members);
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && (me() == uid || (isCar() && carOwner() == uid));
+      match /categories/{id} { allow read, write: if signedIn() && me() == uid; }
+      match /friends/{id} { allow read, write: if signedIn() && (me() == uid || me() == id); }
+    }
+
+    match /cars/{carId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && me() == carId;
+      allow update: if signedIn() && (me() == carId || resource.data.ownerUid == me() || resource.data.ownerUid == null);
+    }
+
+    match /groups/{gid} {
+      allow read: if signedIn() && (memberOf(gid) || resource.data.inviteCode == request.resource.data.inviteCode);
+      allow create: if signedIn() && me() in request.resource.data.memberIds;
+      // 참여(코드)는 본인 uid를 memberIds에 더하는 것만, 그룹장은 내보내기·이름 바꾸기
+      allow update: if signedIn() && (
+        request.resource.data.memberIds.hasAll(resource.data.memberIds) && request.resource.data.memberIds.hasAll([me()])
+        || resource.data.ownerUid == me()
+        || me() in resource.data.memberIds
+      );
+      match /{sub=**} { allow read, write: if signedIn() && memberOf(gid); }
+    }
+  }
+}

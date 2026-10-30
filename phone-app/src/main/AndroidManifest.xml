@@ -37,6 +37,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="carplan" android:host="i" />
             </intent-filter>
+            <!-- 17장: a tapped push opens that trip day -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="carplan" android:host="trip" />
+            </intent-filter>
         </activity>
         <!-- 17장: FCM token + foreground notifications -->
         <service android:name=".push.CarplanMessagingService" android:exported="false">

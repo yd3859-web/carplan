@@ -15,4 +15,15 @@ object InviteInbox {
     fun offerCode(code: String) { if (code.isNotBlank()) _code.value = code }
 
     fun clear() { _code.value = null }
+
+    /** 17장: a tapped push wants a trip day opened — carplan://trip/{groupId}/{eventId}/{date}. */
+    private val _openTrip = MutableStateFlow<List<String>?>(null)
+    val openTrip: StateFlow<List<String>?> = _openTrip
+
+    fun offerTrip(uri: String?) {
+        val m = Regex("carplan://trip/([^/]+)/([^/]+)/([0-9-]+)").find(uri ?: return) ?: return
+        _openTrip.value = listOf(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    fun clearTrip() { _openTrip.value = null }
 }

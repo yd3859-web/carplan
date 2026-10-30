@@ -3,6 +3,9 @@
   "target": {
     "namespace": "android_app",
     "package_name": "com.htb.carplan.phone",
-    "sha256_cert_fingerprints": ["RELEASE_KEY_SHA256_HERE"]
+    "sha256_cert_fingerprints": [
+      "55:E5:EF:EA:3D:F6:78:56:8F:D7:B7:11:85:D2:68:E1:D5:D1:14:36:2B:1A:5E:0B:EC:AA:4C:2B:B1:81:E9:55",
+      "DD:A1:3E:94:DB:69:81:9C:57:82:4C:CC:39:FB:DE:C7:54:7B:2D:28:FB:A2:46:09:E4:9B:5F:2C:77:39:AC:7E"
+    ]
   }
 }]

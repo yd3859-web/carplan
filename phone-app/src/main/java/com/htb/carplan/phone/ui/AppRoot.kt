@@ -38,6 +38,10 @@ import com.htb.carplan.phone.car.CarTab
 import com.htb.carplan.phone.group.GroupTab
 import com.htb.carplan.phone.group.GroupViewModel
 import com.htb.carplan.phone.group.JoinDialog
+import com.htb.carplan.phone.group.InviteInbox
+import com.htb.carplan.phone.trip.TripDayScreen
+import com.htb.carplan.phone.trip.TripRef
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.htb.carplan.phone.record.RecordTab
 
 /** 하단 바 (2장): 캘린더 · 그룹 · 기록 · 차량 · 설정. */
@@ -53,6 +57,12 @@ enum class Tab(val label: String, val icon: ImageVector) {
 fun AppRoot() {
     var tab by rememberSaveable { mutableStateOf(Tab.CALENDAR) }
     val groupVm: GroupViewModel = viewModel()
+    val pushTrip by InviteInbox.openTrip.collectAsStateWithLifecycle()
+    pushTrip?.let { (g, e, d) ->
+        // 17장: the push's trip day, full screen, until the user goes back.
+        TripDayScreen(TripRef(g, e, d), onBack = { InviteInbox.clearTrip() })
+        return
+    }
     Column(Modifier.fillMaxSize().background(Palette.Background)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {

@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
             runCatching { SessionRepository().ensureSession() }.getOrNull()?.let { CarplanMessagingService.syncToken(it.uid) }
         }
         InviteInbox.offer(intent?.dataString)
+        InviteInbox.offerTrip(intent?.dataString)
         setContent {
             CarplanTheme { AppRoot() }
         }
@@ -34,5 +35,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         InviteInbox.offer(intent.dataString)
+        InviteInbox.offerTrip(intent.dataString)
     }
 }
