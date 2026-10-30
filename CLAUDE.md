@@ -34,7 +34,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 안 된다: 시동 상태, 경로선 좌표, 타이어 공기압(시스템 권한), 내비 검색 결과를 데이터로 받기, 에뮬 GPS로 차 이동, TTS와 STT 동시 사용(말하기 끝난 뒤 듣기).
 - Pleos 권한이 manifest에 빠지면 SDK 호출 순간 앱이 죽는다. 새 SDK 기능을 쓰면 권한부터 확인.
 - 에뮬레이터는 반드시 Cold boot. Virtual Console: `adb forward tcp:8088 tcp:8088` 후 http://127.0.0.1:8088
-- Virtual Console을 curl로 조작하려면 1초마다 `POST /browser/session?client=x` 하트비트를 보내야 켜진다(브라우저 흉내). 그 뒤 `PUT /vehicle/gear?gear=Park|Drive`, 문은 `PUT /vehicle/body?door_fl=true`, 연료·주행거리는 `/vehicle/ev-battery`, `/vehicle/odometer`. 목록은 `GET /vehicle/catalog`. **벨트 신호는 콘솔에 없다**(13장은 P + 운전석 문으로).
+- Virtual Console을 curl로 조작하려면 1초마다 `POST /browser/session?client=x` 하트비트를 보내야 켜진다(브라우저 흉내). 그 뒤 `PUT /vehicle/gear?gear=Park|Drive`, 문은 `PUT /vehicle/body?door_fl=true`, 연료·주행거리는 `/vehicle/ev-battery`, `/vehicle/odometer`. 목록은 `GET /vehicle/catalog`. **벨트 신호는 콘솔에 없다**(13장은 P + 운전석 문으로). 좌석 착석(`seat-occupancy`, 좌석별 Occupied/Empty)·문 잠금(`door-lock`)·하이패스 시나리오는 **있다**(2026-10-30 확인, 브라우저 UI의 BODY 칸 / `GET /vehicle/catalog`). "Seat Belt"는 경고등(telltale)일 뿐 버클 신호 아님. 위치 이동(GPS)은 여전히 없음.
 - 에뮬 온디바이스 TTS는 `onDone`이 안 온다 → `VoicePrompt`는 문장 길이만큼 기다렸다 STT로 넘어간다. STT는 마이크 입력이 없어 결과를 못 본다(버튼으로 대신).
 
 ## 비밀값 — 절대 git에 올리지 않는다
