@@ -21,8 +21,6 @@ dependencyResolutionManagement {
         mavenCentral()
         // Pleos Connect SDK
         maven { url = uri("https://nexus-playground.pleos.ai/repository/maven-releases/") }
-        // Kakao SDK (1장 카카오 로그인)
-        maven { url = uri("https://devrepo.kakao.com/nexus/content/groups/public/") }
     }
 }
 

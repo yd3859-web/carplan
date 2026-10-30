@@ -2,7 +2,6 @@
 // 푸시는 users/{uid}.fcmTokens[] 로 보내고, 보낸 사람 본인은 뺀다.
 const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 
@@ -107,27 +106,6 @@ exports.onParkingHint = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}
   const [ev, stop] = await Promise.all([db.doc(`groups/${gid}/events/${eid}`).get(), db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${stopId}`).get()]);
   const tokens = await groupTokens(gid, ev.get("driverUid"));
   await push(tokens, "주차장 찾아봐 주세요", `${stop.get("place")?.name || "다음 장소"} 도착 5분 전이에요`, { groupId: gid, eventId: eid, date });
-});
-
-// 1장 카카오 로그인: 카카오 access token → 카카오 사용자 확인 → Firebase 커스텀 토큰.
-// 처음 보는 카카오 id는 호출한 (익명) uid에 묶어서 데이터가 그대로 이어지고, 다음부터는 같은 uid로 들어온다.
-exports.kakaoLogin = onCall({ region: "asia-northeast3" }, async (request) => {
-  const accessToken = request.data?.accessToken;
-  if (!accessToken) throw new HttpsError("invalid-argument", "accessToken이 필요해요");
-  const res = await fetch("https://kapi.kakao.com/v2/user/me", { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) throw new HttpsError("unauthenticated", `카카오 토큰 확인 실패 (${res.status})`);
-  const me = await res.json();
-  const kakaoId = String(me.id);
-  const nickname = me.kakao_account?.profile?.nickname || me.properties?.nickname || null;
-  const photo = me.kakao_account?.profile?.profile_image_url || me.properties?.profile_image || null;
-  const linkRef = db.doc(`kakaoLinks/${kakaoId}`);
-  let uid = (await linkRef.get()).get("uid");
-  if (!uid) {
-    uid = request.auth?.uid || `kakao:${kakaoId}`;
-    await linkRef.set({ uid, linkedAt: admin.firestore.FieldValue.serverTimestamp() });
-  }
-  const token = await admin.auth().createCustomToken(uid, { kakaoId });
-  return { token, nickname, photo };
 });
 
 // 차량 관리 시기 → 차 주인 (매일 09:00 KST, 7일 안 예정)

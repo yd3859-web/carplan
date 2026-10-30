@@ -28,10 +28,6 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         buildConfigField("String", "KAKAO_REST_KEY", "\"${localProps.getProperty("KAKAO_REST_KEY", "")}\"")
-        // 1장 카카오 로그인: 네이티브 앱 키 (없으면 카카오 버튼은 "준비 중")
-        val kakaoNative = localProps.getProperty("KAKAO_NATIVE_APP_KEY", "")
-        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$kakaoNative\"")
-        manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = kakaoNative
     }
 
     signingConfigs {
@@ -80,12 +76,10 @@ dependencies {
     implementation(libs.coil.network)
     // 17장 push
     implementation(libs.firebase.messaging)
-    // 1장 로그인: 구글(Credential Manager) + 카카오(SDK → Functions 커스텀 토큰)
+    // 1장 로그인: 구글(Credential Manager) — 익명 계정에 연결
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play)
     implementation(libs.googleid)
-    implementation(libs.kakao.user)
-    implementation(libs.firebase.functions)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)

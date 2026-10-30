@@ -87,16 +87,6 @@ class SessionRepository(
         return LinkResult(s.uid, switched)
     }
 
-    /** Kakao: Functions `kakaoLogin` already mapped the Kakao id to a uid (the caller's anonymous uid the first time). */
-    suspend fun signInWithCustomToken(token: String, name: String?, photoUrl: String?): LinkResult {
-        val before = auth.currentUser?.uid
-        auth.signInWithCustomToken(token).await()
-        cachedSession = null
-        val s = ensureSession()
-        fillProfile(s.uid, name, photoUrl, "kakao")
-        return LinkResult(s.uid, before != null && before != s.uid)
-    }
-
     fun isAnonymous(): Boolean = auth.currentUser?.isAnonymous != false
 
     /** Keep a real name over the "일행-1234" placeholder; never overwrite a name the user typed. */

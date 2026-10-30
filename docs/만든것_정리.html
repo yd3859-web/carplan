@@ -51,7 +51,7 @@
 <div class="flow">
   <div class="box"><b>폰 앱 <code>phone-app</code></b>캘린더·여행 레일·그룹·투표·다트·픽업 지도·기록 사진·차량 관리·설정</div>
   <div class="arrow">⇄</div>
-  <div class="box"><b>Firestore (서버)</b>실시간 DB. 바뀌면 보고 있는 모든 화면에 바로 반영. + Storage(사진) + Functions(푸시·카카오 로그인) + Hosting(초대 페이지)</div>
+  <div class="box"><b>Firestore (서버)</b>실시간 DB. 바뀌면 보고 있는 모든 화면에 바로 반영. + Storage(사진) + Functions(푸시) + Hosting(초대 페이지)</div>
   <div class="arrow">⇄</div>
   <div class="box"><b>차 앱 <code>car-app</code> (Pleos Connect)</b>오늘 일정표, "다음 목적지로 갈까요?", 내비 경로 넣기, P단 기록, 연료·주행거리 읽기, 음성</div>
   <div class="arrow">→</div>
@@ -70,12 +70,11 @@
 <p><b>어떻게 돌아가나</b></p>
 <ol class="steps">
   <li>앱을 켠 첫 순간에 Firebase <b>익명 로그인</b>이 자동으로 되고 "나만" 그룹이 생긴다. 그래서 로그인 없이도 바로 쓸 수 있다.</li>
-  <li>첫 화면(<code>login/Login.kt</code>)에 <b>[구글로 시작하기] [카카오로 시작하기] [나중에 할게요]</b>.</li>
+  <li>첫 화면(<code>login/Login.kt</code>)에 <b>[구글로 시작하기] [나중에 할게요]</b>. (카카오는 시연에 필요 없어 뺌)</li>
   <li><b>구글</b>: 안드로이드 Credential Manager로 계정을 고르면, 그 구글 계정을 <b>지금 익명 계정에 연결</b>한다. uid가 그대로여서 그룹·일정·기록이 전부 유지된다. 그 구글 계정이 이미 다른 데이터를 가진 경우에만 그 계정으로 들어가고 화면을 다시 시작한다.</li>
-  <li><b>카카오</b>: 카카오 SDK로 토큰을 받아 Cloud Functions <code>kakaoLogin</code>에 보낸다. 서버가 카카오에 "이 토큰 진짜냐" 확인하고, 처음 보는 카카오 id면 지금 익명 uid에 묶어(<code>kakaoLinks/{카카오id}</code>) Firebase 커스텀 토큰을 만들어 준다. 다음부터 같은 uid로 들어온다.</li>
-  <li>로그인 뒤 <b>이름 확인</b> 창(구글/카카오 이름이 기본, 고칠 수 있음). [나중에]는 다음 실행부터 안 묻고 설정 탭 [연결]로 언제든.</li>
+  <li>로그인 뒤 <b>이름 확인</b> 창(구글 이름이 기본, 고칠 수 있음). [나중에]는 다음 실행부터 안 묻고 설정 탭 [연결]로 언제든.</li>
 </ol>
-<p class="sub">카카오는 네이티브 앱 키·키 해시 등록·Blaze(Functions)가 있어야 켜진다. Pleos 에뮬레이터엔 구글 서비스가 없어서 구글 버튼은 "이 기기에 구글 계정이 없어요" 안내만 나온다.</p>
+<p class="sub">Pleos 에뮬레이터엔 구글 서비스가 없어서 구글 버튼은 "이 기기에 구글 계정이 없어요" 안내만 나온다.</p>
 
 <!-- ============================================================ -->
 <h2 id="cal">2 · 캘린더 메인 (폰) <span class="tag ok">에뮬 확인</span></h2>
@@ -189,7 +188,7 @@
 <p>출퇴근 카테고리로 <b>반복 일정</b>(요일 + 시간 + 장소)을 등록하면(<code>Repeat.kt</code>), 차 앱이 그 시간 ±60분 안에 켜지거나 P→D일 때 "회사로 갈까요?" → 응 → 내비. 한 번 "아니"면 그날은 다시 안 묻고, 오늘 여행이 있으면 여행 질문이 먼저. <b>학습</b>(<code>Commute.kt</code>): 기록 칸을 보고 같은 요일·비슷한 시간(±60분)에 같은 곳(300m 안)이 3번이면 캘린더 위에 "출근 일정으로 등록할까요?" 띠. 묻지 않고 자동 등록은 안 함.</p>
 
 <!-- ============================================================ -->
-<h2 id="push">17 · 알림 <span class="tag warn">Blaze 뒤 배포</span></h2>
+<h2 id="push">17 · 알림 <span class="tag ok">배포됨</span></h2>
 <p>푸시는 서버에서 보내야 해서 <b>Cloud Functions</b>(<code>functions/index.js</code>, asia-northeast3)가 Firestore 변화를 보고 FCM으로 보낸다. 폰은 첫 실행에 알림 권한을 묻고 토큰을 <code>users/{uid}.fcmTokens</code>에 둔다. 알림을 누르면 <code>carplan://trip/그룹/일정/날짜</code>로 그날 레일이 열린다.</p>
 <table>
 <tr><th style="width:230px">언제</th><th>누구에게</th><th>트리거</th></tr>
@@ -199,13 +198,12 @@
 <tr><td>픽업 차 곧 도착(3분 안) / 도착</td><td>그 동승자</td><td><code>onPickupWritten</code></td></tr>
 <tr><td>다음 칸 5분 전 "주차장 찾아봐 주세요"</td><td>운전자 빼고 전원</td><td><code>onParkingHint</code></td></tr>
 <tr><td>차량 관리 예정 7일 안</td><td>차 주인, 매일 09:00</td><td><code>maintenanceDue</code></td></tr>
-<tr><td>카카오 로그인</td><td>(푸시 아님) 토큰 확인 → 커스텀 토큰</td><td><code>kakaoLogin</code></td></tr>
 </table>
 <p class="sub">운전자에게 가는 것(일정 변경·주유)은 푸시가 아니라 차 음성 질문이다(10·12장).</p>
 
 <!-- ============================================================ -->
 <h2 id="data">18 · 데이터 구조 · 보안 규칙</h2>
-<pre>users/{uid}                      이름, 사진, fcmTokens[], soloGroupId(나만 그룹), carId, friendCode, provider(google/kakao)
+<pre>users/{uid}                      이름, 사진, fcmTokens[], soloGroupId(나만 그룹), carId, friendCode, provider(google)
   /categories/{id}               사용자가 추가한 카테고리(이름·색)
   /friends/{상대uid}             친구 (양쪽에 기록)
 cars/{carId}                     ownerUid, linkCode(6자리), activeGroupId/EventId, odometerKm, intervals, fuelAlertPercent,
@@ -219,7 +217,7 @@ groups/{gid}                     이름, memberIds[], ownerUid(그룹장), invit
       /pickups/{uid}             픽업: place, order, status, etaSeconds, arrivedAt, name
   /votes/{id}  /darts/{id}       투표, 다트 방
   /events/log-{날짜}             여행 없는 날의 "일상 기록" 일정(나만 그룹)   /events/due-{항목}  차량 관리 예정(자동)
-kakaoLinks/{카카오id}            → uid (Functions만 씀)</pre>
+</pre>
 <p><b>보안 규칙</b>(<code>firestore.rules</code>, 23가지 경우 에뮬레이터 테스트 통과, 배포는 정원이): 그룹 문서는 로그인한 누구나 읽기(초대 코드 조회용)지만, 그 아래 일정·칸·코멘트·기록·픽업·투표·다트는 <b>멤버와 멤버의 차</b>만. 차 계정은 uid가 <code>cars/{id}</code>인 걸로 알아보고 차주 권한을 준다. 그룹 수정은 멤버는 이름·초대·나가기, 그룹장만 내보내기, 멤버 아닌 사람은 "나만 추가"(코드 참여)만. users는 본인(+본인 차), cars는 차 자신·차주·주인 없는 차만.</p>
 
 <!-- ============================================================ -->
@@ -228,7 +226,6 @@ kakaoLinks/{카카오id}            → uid (Functions만 씀)</pre>
 <tr><th style="width:170px">서비스</th><th>어디에</th><th>키</th></tr>
 <tr><td>카카오 로컬·모빌리티</td><td>장소 검색, 근처 추천, 멈춘 곳 이름, 이동 시간, 픽업 순서·ETA·경로선</td><td><code>KAKAO_REST_KEY</code> (폰·차) <span class="tag ok">있음</span></td></tr>
 <tr><td>오피넷</td><td>반경 5km 최저가 주유소</td><td><code>OPINET_KEY</code> (차) <span class="tag ok">있음</span></td></tr>
-<tr><td>카카오 로그인</td><td>1장</td><td><code>KAKAO_NATIVE_APP_KEY</code> <span class="tag warn">아직</span></td></tr>
 <tr><td>OpenStreetMap 타일</td><td>픽업 지도(키 없음, 카카오맵 SDK는 네이티브 키 뒤 교체)</td><td>—</td></tr>
 <tr><td>Firebase</td><td>Auth·Firestore·Storage·Functions·Hosting·FCM</td><td><code>google-services.json</code>(git 제외)</td></tr>
 <tr><td>Pleos SDK</td><td>Vehicle 2.3.2 · NaviHelper 3.0.5 · TTS/STT 3.3.1</td><td>manifest 권한 (빠지면 앱이 죽음)</td></tr>
@@ -243,8 +240,8 @@ kakaoLinks/{카카오id}            → uid (Functions만 씀)</pre>
 <h2 id="left">남은 것</h2>
 <table>
 <tr><th style="width:230px">무엇</th><th>누가</th><th>메모</th></tr>
-<tr><td>보안 규칙 배포</td><td>정원</td><td><code>firebase deploy --only firestore:rules</code> (Claude는 배포 권한 없음)</td></tr>
-<tr><td>Blaze 전환 → Functions·Storage 배포</td><td>정원 → 명령어는 Claude가</td><td>사진 업로드·푸시·카카오 로그인이 이것 뒤에 켜짐</td></tr>
+<tr><td>보안 규칙 배포</td><td>정원</td><td>완료(2026-10-30, 실서버 23개 통과)</td></tr>
+<tr><td>Blaze 전환 → Functions·Storage 배포</td><td>정원 → 명령어는 Claude가</td><td>완료(2026-10-30)</td></tr>
 <tr><td>에뮬 테스트 F2~F10</td><td>정원 + Claude</td><td><code>테스트체크리스트.md</code> 그대로</td></tr>
 <tr><td>release APK</td><td>Claude (팀명 필요)</td><td><code>apk/팀명_carplan_release.apk</code>, 심사용 README</td></tr>
 <tr><td>기획서 DOCX</td><td>Claude 초안 → 정원 검토</td><td>접수양식 파일 필요</td></tr>

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,33 +39,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.functions.functions
-import com.htb.carplan.phone.BuildConfig
 import com.htb.carplan.phone.R
 import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.data.placeholderName
-import com.kakao.sdk.auth.model.OAuthToken
-import com.kakao.sdk.common.KakaoSdk
-import com.kakao.sdk.user.UserApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.tasks.await
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /** 설정 탭 "로그인 연결" → the gate opens again even though the user skipped it before. */
 object LoginGateBus { val reopen = MutableStateFlow(false) }
 
 /**
- * 1장: 구글로 시작하기 · 카카오로 시작하기 · 나중에. The app is usable anonymously from the first second (익명 로그인);
+ * 1장: 구글로 시작하기 · 나중에 (카카오는 뺌, 2026-10-30 정원: 시연만 하면 되니 구글만). The app is usable anonymously from the first second (익명 로그인);
  * logging in links that account so every group, event and record stays under the same uid.
  */
 class LoginViewModel(app: Application) : AndroidViewModel(app) {
@@ -78,7 +67,6 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
     val message = MutableStateFlow<String?>(null)
     /** Set after a successful login: (suggested name, the account changed to a different uid). */
     val confirmName = MutableStateFlow<Pair<String, Boolean>?>(null)
-    val kakaoReady = BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank()
 
     init { viewModelScope.launch { LoginGateBus.reopen.collect { if (it) { _show.value = true; LoginGateBus.reopen.value = false } } } }
 
@@ -96,21 +84,6 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         val g = GoogleIdTokenCredential.createFrom(c.data)
         val r = sessions.linkGoogle(g.idToken, g.displayName, g.profilePictureUri?.toString())
         confirmName.value = (g.displayName ?: "") to r.switchedAccount
-    }
-
-    fun kakao(context: Context) = run("카카오") {
-        if (!kakaoReady) error("카카오 네이티브 앱 키가 아직 없어요 (local.properties KAKAO_NATIVE_APP_KEY)")
-        if (!kakaoInit) { KakaoSdk.init(context.applicationContext, BuildConfig.KAKAO_NATIVE_APP_KEY); kakaoInit = true }
-        val token = suspendCancellableCoroutine<OAuthToken> { cont ->
-            val cb = { t: OAuthToken?, e: Throwable? -> if (t != null) cont.resume(t) else cont.resumeWithException(e ?: Exception("취소")) }
-            val api = UserApiClient.instance
-            if (api.isKakaoTalkLoginAvailable(context)) api.loginWithKakaoTalk(context, callback = cb) else api.loginWithKakaoAccount(context, callback = cb)
-        }
-        // Functions(asia-northeast3) checks the token with Kakao and mints a Firebase custom token for our uid.
-        val data = Firebase.functions("asia-northeast3").getHttpsCallable("kakaoLogin")
-            .call(mapOf("accessToken" to token.accessToken)).await().data as Map<*, *>
-        val r = sessions.signInWithCustomToken(data["token"] as String, data["nickname"] as String?, data["photo"] as String?)
-        confirmName.value = ((data["nickname"] as String?) ?: "") to r.switchedAccount
     }
 
     fun saveName(name: String) = viewModelScope.launch {
@@ -133,7 +106,6 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         busy.value = false
     }
 
-    companion object { private var kakaoInit = false }
 }
 
 @Composable
@@ -153,18 +125,13 @@ fun LoginGate(vm: LoginViewModel) {
             colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text(if (busy) "로그인 중…" else "구글로 시작하기", fontSize = 17.sp) }
-        OutlinedButton(
-            onClick = { vm.kakao(context) }, enabled = !busy, shape = Corner,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.TextStrong),
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 0.dp),
-        ) { Text(if (vm.kakaoReady) "카카오로 시작하기" else "카카오로 시작하기 (준비 중)", fontSize = 17.sp) }
         message?.let { Text(it, fontSize = 14.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 10.dp)) }
         Text("로그인하면 그룹·일정·기록이 계정에 묶여 폰을 바꿔도 이어져요. 지금 둘러보다가 설정 탭에서 연결해도 돼요.", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 14.dp))
         TextButton(onClick = vm::skip, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp)) { Text("나중에 할게요", color = Palette.TextSoft, fontSize = 15.sp) }
     }
 
     confirm?.let { (suggested, switched) ->
-        // 1장 2: first time → confirm the name (Google/Kakao name as the default, editable).
+        // 1장 2: first time → confirm the name (Google name as the default, editable).
         val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         var name by remember { mutableStateOf(suggested.ifBlank { placeholderName(uid) }) }
         CenterSheet(onDismiss = {}) {

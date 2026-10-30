@@ -45,7 +45,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 ## 작업 방식
 - 지금은 정원 혼자 만든다: **`main`에 바로 커밋하고 push**. 커밋 메시지에 장 번호를 쓴다(예: `phone 2장: 캘린더 월 보기`).
 - 나중에 작업을 나눌 때부터는 기능 하나 = 브랜치 하나 = PR 하나(`car/09-next-destination`)로 바꾼다.
-- 로그인(1장) 코드 완료(`phone/login/Login.kt`): 첫 실행은 익명 → 첫 화면에서 구글(Credential Manager, 익명 계정에 link → uid 유지)·카카오(SDK → Functions `kakaoLogin` 커스텀 토큰, `kakaoLinks/{id}`→uid)·나중에. 카카오는 `local.properties`의 `KAKAO_NATIVE_APP_KEY` + 카카오 콘솔 키 해시 등록 + Blaze(Functions) 뒤에 켜진다. 구글 SHA-1(debug·release)은 Firebase에 이미 등록됨. Pleos 에뮬레이터엔 구글 서비스가 없어 실제 폰에서 확인.
+- 로그인(1장) 코드 완료(`phone/login/Login.kt`): 첫 실행은 익명 → 첫 화면에서 구글(Credential Manager, 익명 계정에 link → uid 유지)·나중에. **카카오 로그인은 안 만든다**(2026-10-30 정원: 시연만 하면 되니 구글만). 구글 SHA-1(debug·release)은 Firebase에 이미 등록됨. Pleos 에뮬레이터엔 구글 서비스가 없어 실제 폰에서 확인.
 - 사용자는 한국어, 쉬운 말과 표·단계로 설명받기를 원한다.
 - 빌드 확인: `./gradlew assembleDebug`. 제출 APK: `./gradlew assembleRelease`.
 
@@ -95,7 +95,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록은 `phone-app/src/main/assets/regions.csv`(시도,시군구,읍면동,lat,lng)로 넣으면 교체됨.
 - 11장 코드 완료(shared `PickupRepository`, 폰 `trip/PickupSheet`+`ui/SimpleMap`(OSM 타일), 차 픽업 동의 질문·픽업 우선 경로·5초 공유·가짜 주행 보간). 에뮬 확인은 체크리스트 F6.
 - 16장 코드 완료(shared `Repeat`·`Commute` + 테스트, 반복 일정 펼치기, 차 "회사로 갈까요?", 폰 학습 띠). 에뮬 확인은 체크리스트 F7.
-- 17장 **배포됨**(2026-10-30): Functions 7개(asia-northeast3, Node 22) + Storage 버킷 `carplan-htb.firebasestorage.app`(US-EAST1 무료 위치) + storage.rules(아직 dev: 로그인하면 5MB 이미지). 다시 배포는 정원이 `firebase deploy --only functions --force`.
+- 17장 **배포됨**(2026-10-30): Functions 6개(kakaoLogin은 코드에서 뺌 — 다음 배포 때 삭제 확인 Y)(asia-northeast3, Node 22) + Storage 버킷 `carplan-htb.firebasestorage.app`(US-EAST1 무료 위치) + storage.rules(아직 dev: 로그인하면 5MB 이미지). 다시 배포는 정원이 `firebase deploy --only functions --force`.
 - 폰 알림 탭 딥링크 `carplan://trip/{gid}/{eid}/{date}` 처리됨(`InviteInbox.offerTrip` → `AppRoot`가 그날 레일을 전체 화면으로). `hosting/public/.well-known/assetlinks.json`에 release·debug 키 SHA-256 들어감(release 키 `~/carplan-keys/carplan-release.jks`).
 - 설정 탭 완료(`phone/settings/SettingsTab.kt`: 이름·친구 코드·일정 알림 스위치·주유 알림 기준 `cars.fuelAlertPercent`·계정·버전). 일정 [알림] 칩은 `phone/push/Reminders.kt`(AlarmManager, 2주, 반복 포함)로 실제로 울림. 11장 픽업 순서(총 시간)·지도 경로선·ETA, 17장 "곧 도착"·"주차장" 푸시까지 코드 완료.
 - 18장 보안 규칙 = `firestore.rules`(= `firestore.prod.rules`, 에뮬레이터로 23개 경우 통과). 배포 완료(2026-10-30). 바꾸면 **정원이 직접** `firebase deploy --only firestore:rules`(Claude는 배포 권한 없음). 문제 생기면 `firestore.dev.rules`를 `firestore.rules`로 복사해 다시 배포. 규칙 테스트는 `firebase emulators:exec --only firestore "python3 -I <스크립트>"`로 가짜 JWT(alg none) + REST. 주의: v2 규칙에서 `{doc=**}`는 0단계도 잡아 부모 문서 규칙을 덮는다.
