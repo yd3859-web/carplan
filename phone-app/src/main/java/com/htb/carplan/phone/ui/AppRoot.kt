@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.htb.carplan.phone.calendar.CalendarScreen
+import com.htb.carplan.phone.car.CarTab
 
 /** 하단 바 (2장): 캘린더 · 그룹 · 기록 · 차량 · 설정. */
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -48,6 +49,7 @@ fun AppRoot() {
     Box(Modifier.fillMaxSize().background(Palette.Background)) {
         when (tab) {
             Tab.CALENDAR -> CalendarScreen()
+            Tab.CAR -> CarTab()
             else -> ComingSoon(tab)
         }
         FloatingTabBar(

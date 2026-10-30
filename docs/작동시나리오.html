@@ -394,7 +394,7 @@
     <div class="step"><div class="step-n">4</div><div class="step-t">QR 띄우는 때: 차 화면 <b>[같이 탄 사람 추가]</b> 버튼 + 조수석·뒷좌석에 사람이 앉으면(좌석 착석 신호) "같이 타셨나요? QR 찍고 들어오세요" <span class="suggest">Claude 제안</span></div></div>
     <div class="note-in">차 앱은 연결된 사람의 캘린더 + 오늘 그 차에 걸린 그룹 여행을 보여 줌. 좌석 착석 신호(Vehicle SDK SeatOccupancy)는 SDK에 있음, 에뮬레이터에서 아직 안 봄</div>
     <div class="ask"><span class="qid">Q16</span><b>오늘 걸린 여행이 없을 때 QR은 어느 그룹으로?</b><span class="rec">추천: 운전자가 차 화면에서 [새 그룹] 누르면 그 자리에서 그룹이 생기고 QR이 뜸. 이전 그룹 목록에서 고를 수도 있게.</span></div>
-    <div class="ask"><span class="qid">Q17</span><b>운전자가 아닌 멤버의 차를 탈 때는?</b> 한 차에 여러 계정을 연결하나?<span class="rec">추천: 차는 주인 계정 하나 + 그날 여행 그룹에 붙음. 운전자는 여행마다 지정.</span></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t"><b>차주가 호스트</b> <span class="decided">정함</span>: 차는 차주 계정 하나에 연결. 차주가 만든 그룹에 일행이 들어오면 일행도 그날 일정을 <b>차주와 같은 권한</b>으로 고치고 추가. 각자 자기 캘린더는 따로 쓴다. 차 화면은 차주 캘린더 + 차주가 호스트인 그룹 일정을 보여 줌</div></div>
     <div class="ask"><span class="qid">Q18</span><b>"운전 중 운전자는 수정 못 함" — 운전자의 폰도 막나?</b> 차 화면은 주행 제한으로 막히지만 폰은 따로.<span class="rec">추천: 차 앱이 주행 상태를 서버에 올리고, 그 여행 운전자 폰의 편집 버튼을 잠금.</span></div>
   </div>
 </div>
@@ -414,7 +414,7 @@
     <div class="step"><div class="step-n">·</div><div class="step-t">상태 띠: 연료/배터리, 주행가능거리, 그룹 이름, 동승자 수</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t"><b>주행 중</b>(주행 제한 켜짐) → 화면은 보기만, 큰 버튼 2개만 남김. <b>P단</b>이면 전부 됨 (확인됨)</div></div>
     <div class="note-in">Pleos 가이드: 자주 쓰는 건 첫 화면에, 터치 줄이고 음성, 글자 입력 대신 정해진 항목. 차 화면이 "내비 + 일정표"로 가벼운 게 가이드와 맞음</div>
-    <div class="ask"><span class="qid">Q19</span><b>차 화면 역할이 이 정도로 충분한가</b> (2판 G6 미정)<span class="rec">추천: 충분. 대신 "차만의 장면"(음성 안내, P단 기록, 주유 추천, 다 같이 다트)을 시연에서 강조.</span></div>
+    <div class="step"><div class="step-n">·</div><div class="step-t">차 화면 역할 <span class="decided">정함</span>: 오늘 일정표 + 이번 주 + 큰 버튼 + 상태 띠에 더해 <b>차에서도 일정 만들기</b>(주차 중. 주행 중엔 보기만 — Pleos 주행 제한)</div></div>
     <div class="ask"><span class="qid">Q20</span><b>혼자 탈 때 차에서 일정을 새로 만들 수 있나?</b><span class="rec">추천: 주차 중에만, 음성으로 "내일 3시 세차" 정도.</span></div>
   </div>
 </div>
@@ -789,7 +789,7 @@
 
     <div class="qgroup">🔴 뼈대 만들기 전에 (나중에 바꾸기 비쌈)</div>
     <div class="qlist">
-      <div class="q"><div class="qh"><span class="qid">Q16·Q17</span><span class="qt">여행 없을 때 QR 그룹 · 차는 주인 계정 하나 + 여행마다 운전자 지정?</span><span class="qwhere">7장</span></div><div class="qr"><b>추천</b> 차에서 [새 그룹] · 예</div></div>
+      <div class="q"><div class="qh"><span class="qid">Q16</span><span class="qt">여행 없을 때 QR은 어느 그룹으로?</span><span class="qwhere">7장</span></div><div class="qr"><b>추천</b> 차에서 [새 그룹]</div></div>
       <div class="q"><div class="qh"><span class="qid">Q47</span><span class="qt">Blaze 예산 알림 금액 (Blaze는 필수)</span><span class="qwhere">17장</span></div><div class="qr"><b>추천</b> 1만 원</div></div>
     </div>
 
@@ -820,7 +820,6 @@
       <div class="q"><div class="qh"><span class="qid">Q13</span><span class="qt">기본 투표 예시</span><span class="qwhere">5장</span></div></div>
       <div class="q"><div class="qh"><span class="qid">Q14</span><span class="qt">다트 동네 데이터</span><span class="qwhere">6장</span></div><div class="qr"><b>추천</b> 공공 행정동 목록</div></div>
       <div class="q"><div class="qh"><span class="qid">Q15</span><span class="qt">다트 다시 던지기 제한</span><span class="qwhere">6장</span></div><div class="qr"><b>추천</b> 없음</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q19</span><span class="qt">차 화면 역할 충분?</span><span class="qwhere">8장</span></div><div class="qr"><b>추천</b> 충분</div></div>
       <div class="q"><div class="qh"><span class="qid">Q20</span><span class="qt">차에서 일정 만들기</span><span class="qwhere">8장</span></div><div class="qr"><b>추천</b> 주차 중 음성</div></div>
       <div class="q"><div class="qh"><span class="qid">Q26</span><span class="qt">위치 보내는 간격</span><span class="qwhere">11장</span></div><div class="qr"><b>추천</b> 픽업 중 5초</div></div>
       <div class="q"><div class="qh"><span class="qid">Q28</span><span class="qt">픽업 시연 방식</span><span class="qwhere">11장</span></div><div class="qr"><b>추천</b> 가짜 위치 재생</div></div>
@@ -851,7 +850,7 @@
     </div>
 
     <div class="qgroup">✓ 정함 (질문에서 옮겨 온 것)</div>
-    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)</div>
+    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)</div>
   </div>
 </div>
 

@@ -11,68 +11,43 @@ import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.google.firebase.auth.FirebaseAuth
-import com.htb.carplan.shared.data.DevTrip
-import com.htb.carplan.shared.data.TripRepository
-import com.htb.carplan.shared.model.Stop
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.distinctUntilChanged
+import com.htb.carplan.shared.data.CarRepository
+import com.htb.carplan.shared.data.ensureSignedIn
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.time.LocalDate
 
 /**
- * Stays alive in the foreground so itinerary changes reach the navigation
- * even while the navigation app is in front (10장).
+ * Keeps the car app alive in the foreground: uploads the car's state (gear, fuel,
+ * range, driving restriction) so phones see it, and will carry itinerary → navi sync (10장).
  */
 class TripSyncService : LifecycleService() {
 
-    private lateinit var router: NaviRouter
-
+    @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
         startInForeground()
-        router = NaviRouter(this).also { it.start() }
+        val monitor = CarRuntime.monitor(this)
         lifecycleScope.launch {
-            // TODO(1장): replace anonymous sign-in with the linked owner account (7장).
-            val auth = FirebaseAuth.getInstance()
-            if (auth.currentUser == null) auth.signInAnonymously().await()
-            val today = LocalDate.now().toString()
-            TripRepository()
-                .observeStops(DevTrip.GROUP_ID, DevTrip.EVENT_ID, today)
-                .distinctUntilChanged()
-                .catch { Log.e(TAG, "stop sync failed", it) }
-                .collect { stops ->
-                    _todayStops.value = stops
-                    // TODO(10장, Q23): while driving, ask by voice before rerouting.
-                    router.applyRoute(stops.filterNot { it.visited })
-                }
+            val carId = runCatching { FirebaseAuth.getInstance().ensureSignedIn() }
+                .onFailure { Log.e(TAG, "sign-in failed", it) }.getOrNull() ?: return@launch
+            val cars = CarRepository()
+            cars.ensureCar(carId)
+            monitor.state.debounce(1_000).collect { state ->
+                runCatching { cars.updateState(carId, state) }.onFailure { Log.w(TAG, "state upload failed", it) }
+            }
         }
-    }
-
-    override fun onDestroy() {
-        router.release()
-        super.onDestroy()
     }
 
     private fun startInForeground() {
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "일정 동기화", NotificationManager.IMPORTANCE_LOW),
-        )
+        manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "일정 동기화", NotificationManager.IMPORTANCE_LOW))
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("carplan")
-            .setContentText("오늘 일정을 내비와 맞추는 중")
+            .setContentText("일정과 차 상태를 맞추는 중")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .build()
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-        )
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
     }
 
     companion object {
@@ -80,11 +55,22 @@ class TripSyncService : LifecycleService() {
         private const val CHANNEL_ID = "trip_sync"
         private const val NOTIFICATION_ID = 1
 
-        private val _todayStops = MutableStateFlow<List<Stop>>(emptyList())
-        val todayStops: StateFlow<List<Stop>> = _todayStops.asStateFlow()
-
         fun start(context: Context) {
             context.startForegroundService(Intent(context, TripSyncService::class.java))
         }
     }
+}
+
+/** Process-wide car objects shared by the service and the screen. */
+object CarRuntime {
+    private var monitor: VehicleMonitor? = null
+    private var router: NaviRouter? = null
+
+    @Synchronized
+    fun monitor(context: Context): VehicleMonitor =
+        monitor ?: VehicleMonitor(context.applicationContext).also { it.start(); monitor = it }
+
+    @Synchronized
+    fun router(context: Context): NaviRouter =
+        router ?: NaviRouter(context.applicationContext).also { it.start(); router = it }
 }

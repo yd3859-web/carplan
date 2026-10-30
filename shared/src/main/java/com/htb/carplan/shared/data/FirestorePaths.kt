@@ -29,11 +29,3 @@ object FirestorePaths {
         "${records(groupId, eventId, date)}/$recordId/comments"
 }
 
-/**
- * Fixed trip used until login, groups and car linking exist (뼈대 한 줄 연결 test).
- * Remove once 1장 로그인 and 7장 차 연결 are built.
- */
-object DevTrip {
-    const val GROUP_ID = "dev-group"
-    const val EVENT_ID = "dev-trip"
-}

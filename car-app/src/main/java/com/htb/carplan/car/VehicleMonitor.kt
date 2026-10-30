@@ -1,0 +1,94 @@
+package com.htb.carplan.car
+
+import ai.pleos.playground.vehicle.Vehicle
+import android.car.Car
+import android.car.VehicleGear
+import android.car.VehiclePropertyIds
+import android.car.drivingstate.CarUxRestrictionsManager
+import android.car.hardware.CarPropertyValue
+import android.car.hardware.property.CarPropertyManager
+import android.content.Context
+import android.util.Log
+import com.htb.carplan.shared.model.CarState
+import com.htb.carplan.shared.model.Gear
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+/**
+ * Reads the car through the paths verified on the emulator (docs/기획정리본.html 09장):
+ * gear and fuel via android.car properties (Pleos getFuelPercent fails), range via the
+ * Pleos Odometer, driving restriction via CarUxRestrictionsManager.
+ */
+class VehicleMonitor(private val context: Context) {
+    private val _state = MutableStateFlow(CarState())
+    val state: StateFlow<CarState> = _state.asStateFlow()
+
+    private var car: Car? = null
+    private var vehicle: Vehicle? = null
+    private var fuelCapacity: Float? = null
+    private var evCapacity: Float? = null
+
+    fun start() {
+        val c = runCatching { Car.createCar(context) }.onFailure { Log.e(TAG, "Car connect failed", it) }.getOrNull() ?: return
+        car = c
+        val pm = c.getCarManager(Car.PROPERTY_SERVICE) as CarPropertyManager
+        fuelCapacity = pm.readFloat(VehiclePropertyIds.INFO_FUEL_CAPACITY)
+        evCapacity = pm.readFloat(VehiclePropertyIds.INFO_EV_BATTERY_CAPACITY)
+        pm.listen(VehiclePropertyIds.GEAR_SELECTION) { v -> _state.update { it.copy(gear = (v as? Int).toGear()) } }
+        pm.listen(VehiclePropertyIds.FUEL_LEVEL) { v -> percentOf(v, fuelCapacity)?.let { p -> _state.update { it.copy(fuelPercent = p) } } }
+        pm.listen(VehiclePropertyIds.EV_BATTERY_LEVEL) { v -> percentOf(v, evCapacity)?.let { p -> _state.update { it.copy(fuelPercent = p) } } }
+
+        runCatching {
+            val ux = c.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as CarUxRestrictionsManager
+            _state.update { it.copy(drivingRestricted = ux.currentCarUxRestrictions.isRequiresDistractionOptimization) }
+            ux.registerListener { r -> _state.update { it.copy(drivingRestricted = r.isRequiresDistractionOptimization) } }
+        }.onFailure { Log.e(TAG, "UX restrictions unavailable", it) }
+
+        vehicle = Vehicle(context).also { v ->
+            v.initialize()
+            v.getOdometer().getRangeRemainingDistance(
+                // Pleos reports metres (500000 while the cluster shows 500 km).
+                { m -> m?.let { r -> _state.update { it.copy(rangeKm = r.toDouble() / 1000) } } },
+                { Log.w(TAG, "range read failed", it) },
+            )
+        }
+    }
+
+    fun stop() {
+        vehicle?.release()
+        car?.disconnect()
+    }
+
+    private fun CarPropertyManager.readFloat(id: Int): Float? =
+        runCatching { getProperty<Float>(id, 0)?.value }.getOrNull()
+
+    private fun CarPropertyManager.listen(id: Int, onValue: (Any?) -> Unit) {
+        runCatching {
+            onValue(getProperty<Any>(id, 0)?.value)
+            registerCallback(object : CarPropertyManager.CarPropertyEventCallback {
+                override fun onChangeEvent(value: CarPropertyValue<*>) = onValue(value.value)
+                override fun onErrorEvent(propId: Int, zone: Int) = Unit
+            }, id, CarPropertyManager.SENSOR_RATE_ONCHANGE)
+        }.onFailure { Log.w(TAG, "property $id unavailable: ${it.message}") }
+    }
+
+    private fun percentOf(value: Any?, capacity: Float?): Double? {
+        val v = (value as? Float) ?: return null
+        val cap = capacity?.takeIf { it > 0f } ?: return null
+        return (v / cap * 100).toDouble().coerceIn(0.0, 100.0)
+    }
+
+    private fun Int?.toGear() = when (this) {
+        VehicleGear.GEAR_PARK -> Gear.P
+        VehicleGear.GEAR_REVERSE -> Gear.R
+        VehicleGear.GEAR_NEUTRAL -> Gear.N
+        null -> Gear.UNKNOWN
+        else -> if (this >= VehicleGear.GEAR_DRIVE) Gear.D else Gear.UNKNOWN
+    }
+
+    companion object {
+        private const val TAG = "VehicleMonitor"
+    }
+}
