@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteBuffer
+import android.util.Log
 
 /**
  * 14장: the day as a short vertical video — a title card, then every photo of every stop as a slide
@@ -29,6 +30,7 @@ import java.nio.ByteBuffer
  * handed to the share sheet. Pure CPU path (bitmap → YUV420 input buffers) so it runs on any device.
  */
 object DayVideo {
+    private const val TAG = "DayVideo"
     private const val W = 720
     private const val H = 1280
     private const val FPS = 30
@@ -136,7 +138,7 @@ object DayVideo {
             while (true) {
                 val idx = codec.dequeueOutputBuffer(info, if (end) 10_000 else 0)
                 when {
-                    idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> { track = muxer.addTrack(codec.outputFormat); muxer.start() }
+                    idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> { track = muxer.addTrack(codec.outputFormat); muxer.start(); Log.d(TAG, "muxer started") }
                     idx >= 0 -> {
                         val buf = codec.getOutputBuffer(idx)!!
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 && info.size > 0 && track >= 0) muxer.writeSampleData(track, buf, info)
@@ -153,11 +155,14 @@ object DayVideo {
                 val yuv = toYuv(bmp)
                 repeat((seconds * FPS).toInt()) {
                     var idx: Int
-                    while (true) { idx = codec.dequeueInputBuffer(10_000); if (idx >= 0) break; drain(false) }
+                    var waits = 0
+                    while (true) { idx = codec.dequeueInputBuffer(10_000); if (idx >= 0) break; drain(false); if (++waits % 100 == 0) Log.w(TAG, "frame $frame: still waiting for an input buffer ($waits)") }
                     val img = codec.getInputImage(idx) ?: error("encoder gave no input image")
                     fill(img.planes[0], yuv.y, W, H); fill(img.planes[1], yuv.u, W / 2, H / 2); fill(img.planes[2], yuv.v, W / 2, H / 2)
-                    codec.queueInputBuffer(idx, 0, 0, frame * frameUs, 0)
+                    img.close()
+                    codec.queueInputBuffer(idx, 0, W * H * 3 / 2, frame * frameUs, 0)
                     frame++
+                    if (frame <= 3 || frame % 30 == 0L) Log.d(TAG, "queued frame $frame/$totalFrames (slide $si)")
                     if (frame % 15 == 0L) onProgress("영상 만드는 중 ${frame * 100 / totalFrames}%")
                     drain(false)
                 }
