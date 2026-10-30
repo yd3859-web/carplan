@@ -84,13 +84,13 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 
 ## 진행 상황 (2026-10-30)
 - 완료: 뼈대·Firebase(`carplan-htb`), shared 데이터 구조, 폰 캘린더 메인(오늘 카드+월 보기+그날 동선, 디자인은 추후), 빠른 일정 입력, 카테고리 추가, 폰 차량 탭(차 연결), 차 첫 화면(상태 띠·오늘·이번 주·큰 버튼), 차에서 일정 추가, 차 상태 Firestore 공유, 이름만 있는 장소는 현대 내비 검색으로, **3장 여행 일정**(여러 날 여행 → 날짜별 장소 칸: 추가·시간·메모·빼기·되살리기·끌어서 순서·직선거리 정렬, 매 변경마다 그날 `version +1`; `docs/다음작업_3장_여행일정.md`는 끝난 메모).
-- 카카오 키는 아직 없음. `local.properties`에 `KAKAO_REST_KEY=`를 넣고 다시 빌드하면 장소 검색·근처 추천·길찾기가 카카오로 바뀐다(없으면 이름 직접 입력·직선거리).
+- 카카오 REST 키·오피넷 키는 정원 컴퓨터 `local.properties`에 들어 있음(2026-10-30, 둘 다 동작 확인). 한국도로공사 휴게소 API는 오피넷과 겹쳐서 안 쓴다. 키 없는 컴퓨터에서도 빌드·실행은 됨(이름 입력·직선거리·내비 검색으로 대체).
 - 3장 타임라인 완료: 레일 화면, 칸별 코멘트 글타래(`days/{date}/comments`), 예상 도착 시각(`shared/calendar/Schedule.kt`), 시간 그 자리에서 확정.
 - 9장 "다음 목적지로 갈까요?" 완료(차: `TripNavigator`·`VoicePrompt`, 앱 켤 때·P→D 때 묻기, 경유지 2+목적지 → 도착마다 채움, 시연용 도착 버튼). 10장(일정 변경 → 내비 갱신)은 `TripNavigator`가 `TripDay.version`을 보고 묻는 것부터.
 - 10장 완료(차 `TripNavigator`: version 변경 5초 모아 묻기, 바꾸기/그대로, `routeSyncedVersion`·`holdByDriver`·`etaNext`; 폰: 차주 폰 주행 중 편집 잠금, 상태 줄).
 - 4장·7장 완료(폰 `group/`: 그룹 탭·화면·초대 3종·딥링크/QR 참여·친구, 여행 그룹 칩, "오늘 이 차로 가요"; 차: 초대 QR·착석 자동 QR; `hosting/public` 초대 페이지 배포됨, `firebase deploy --only hosting`).
 - 13·14장 1차(기록 칸·레일 기록·사진 코드·내보내기·기록 탭)와 12·20장(주유/충전 질문·오피넷·시연 메뉴) 코드 완료. **에뮬 확인은 `docs/테스트체크리스트.md` F2·F3가 남음.**
-- 키: `local.properties`에 `KAKAO_REST_KEY=`(폰), `OPINET_KEY=`(차). 둘 다 없어도 동작(대체 경로).
+- 키 이름: `KAKAO_REST_KEY`(폰), `OPINET_KEY`(차). 둘 다 없어도 동작(대체 경로).
 - 15장 차량 관리 코드 완료(shared `MaintenanceRules`·`MaintenanceRepository`, 폰 차량 탭, 차 주행거리·"주유했어요?"). 에뮬 확인은 체크리스트 F4.
 - 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록은 `phone-app/src/main/assets/regions.csv`(시도,시군구,읍면동,lat,lng)로 넣으면 교체됨.
 - 11장 코드 완료(shared `PickupRepository`, 폰 `trip/PickupSheet`+`ui/SimpleMap`(OSM 타일), 차 픽업 동의 질문·픽업 우선 경로·5초 공유·가짜 주행 보간). 에뮬 확인은 체크리스트 F6.
