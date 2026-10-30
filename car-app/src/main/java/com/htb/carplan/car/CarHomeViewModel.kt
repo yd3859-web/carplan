@@ -8,6 +8,12 @@ import com.htb.carplan.shared.data.CalendarEvent
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.data.DartRepository
+import com.htb.carplan.shared.data.Regions
+import com.htb.carplan.shared.data.TripRepository
+import com.htb.carplan.shared.model.Dart
+import com.htb.carplan.shared.model.DartScope
+import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Group
 import kotlinx.coroutines.flow.combine
 import com.htb.carplan.shared.data.ensureSignedIn
@@ -52,6 +58,35 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun goViaStation(st: com.htb.carplan.shared.net.GasStation) = navigator.goViaStation(st)
     fun dismissStations() = navigator.dismissStations()
+
+    // 6장 다트 (주차 중): same room as the phones
+    private val dartRepo = DartRepository()
+    val dart: StateFlow<Dart?> = trip.flatMapLatest { t -> t?.let { dartRepo.observeLatest(it.groupId) } ?: flowOf(null) }
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun throwDart(scope: DartScope) {
+        val t = trip.value ?: return
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            val cur = dart.value
+            val same = cur != null && cur.scope == scope && cur.eventId == t.eventId
+            val here = vehicle.value.let { s -> if (s.lat != null && s.lng != null) s.lat to s.lng else null }
+            val pick = Regions.pick(scope, here?.first, here?.second) ?: return@launch
+            runCatching { dartRepo.throwDart(t.groupId, if (same) cur!!.id else null, scope, here?.first, here?.second, null, pick, if (same) cur!!.throwCount + 1 else 1, u.uid, t.eventId, t.date) }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
+    fun addDartAsStop() {
+        val t = trip.value ?: return
+        val d = dart.value ?: return
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            runCatching { TripRepository().addStop(t.groupId, t.eventId, t.date, Place(name = d.resultName, lat = d.resultLat, lng = d.resultLng), null, "다트로 정함", u.uid) }
+                .onFailure { _error.value = it.message }
+        }
+    }
 
     // 20장 디버그 메뉴
     fun setFuelOverride(percent: Double?) { monitor.fuelOverride = percent }

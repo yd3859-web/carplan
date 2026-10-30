@@ -20,6 +20,7 @@ object FirestorePaths {
     fun events(groupId: String) = "${group(groupId)}/$EVENTS"
     fun event(groupId: String, eventId: String) = "${events(groupId)}/$eventId"
     fun votes(groupId: String) = "${group(groupId)}/votes"
+    fun darts(groupId: String) = "${group(groupId)}/darts"
 
     /** One day of a trip event. [date] is yyyy-MM-dd. */
     fun day(groupId: String, eventId: String, date: String) = "${event(groupId, eventId)}/days/$date"

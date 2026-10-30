@@ -12,6 +12,9 @@ import com.htb.carplan.phone.record.DayExport
 import com.htb.carplan.phone.record.ExportItem
 import com.htb.carplan.phone.record.Photos
 import com.htb.carplan.phone.ui.CenterSheet
+import com.htb.carplan.phone.vote.DartSheet
+import com.htb.carplan.phone.vote.VoteSheet
+import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Record
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -147,6 +150,9 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     var noteFor by remember { mutableStateOf<Record?>(null) }
     var placeFor by remember { mutableStateOf<Record?>(null) }
     var manualRecord by remember { mutableStateOf(false) }
+    var voteOpen by remember { mutableStateOf(false) }
+    var dartOpen by remember { mutableStateOf(false) }
+    var placePicker by remember { mutableStateOf<((Place) -> Unit)?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // 14장: pick a photo → shrink to 1600 px → upload to the record (Q40).
@@ -182,6 +188,10 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                 )
             }
             if (busy) Text("저장 중", fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
+            if (!locked) {
+                TextButton(onClick = { voteOpen = true }) { Text("투표", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                TextButton(onClick = { dartOpen = true }) { Text("다트", color = Palette.Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+            }
             if (records.isNotEmpty()) TextButton(onClick = {
                 scope.launch {
                     val items = buildList {
@@ -330,6 +340,9 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     editing?.let { stop ->
         StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null })
     }
+    if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false })
+    if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
+    placePicker?.let { cb -> PlaceSearchSheet(vm = vm, onPick = { cb(it); placePicker = null }, onDismiss = { placePicker = null }) }
     noteFor?.let { r ->
         NoteDialog(initial = r.note, onSave = { vm.setNote(r.id, it); noteFor = null }, onDismiss = { noteFor = null })
     }

@@ -52,6 +52,8 @@ import com.htb.carplan.phone.calendar.QuickAddSheet
 import com.htb.carplan.phone.trip.TripDayScreen
 import com.htb.carplan.phone.trip.TripRef
 import com.htb.carplan.phone.ui.CenterSheet
+import com.htb.carplan.phone.vote.DartSheet
+import com.htb.carplan.phone.vote.VoteSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.data.CalendarEvent
@@ -159,6 +161,8 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
     val scope = rememberCoroutineScope()
     var newTrip by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var voteOpen by remember { mutableStateOf(false) }
+    var dartOpen by remember { mutableStateOf(false) }
     BackHandler(onBack = onBack)
     val g = group ?: return
     val isOwner = g.ownerUid == session?.uid
@@ -211,6 +215,11 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
                 HorizontalDivider(color = Palette.Line)
             }
             item {
+                SectionTitle("같이 정하기")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { voteOpen = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("투표", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                    OutlinedButton(onClick = { dartOpen = true }, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) { Text("다트 (동네 뽑기)", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                }
                 SectionTitle("여행")
                 Button(onClick = { newTrip = true }, modifier = Modifier.fillMaxWidth().height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("새 여행 만들기", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
                 if (trips.isEmpty()) Text("아직 여행이 없어요 — 빈 도화지에서 시작해요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
@@ -238,6 +247,8 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             onDismiss = { newTrip = false },
         )
     }
+    if (voteOpen) VoteSheet(g.id, null, null, nameOf = vm::nameOf, onPickPlace = { }, onDismiss = { voteOpen = false })
+    if (dartOpen) DartSheet(g.id, null, null, nameOf = vm::nameOf, onDismiss = { dartOpen = false })
     if (renaming) NameDialog(title = "그룹 이름", hint = g.name, confirm = "저장", onDismiss = { renaming = false }) { renaming = false; vm.rename(g.id, it) }
 }
 

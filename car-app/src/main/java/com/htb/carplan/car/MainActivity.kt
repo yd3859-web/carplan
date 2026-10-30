@@ -10,6 +10,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.htb.carplan.shared.data.InviteLinks
 import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.net.GasStation
+import com.htb.carplan.shared.model.DartScope
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -114,6 +115,8 @@ private fun CarHome(vm: CarHomeViewModel) {
     val notice by vm.notice.collectAsStateWithLifecycle()
     val stations by vm.stations.collectAsStateWithLifecycle()
     var debug by remember { mutableStateOf(false) }
+    var dartOpen by remember { mutableStateOf(false) }
+    val dart by vm.dart.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
     var qr by remember { mutableStateOf(false) }
     var seatedPrompt by remember { mutableStateOf(false) }
@@ -149,6 +152,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 BigButton("내비 열기") { vm.openNavigation() }
                 if (guiding && tripNext != null) BigButton("${tripNext.place.name} 도착 처리 (시연용)") { vm.debugArrive() }
                 BigButton("같이 탄 사람 추가", enabled = !vehicle.drivingRestricted) { qr = true }
+                if (trip != null) BigButton("다트 (동네 뽑기)", enabled = !vehicle.drivingRestricted) { dartOpen = true }
                 Spacer(Modifier.weight(1f))
                 BigButton("시연 메뉴") { debug = true }
                 BigButton(
@@ -164,6 +168,24 @@ private fun CarHome(vm: CarHomeViewModel) {
     }
     if (stations.isNotEmpty()) StationDialog(stations, onPick = vm::goViaStation, onDismiss = vm::dismissStations)
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
+    if (dartOpen && !vehicle.drivingRestricted) {
+        AlertDialog(
+            onDismissRequest = { dartOpen = false }, shape = Corner, containerColor = Bg,
+            title = { Text("다트 — 동네 뽑기", fontSize = 28.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(dart?.resultName ?: "아직 안 던졌어요", fontSize = 36.sp, fontWeight = FontWeight.Black, color = Ink)
+                    dart?.let { Text("${it.throwCount}번째 다트! · 폰에도 같이 떠요", fontSize = 18.sp, color = Soft) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = { vm.throwDart(DartScope.NATIONAL) }, modifier = Modifier.height(72.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("전국", fontSize = 22.sp) }
+                        Button(onClick = { vm.throwDart(DartScope.NEAR) }, modifier = Modifier.height(72.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("내 위치 100km", fontSize = 22.sp) }
+                    }
+                }
+            },
+            confirmButton = { if (dart != null) TextButton(onClick = { vm.addDartAsStop(); dartOpen = false }) { Text("오늘 일정에 넣기", fontSize = 22.sp, color = Ink, fontWeight = FontWeight.Bold) } },
+            dismissButton = { TextButton(onClick = { dartOpen = false }) { Text("닫기", fontSize = 22.sp, color = Soft) } },
+        )
+    }
     if (qr && !vehicle.drivingRestricted) {
         InviteQrDialog(qrGroup, seated = seatedPrompt, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
     }

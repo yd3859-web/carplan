@@ -92,7 +92,8 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 13·14장 1차(기록 칸·레일 기록·사진 코드·내보내기·기록 탭)와 12·20장(주유/충전 질문·오피넷·시연 메뉴) 코드 완료. **에뮬 확인은 `docs/테스트체크리스트.md` F2·F3가 남음.**
 - 키: `local.properties`에 `KAKAO_REST_KEY=`(폰), `OPINET_KEY=`(차). 둘 다 없어도 동작(대체 경로).
 - 15장 차량 관리 코드 완료(shared `MaintenanceRules`·`MaintenanceRepository`, 폰 차량 탭, 차 주행거리·"주유했어요?"). 에뮬 확인은 체크리스트 F4.
-- 다음: 5·6장 투표·다트 → 11장 픽업 → 16장 출퇴근 → 17장 알림(Blaze) → 제출물 → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
+- 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록은 `phone-app/src/main/assets/regions.csv`(시도,시군구,읍면동,lat,lng)로 넣으면 교체됨.
+- 다음: 11장 픽업 → 16장 출퇴근 → 17장 알림(Blaze) → 제출물 → 9·10장 "다음 목적지로 갈까요?"·일정 변경 → 내비 갱신 → 13·14장 기록 → 15·16장 차량 관리·출퇴근 → 나머지.
 - Firestore 규칙은 아직 dev(로그인만 하면 읽기·쓰기). 1차 제출 전 18장 규칙으로 바꾼다.
 
 ## 에뮬레이터 테스트 요령

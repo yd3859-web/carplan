@@ -244,12 +244,40 @@ data class Comment(
 
 enum class VoteStatus { OPEN, CLOSED }
 
-/** groups/{gid}/votes/{id} */
+/** groups/{gid}/votes/{id} — 5장. [places] has an entry per option (null when the option is not a place). */
 data class Vote(
     @DocumentId val id: String = "",
     val question: String = "",
     val options: List<String> = emptyList(),
+    val places: List<Place?> = emptyList(),
     /** uid -> option index */
     val ballots: Map<String, Int> = emptyMap(),
     val status: VoteStatus = VoteStatus.OPEN,
+    /** Indices that won when closed (two on a tie, Q12). */
+    val winners: List<Int> = emptyList(),
+    /** Trip this vote belongs to, so the winning place can become a stop. */
+    val eventId: String? = null,
+    val date: String? = null,
+    val createdBy: String = "",
+    @ServerTimestamp val createdAt: Timestamp? = null,
+)
+
+enum class DartScope { NATIONAL, NEAR, REGION }
+
+/** groups/{gid}/darts/{id} — 6장 다트 방: everyone in the group watches the same throw. */
+data class Dart(
+    @DocumentId val id: String = "",
+    val scope: DartScope = DartScope.NATIONAL,
+    /** For NEAR: the centre; for REGION: the 시·도 name. */
+    val centerLat: Double? = null,
+    val centerLng: Double? = null,
+    val region: String? = null,
+    val resultName: String = "",
+    val resultLat: Double = 0.0,
+    val resultLng: Double = 0.0,
+    val throwCount: Int = 0,
+    val thrownBy: String = "",
+    val eventId: String? = null,
+    val date: String? = null,
+    @ServerTimestamp val thrownAt: Timestamp? = null,
 )
