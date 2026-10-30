@@ -92,7 +92,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 13·14장 1차(기록 칸·레일 기록·사진 코드·내보내기·기록 탭)와 12·20장(주유/충전 질문·오피넷·시연 메뉴) 코드 완료. **에뮬 확인은 `docs/테스트체크리스트.md` F2·F3가 남음.**
 - 키 이름: `KAKAO_REST_KEY`(폰·차), `OPINET_KEY`(차). 둘 다 없어도 동작(대체 경로). 차는 카카오모빌리티 길찾기로 픽업 순서(총 시간)·ETA(30초마다)를 계산한다.
 - 15장 차량 관리 코드 완료(shared `MaintenanceRules`·`MaintenanceRepository`, 폰 차량 탭, 차 주행거리·"주유했어요?"). 에뮬 확인은 체크리스트 F4.
-- 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록은 `phone-app/src/main/assets/regions.csv`(시도,시군구,읍면동,lat,lng)로 넣으면 교체됨.
+- 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록 `assets/regions.csv`(읍·면·동 3,559곳, 폰·차 둘 다) 들어감 — 출처 vuski/admdongkor ver20261001 경계의 면적 가중 중심점.
 - 11장 코드 완료(shared `PickupRepository`, 폰 `trip/PickupSheet`+`ui/SimpleMap`(OSM 타일), 차 픽업 동의 질문·픽업 우선 경로·5초 공유·가짜 주행 보간). 에뮬 확인은 체크리스트 F6.
 - 16장 코드 완료(shared `Repeat`·`Commute` + 테스트, 반복 일정 펼치기, 차 "회사로 갈까요?", 폰 학습 띠). 에뮬 확인은 체크리스트 F7.
 - 17장 **배포됨**(2026-10-30): Functions 6개(kakaoLogin은 코드에서 뺌 — 다음 배포 때 삭제 확인 Y)(asia-northeast3, Node 22) + Storage 버킷 `carplan-htb.firebasestorage.app`(US-EAST1 무료 위치) + storage.rules(아직 dev: 로그인하면 5MB 이미지). 다시 배포는 정원이 `firebase deploy --only functions --force`.

@@ -373,7 +373,7 @@
     <div class="step"><div class="step-n">2</div><div class="step-t">던지기 → <b>동네</b>(행정동/읍면)가 뽑힘 → 그 동네 장소는 <b>추천</b>만(카카오 카테고리 검색) <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">3</div><div class="step-t"><b>다 같이 실시간</b>: 한 명이 "다트 방" 열면 멤버 화면에 같이 뜸, 결과도 동시에. 일정 짜는 중엔 한 사람이 혼자 던져도 됨 <span class="decided">정함</span></div></div>
     <div class="step"><div class="step-n">4</div><div class="step-t"><span class="who car">차</span> 차 화면에서도 다 같이 던짐 — <b>주차(P단) 중에만</b> (주행 제한 정책) <span class="suggest">Claude 제안</span></div></div>
-    <div class="note-in">Q14 동네 목록 = <b>앱 안의 행정구역 목록(이름 + 중심 좌표)</b>에서 랜덤. 지금은 시·군·구 중심의 시작 목록이고, 공공데이터 행정동 CSV를 <code>phone-app/src/main/assets/regions.csv</code>로 넣으면 그걸 씀. 카카오 키가 있으면 좌표→행정동 이름으로 다듬음 <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q14 동네 목록 = <b>앱 안의 행정구역 목록(이름 + 중심 좌표)</b>에서 랜덤. 전국 <b>읍·면·동 3,559곳</b>(두 앱의 <code>assets/regions.csv</code>, 시도·시군구·읍면동·중심 좌표; 출처 vuski/admdongkor 2026-10-01판 행정동 경계에서 면적 가중 중심점 계산, 2026-10-30 넣음). 카카오 키가 있으면 좌표→행정동 이름으로 다듬음 <span class="decided">정함</span> 2026-10-30</div>
     <div class="note-in">Q15 다시 던지기 <b>제한 없음</b>, "3번째 다트!" 같은 문구. 폰·차(주차 중) 둘 다, <b>다트 방</b>(groups/{gid}/darts)으로 그룹 전원이 같은 결과를 실시간으로 봄 <span class="decided">정함</span> 2026-10-30</div>
     <div class="note-in">만든 것(2026-10-30, 에뮬 미확인): [다트] → 범위(전국 / 내 위치 100km / 지역 시·도) → 바늘이 도는 판 → 동네 이름 크게 + "n번째 다트! · 누가" → [이 동네를 여행 칸으로]. 차 화면 [다트 (동네 뽑기)]도 같은 방(주차 중만). 동네 목록은 <code>shared/data/Regions.kt</code> 시작 목록(시·군·구 150여 곳), <code>assets/regions.csv</code>가 있으면 그걸 씀. 근처 추천(카페·맛집·관광지)은 칸으로 넣은 뒤 장소 칸의 근처 추천으로.</div>
   </div>

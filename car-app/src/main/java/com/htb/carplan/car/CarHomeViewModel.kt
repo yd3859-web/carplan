@@ -67,9 +67,18 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .catch { emit(null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    private var regionsLoaded = false
+    /** 6장 Q14: the full 읍·면·동 list (assets/regions.csv, 3,559 rows) replaces the built-in starter list. */
+    private fun loadRegions() {
+        if (regionsLoaded) return
+        regionsLoaded = true
+        runCatching { getApplication<Application>().assets.open("regions.csv").bufferedReader().readLines() }.onSuccess { Regions.load(it) }
+    }
+
     fun throwDart(scope: DartScope) {
         val t = trip.value ?: return
         val u = owner.value ?: return
+        loadRegions()
         viewModelScope.launch {
             val cur = dart.value
             val same = cur != null && cur.scope == scope && cur.eventId == t.eventId
