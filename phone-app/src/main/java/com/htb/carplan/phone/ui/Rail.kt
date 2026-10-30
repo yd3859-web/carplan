@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * The day rail (from the sketch in 이미지/): one vertical line with a node per stop.
+ * The day rail (from the sketch docs/캘린더예시/타임라인_스케치.png): one vertical line with a node per stop.
  * Dotted = still to drive, solid grey = driven. Used by the trip editor, 그날 동선 and the car.
  */
 enum class NodeState { PLANNED, NEXT, VISITED }

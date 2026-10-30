@@ -99,7 +99,7 @@ private val RAIL_W = 48.dp
 private val NODE = 26.dp
 
 /**
- * 3장 그날 장소 칸 as one living timeline (the sketch in 이미지/): a rail on the left with a node
+ * 3장 그날 장소 칸 as one living timeline (the sketch docs/캘린더예시/타임라인_스케치.png): a rail on the left with a node
  * per stop, a box with time + place, comment bubbles hanging under each stop, the drive between
  * stops on a dotted rail, and a "+" node at the end. The same rail is what the car fills in later
  * (visited nodes grey, the next one blue). Everything saves immediately.
