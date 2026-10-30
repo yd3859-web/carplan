@@ -1,5 +1,6 @@
 package com.htb.carplan.car
 
+import ai.pleos.playground.navi.data.CurrentLocationInfo
 import ai.pleos.playground.navi.data.DestinationArrivedInfo
 import ai.pleos.playground.navi.data.RouteStartInfo
 import ai.pleos.playground.navi.data.WaypointArrivedInfo
@@ -8,6 +9,11 @@ import android.util.Log
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
+import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.data.RecordRepository
+import com.htb.carplan.shared.calendar.RouteMath
+import com.htb.carplan.shared.model.Place
+import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.BuiltInCategory
 import com.htb.carplan.shared.model.DayStatus
@@ -68,6 +74,8 @@ class TripNavigator(
     private val calendar = CalendarRepository()
     private val trips = TripRepository()
     private val cars = CarRepository()
+    private val records = RecordRepository()
+    private val groups = GroupRepository()
 
     private val carId = MutableStateFlow<String?>(null)
     private val _prompt = MutableStateFlow<NextPrompt?>(null)
@@ -92,6 +100,17 @@ class TripNavigator(
     private var askedOnStart = false
     private var lastGear = Gear.UNKNOWN
     private var lastRouteSentAt = 0L
+
+    // ---- 13장 arrival → record
+    private var parkTimer: Job? = null
+    /** Set once a record was made for this parking; cleared when the car drives off. */
+    private var parkedRecord: Triple<String, String, String>? = null // groupId, eventId, recordId
+    private var parkedDate: String = ""
+    private var lastLocation: Pair<Double, Double>? = null
+    private var lastAddress: String = ""
+    private val _notice = MutableStateFlow<String?>(null)
+    /** Short status for the screen ("기록 칸: 서현역 12:40"). */
+    val notice: StateFlow<String?> = _notice.asStateFlow()
 
     /** Today's trip of the car owner: prefers the one the car already marked active, else the first trip of the day. */
     val trip: StateFlow<TodayTrip?> = carId.filterNotNull()
@@ -124,6 +143,10 @@ class TripNavigator(
             override fun onWayPointArrived(info: WaypointArrivedInfo) { Log.i(TAG, "waypoint arrived ${info.name}"); onArrived() }
             override fun onDestinationArrived(info: DestinationArrivedInfo) { Log.i(TAG, "destination arrived ${info.name}"); onArrived() }
             override fun onRouteStarted(info: RouteStartInfo) { onRouteStarted(info.duration) }
+            override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
+                lastLocation = info.latitude to info.longitude
+                lastAddress = info.address
+            }
             override fun onRouteCancelled() {
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
                 if (System.currentTimeMillis() - lastRouteSentAt < OWN_CANCEL_WINDOW_MS) return
@@ -152,6 +175,62 @@ class TripNavigator(
         lastGear = gear
         if (prev == Gear.P && gear == Gear.D && !_guiding.value && trip.value?.next != null) ask(PromptReason.GEAR_D)
         if (prev == Gear.D && gear == Gear.P && pendingChange) { heldVersion = -1; scheduleChangeCheck(delayMs = 0) }
+        // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
+        if (gear == Gear.P && prev != Gear.P) {
+            router.requestCurrentLocation()
+            parkTimer?.cancel()
+            parkTimer = scope.launch { delay(PARK_CONFIRM_MS); confirmArrival(reason = "P 5분") }
+        }
+        if (prev == Gear.P && gear != Gear.P) {
+            parkTimer?.cancel()
+            parkedRecord?.let { (g, e, r) -> scope.launch { runCatching { records.markLeft(g, e, parkedDate, r) } } }
+            parkedRecord = null
+        }
+    }
+
+    /** Driver door opened (from [VehicleMonitor]): in P that means "내렸다" → arrival now (Q34). */
+    fun onDriverDoorOpened() {
+        if (lastGear == Gear.P) { parkTimer?.cancel(); confirmArrival(reason = "운전석 문") }
+    }
+
+    /**
+     * Makes the record for this parking (once): linked to the next planned stop when within
+     * [NEAR_METERS] of it (or when we cannot measure and a route is active), otherwise unplanned;
+     * on a day without a trip, under the owner's "일상 기록" event (Q37).
+     */
+    private fun confirmArrival(reason: String, assumeAtNext: Boolean = false) {
+        if (parkedRecord != null) return
+        scope.launch {
+            val t = trip.value
+            val today = LocalDate.now().toString()
+            val loc = lastLocation
+            val next = t?.next
+            val nearNext = next != null && (assumeAtNext || (loc != null && next.place.hasCoords() && RouteMath.metersBetween(loc.first, loc.second, next.place.lat, next.place.lng) <= NEAR_METERS) || (loc == null && _guiding.value))
+            runCatching {
+                val carUid = carId.value.orEmpty()
+                if (t != null && nearNext && next != null) {
+                    val id = records.addRecord(t.groupId, t.eventId, today, Record(place = next.place, stopId = next.id, createdBy = carUid))
+                    parkedRecord = Triple(t.groupId, t.eventId, id); parkedDate = today
+                    _notice.value = "기록 칸: ${next.place.name} ($reason)"
+                    onArrived() // ✓ + refill route
+                } else {
+                    val place = Place(name = lastAddress.ifBlank { "이름 없는 곳" }, lat = loc?.first ?: 0.0, lng = loc?.second ?: 0.0, address = lastAddress)
+                    val (g, e) = if (t != null) t.groupId to t.eventId else dailyLogTarget(today) ?: return@runCatching
+                    val id = records.addRecord(g, e, today, Record(place = place, unplanned = true, createdBy = carUid))
+                    parkedRecord = Triple(g, e, id); parkedDate = today
+                    _notice.value = "계획 밖 기록 칸: ${place.name} ($reason)"
+                }
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
+    /** Q37: the owner's solo group + its "일상 기록" event for [date]. */
+    private suspend fun dailyLogTarget(date: String): Pair<String, String>? {
+        val car = carId.value?.let { calendar.observeCar(it).first() } ?: return null
+        val owner = car.ownerUid ?: return null
+        val user = groups.user(owner) ?: return null
+        if (user.soloGroupId.isBlank()) return null
+        return user.soloGroupId to records.ensureDailyLog(user.soloGroupId, date, owner)
     }
 
     /** The 🎤 button: ask again now. */
@@ -210,8 +289,14 @@ class TripNavigator(
 
     fun dismiss() = later()
 
-    /** Emulator has no moving GPS: lets the demo mark the next stop as reached (20장 debug). */
-    fun debugArrive() = onArrived()
+    /** Emulator has no moving GPS: the demo button plays "parked at the next stop + got out" (20장 debug). */
+    fun debugArrive() {
+        if (parkedRecord != null) { parkedRecord = null } // allow repeated demo taps
+        parkTimer?.cancel()
+        confirmArrival(reason = "시연", assumeAtNext = true)
+    }
+
+    fun clearNotice() { _notice.value = null }
 
     // ---------- 10장: plan changed while guiding ----------
 
@@ -327,6 +412,10 @@ class TripNavigator(
         private const val OWN_CANCEL_WINDOW_MS = 5_000L
         /** Q25: several quick edits become one question. */
         private const val CHANGE_SETTLE_MS = 5_000L
+        /** Q34: P without a door signal counts as arrived after this long. */
+        private const val PARK_CONFIRM_MS = 5 * 60_000L
+        /** 13장 4: within this of the next planned stop = that stop. */
+        private const val NEAR_METERS = 300.0
 
         /** "해운대로" / "광안리로" / "감천문화마을로" — picks 로/으로 by the last syllable's final consonant. */
         fun withRo(name: String): String {

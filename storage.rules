@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// DEV RULES: any signed-in user may read/write record photos.
+// Tighten to group members before 1차 제출 (18장).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /records/{allPaths=**} {
+      allow read, write: if request.auth != null && request.resource == null
+        || (request.auth != null && request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*'));
+    }
+  }
+}

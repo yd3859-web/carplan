@@ -47,6 +47,8 @@ class TripSyncService : LifecycleService() {
         lifecycleScope.launch {
             monitor.state.map { it.gear }.distinctUntilChanged().collect { CarRuntime.navigator(this@TripSyncService).onGear(it) }
         }
+        // 13장: driver door while parked = arrived.
+        lifecycleScope.launch { monitor.driverDoorOpened.collect { CarRuntime.navigator(this@TripSyncService).onDriverDoorOpened() } }
     }
 
     private fun startInForeground() {

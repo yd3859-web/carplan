@@ -8,6 +8,8 @@ import com.htb.carplan.shared.calendar.Schedule
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.GroupRepository
+import com.htb.carplan.shared.data.RecordRepository
+import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.data.SessionRepository
 import com.htb.carplan.shared.data.TripRepository
@@ -97,6 +99,41 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val groups = GroupRepository()
+    private val recordsRepo = RecordRepository()
+
+    /** 13장: what the car actually did today — records linked to stops and unplanned ones. */
+    val records: StateFlow<List<Record>> = _date
+        .flatMapLatest { recordsRepo.observeRecords(groupId, eventId, it) }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Record of each planned stop (newest wins when the car parked there twice). */
+    val recordByStop: StateFlow<Map<String, Record>> = records
+        .map { list -> list.filter { it.stopId != null }.associateBy { it.stopId!! } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** 14장: a photo picked on the phone, downscaled by the caller to JPEG bytes (Q40: 10 per record). */
+    fun addPhoto(recordId: String, jpeg: ByteArray) = write {
+        val r = records.value.firstOrNull { it.id == recordId } ?: return@write
+        if (r.photoUrls.size >= 10) { _error.value = "사진은 칸당 10장까지예요"; return@write }
+        recordsRepo.addPhoto(groupId, eventId, _date.value, recordId, jpeg)
+    }
+
+    fun removePhoto(recordId: String, url: String) = write { recordsRepo.removePhoto(groupId, eventId, _date.value, recordId, url) }
+
+    fun setNote(recordId: String, note: String) = write { recordsRepo.setNote(groupId, eventId, _date.value, recordId, note) }
+
+    /** Q36: fix a wrong place name on an unplanned record. */
+    fun setRecordPlace(recordId: String, place: Place) = write {
+        val r = records.value.firstOrNull { it.id == recordId } ?: return@write
+        val keepCoords = if (place.hasCoords()) place else place.copy(lat = r.place.lat, lng = r.place.lng)
+        recordsRepo.setPlace(groupId, eventId, _date.value, recordId, keepCoords)
+    }
+
+    /** A record typed by hand (일상 기록 on a day the car did not drive, or a place the car missed). */
+    fun addManualRecord(name: String) = write {
+        recordsRepo.addRecord(groupId, eventId, _date.value, Record(place = Place(name = name.trim()), unplanned = true, createdBy = me()))
+    }
 
     /** The group this trip belongs to (name in the header, 4장). */
     val group: StateFlow<Group?> = groups.observeGroup(groupId)

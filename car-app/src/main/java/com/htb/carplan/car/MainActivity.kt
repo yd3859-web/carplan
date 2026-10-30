@@ -110,6 +110,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     val prompt by vm.prompt.collectAsStateWithLifecycle()
     val guiding by vm.guiding.collectAsStateWithLifecycle()
     val qrGroup by vm.qrGroup.collectAsStateWithLifecycle()
+    val notice by vm.notice.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
     var qr by remember { mutableStateOf(false) }
     var seatedPrompt by remember { mutableStateOf(false) }
@@ -120,6 +121,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     Column(Modifier.fillMaxSize()) {
         StatusBand(car, vehicle)
         error?.let { Text("오류: $it", color = Warn, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
+        notice?.let { Text(it, color = Accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
             LinkCodeScreen(car?.linkCode)
             return@Column

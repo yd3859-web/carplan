@@ -15,9 +15,14 @@ object RouteMath {
     /** Straight-line distance in meters, or null when either place has no coordinates. */
     fun meters(a: Place, b: Place): Double? {
         if (!a.hasCoords() || !b.hasCoords()) return null
-        val dLat = Math.toRadians(b.lat - a.lat)
-        val dLng = Math.toRadians(b.lng - a.lng)
-        val h = sin(dLat / 2) * sin(dLat / 2) + cos(Math.toRadians(a.lat)) * cos(Math.toRadians(b.lat)) * sin(dLng / 2) * sin(dLng / 2)
+        return metersBetween(a.lat, a.lng, b.lat, b.lng)
+    }
+
+    /** Haversine distance in meters between two coordinates. */
+    fun metersBetween(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLng = Math.toRadians(lng2 - lng1)
+        val h = sin(dLat / 2) * sin(dLat / 2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2) * sin(dLng / 2)
         return 2 * EARTH_M * atan2(sqrt(h), sqrt(1 - h))
     }
 

@@ -1,7 +1,10 @@
 package com.htb.carplan.car
 
 import ai.pleos.playground.vehicle.Vehicle
+import ai.pleos.playground.vehicle.api.model.area.DoorArea
 import ai.pleos.playground.vehicle.api.model.area.SeatArea
+import ai.pleos.playground.vehicle.constant.area.DoorValue
+import ai.pleos.playground.vehicle.listener.DoorPositionListener
 import ai.pleos.playground.vehicle.constant.area.SeatValue
 import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -35,6 +38,11 @@ class VehicleMonitor(private val context: Context) {
     val passengerSeated: SharedFlow<SeatValue> = _passengerSeated
     private val occupied = HashMap<SeatValue, Boolean>()
 
+    /** Fires when the driver's door goes from closed to open (13장: "사람이 내렸다"). */
+    private val _driverDoorOpened = MutableSharedFlow<Unit>(extraBufferCapacity = 2)
+    val driverDoorOpened: SharedFlow<Unit> = _driverDoorOpened
+    private var driverDoorOpen = false
+
     private var car: Car? = null
     private var vehicle: Vehicle? = null
     private var fuelCapacity: Float? = null
@@ -58,6 +66,16 @@ class VehicleMonitor(private val context: Context) {
 
         vehicle = Vehicle(context).also { v ->
             v.initialize()
+            runCatching {
+                v.getDoor().registerDoorPosition(DoorArea(DoorValue.ROW_1_LEFT), object : DoorPositionListener {
+                    override fun onPositionUpdated(position: Int?) {
+                        val open = (position ?: 0) > 0
+                        if (open && !driverDoorOpen) _driverDoorOpened.tryEmit(Unit)
+                        driverDoorOpen = open
+                    }
+                    override fun onFailed(e: Exception) { Log.w(TAG, "driver door: ${e.message}") }
+                })
+            }.onFailure { Log.w(TAG, "door position unavailable", it) }
             // Passenger seats only; the driver's seat never triggers the QR.
             listOf(SeatValue.ROW_1_RIGHT, SeatValue.ROW_2_LEFT, SeatValue.ROW_2_CENTER, SeatValue.ROW_2_RIGHT).forEach { seat ->
                 runCatching {

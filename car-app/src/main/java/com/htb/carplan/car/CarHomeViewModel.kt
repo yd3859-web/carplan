@@ -46,6 +46,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val trip: StateFlow<TodayTrip?> = navigator.trip
     val prompt: StateFlow<NextPrompt?> = navigator.prompt
     val guiding: StateFlow<Boolean> = navigator.guiding
+    val notice: StateFlow<String?> = navigator.notice
 
     private val carId = MutableStateFlow<String?>(null)
     private val _error = MutableStateFlow<String?>(null)

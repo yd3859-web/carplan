@@ -566,10 +566,10 @@
       <div class="c"><div class="cn">9</div><div class="ct"><span class="who car">차</span> P → D 되면 기록 칸 <b>떠난 시각</b> 기록</div></div>
     </div>
     <div class="warn-in wide">시연: Virtual Console에서 기어 P → 운전석 문 열기로 "도착" 장면을 만듦(시간 기다릴 필요 없음). 내비 도착 이벤트는 에뮬 GPS 문제로 아직 못 봄 <span class="cant">에뮬 제약</span></div>
-    <div class="ask wide"><span class="qid">Q34</span><b>도착 확정 기준</b><span class="rec">추천: P + (운전석 벨트 풀림 또는 운전석 문 열림)이면 바로. 그 신호가 없으면 P 5분. 시간은 설정에서 바꿀 수 있게.</span></div>
-    <div class="ask wide"><span class="qid">Q35</span><b>내려 주기·태우기 정차</b>(픽업처럼 잠깐 선 곳)도 칸을 만드나?<span class="rec">추천: 운전석이 그대로고 다른 자리만 바뀌면 칸 안 만듦. 픽업 장소도 칸 없음(픽업으로 처리).</span></div>
-    <div class="ask wide"><span class="qid">Q36</span><b>장소 이름이 틀리면?</b> (2판 D8)<span class="rec">추천: 칸에서 "장소 바꾸기" → 근처 후보 5개 중 고르기.</span></div>
-    <div class="ask wide"><span class="qid">Q37</span><b>집·회사에서 P단은?</b> 출퇴근할 때마다 칸이 생기면 귀찮음<span class="rec">추천: 기록 칸은 "여행 일정이 있는 날"만. 평소엔 주유소 판별만.</span></div>
+    <div class="note-in">Q34 도착 확정 = <b>P + 운전석 문 열림이면 바로, 그 신호 없이 P만 계속이면 5분 뒤</b>(벨트 신호는 Virtual Console에 없어 문으로) <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q35 운전석이 그대로고 다른 자리 문만 바뀌면 <b>칸 안 만듦</b>(픽업·내려 주기) <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q36 장소 이름이 틀리면 칸에서 <b>"장소 바꾸기" → 좌표 근처 후보(카카오 키 있을 때) 또는 직접 입력</b> <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q37 <b>여행 없는 날도 기록 칸이 생긴다</b>(정원: 일상도 기록하고 싶을 수 있음). 그날 나만 그룹에 "일상 기록" 일정(<code>log-날짜</code>)이 자동으로 생기고 그 밑에 칸이 쌓임. 기록 탭에서 보고 사진도 넣음 <span class="decided">정함</span> 2026-10-30</div>
   </div>
 </div>
 
@@ -589,9 +589,9 @@
     <div class="step"><div class="step-n">·</div><div class="step-t">하루 타임라인: 칸을 시간순으로 세로로 이음 (계획에 없던 칸은 다른 색)</div></div>
     <div class="step"><div class="step-n">·</div><div class="step-t"><b>내보내기</b>: 하루를 <b>이미지 한 장</b> 또는 <b>짧은 영상</b>(칸마다 사진 슬라이드 + 장소·시간 자막)으로 → 공유 시트 <span class="decided">정함</span></div></div>
     <div class="note-in">사진은 폰으로(차 실내 카메라 API 없음). 사진 저장 Firebase Storage — Blaze 요금제 필요할 수 있음, 예산 알림 걸기</div>
-    <div class="ask"><span class="qid">Q38</span><b>이동 구간도 타임라인에 넣을까?</b> (팀원 D1, 12장 미정) 이동 중에 쓴 코멘트가 어느 칸에 들어갈지 문제<span class="rec">추천: 칸 사이에 얇은 "이동 구간" 줄(시간·거리) — 이동 중 코멘트는 거기에.</span></div>
-    <div class="ask"><span class="qid">Q39</span><b>내보내기 이미지 모양</b><span class="rec">추천: 세로 긴 이미지, 칸마다 대표 사진 1장 + 장소 + 시간 + 한 줄.</span></div>
-    <div class="ask"><span class="qid">Q40</span><b>사진 장수 제한?</b><span class="rec">추천: 칸당 10장, 올릴 때 줄여서(긴 변 1600px) 용량 아끼기.</span></div>
+    <div class="note-in">Q38 레일의 이동 구간 줄에 <b>실제 걸린 시간</b>(떠난 시각→도착 시각), 이동 중 코멘트는 앞 칸 밑에 <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q39 내보내기 = <b>세로 긴 이미지 1장</b>(칸마다 대표 사진 + 장소 + 시간 + 한 줄) → 공유 시트. 영상은 나중 <span class="decided">정함</span> 2026-10-30</div>
+    <div class="note-in">Q40 사진은 <b>칸당 10장</b>, 올릴 때 긴 변 1600px로 줄임. 저장은 Firebase Storage(Blaze 전환 뒤 켜짐, 코드는 미리) <span class="decided">정함</span> 2026-10-30</div>
   </div>
 </div>
 
@@ -694,7 +694,8 @@
       <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 장소 칸: 순서, 장소{이름,좌표,주소,kakaoId}, 시간?(도착 시각), 메모, 만든사람, 마지막 수정자·시각(Q07), deleted, 다녀옴</div>
       <div class="sb-row"><code>…/days/{date}/comments/{id}</code> 칸 아래 말풍선 코멘트(3장): stopId, uid, 글, 시각. 경로 version은 안 올림</div>
       <div class="sb-row"><code>…/days/{date}/pickups/{uid}</code> 장소, 순서, 상태(대기/탔음/끝), 예상도착</div>
-      <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[]</div>
+      <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[](최대 10), 한 줄 글(note), 만든 주체(차 id). 코멘트는 <code>days/{date}/comments</code>에 stopId = 연결 stopId 또는 record id</div>
+      <div class="sb-row"><code>groups/{solo}/events/log-{date}</code> 여행 없는 날의 "일상 기록" 일정(자동, 카테고리 다른 일정) — 그 밑에 days/{date}/records</div>
       <div class="sb-row"><code>…/records/{id}/comments/{id}</code> uid, 글, 시각</div>
       <div class="sb-row"><code>groups/{gid}/votes/{id}</code> 질문, 후보[], 표{uid:번호}, 상태</div>
     </div>
@@ -799,9 +800,6 @@
     <div class="qgroup">🟠 안전·핵심 흐름 (심사에서 물을 수 있음)</div>
     <div class="qlist">
       <div class="q"><div class="qh"><span class="qid">Q27</span><span class="qt">위치 공유 동의 방식</span><span class="qwhere">11장</span></div><div class="qr"><b>추천</b> 운전자가 직접 켜고 자동 꺼짐</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q34</span><span class="qt">도착 확정 기준</span><span class="qwhere">13장</span></div><div class="qr"><b>추천</b> P + 운전석 벨트·문이면 바로, 없으면 5분</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q35</span><span class="qt">내려 주기·태우기 정차 칸</span><span class="qwhere">13장</span></div><div class="qr"><b>추천</b> 운전석 그대로면 칸 없음</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q37</span><span class="qt">집·회사 P단 칸</span><span class="qwhere">13장</span></div><div class="qr"><b>추천</b> 여행 있는 날만 칸</div></div>
     </div>
 
     <div class="qgroup">🟡 기능 세부</div>
@@ -820,10 +818,6 @@
       <div class="q"><div class="qh"><span class="qid">Q31</span><span class="qt">시연 연료 종류</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 주유 장면</div></div>
       <div class="q"><div class="qh"><span class="qid">Q32</span><span class="qt">차 안 장소 찾기 = 현대 내비?</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 예</div></div>
       <div class="q"><div class="qh"><span class="qid">Q33</span><span class="qt">주유 알림 반복 횟수</span><span class="qwhere">12장</span></div><div class="qr"><b>추천</b> 거절하면 10% 더 줄 때 한 번</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q36</span><span class="qt">장소 이름 틀릴 때</span><span class="qwhere">13장</span></div><div class="qr"><b>추천</b> 근처 후보 5개</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q38</span><span class="qt">이동 구간 타임라인</span><span class="qwhere">14장</span></div><div class="qr"><b>추천</b> 얇은 이동 줄</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q39</span><span class="qt">내보내기 이미지 모양</span><span class="qwhere">14장</span></div><div class="qr"><b>추천</b> 세로 긴 이미지</div></div>
-      <div class="q"><div class="qh"><span class="qid">Q40</span><span class="qt">사진 장수 제한</span><span class="qwhere">14장</span></div><div class="qr"><b>추천</b> 칸당 10장</div></div>
       <div class="q"><div class="qh"><span class="qid">Q41</span><span class="qt">점검 알림 기준</span><span class="qwhere">15장</span></div><div class="qr"><b>추천</b> 먼저 오는 것</div></div>
       <div class="q"><div class="qh"><span class="qid">Q42</span><span class="qt">항목별 기본 주기</span><span class="qwhere">15장</span></div><div class="qr"><b>추천</b> 15장 초안 보고 고치기</div></div>
       <div class="q"><div class="qh"><span class="qid">Q43</span><span class="qt">주유 금액·리터 입력</span><span class="qwhere">15장</span></div><div class="qr"><b>추천</b> 선택 입력</div></div>
@@ -842,7 +836,7 @@
     </div>
 
     <div class="qgroup">✓ 정함 (질문에서 옮겨 온 것)</div>
-    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)<br>Q06 시간 칸 = 도착 시각만 (2026-10-30)<br>Q07 동시 수정 = 나중 저장 우선 + "○○님이 방금 수정" (2026-10-30)<br>Q08 칸 추가·순서는 화면에만, 빼기만 푸시 (2026-10-30)<br>카카오 키 없이도 3장 전부 동작(이름 입력·직선거리), 키는 local.properties KAKAO_REST_KEY (2026-10-30)<br>Q21 음성 못 알아들으면 1번만 다시 묻고 버튼만 (2026-10-30)<br>Q22 내비엔 최대 3곳(경유지 2 + 목적지), 일정은 제한 없이 등록, 도착마다 하나씩 채움 (2026-10-30)<br>Q23 운전 중 변경은 음성으로 묻기, "아니"면 폰에 "운전자가 보류함" (2026-10-30)<br>Q24 답 없으면 10초 뒤 버튼만, 다음 정차 때 다시 (2026-10-30)<br>Q25 연달아 바뀌면 5초 모아 한 번만 (2026-10-30)<br>Q18 주행 중 운전자 폰 편집 잠금 (2026-10-30)<br>하루 화면 = 레일 타임라인(노드·상자·말풍선 코멘트 글타래·예상 도착 시각·[+] 노드), 계획·주행·기록 한 화면, 차는 도착 때 레일 채움만 움직임 (2026-10-30)<br>10장 구현: 5초 모아 묻기, 바꾸기/그대로, 차에 반영됨·다음 도착·운전자가 보류함 표시, 운전자 폰 잠금 (2026-10-30)<br>Q10 친구 = 그룹 이력 + 친구 코드 / Q11 만든 사람이 그룹장 / Q16 차에서 [새 그룹] / 여행 추가 창에 그룹 칩 / 초대 링크 Hosting 지금 / 이름은 임시 (2026-10-30)<br>4장·7장 구현: 그룹 탭·초대 3종·딥링크 참여·QR·오늘 이 차로 가요·착석 QR, 초대 페이지 배포 (2026-10-30)</div>
+    <div class="todo" style="background:#f2fbf6;color:#2b5a40;"><div class="t" style="color:var(--green);">2026-10-29</div>차 화면 QR = 동승자가 탔을 때 그룹 가입용 (7장)<br>프로토/나중 구분 없음 — 문서의 기능 전부 만든다. iOS만 제외 (21장)<br>Q10 친구 추가 넣음 → 남은 건 추가 방법<br>Q05 구글 캘린더 불러오기 넣음 → 남은 건 범위<br>Q45 출퇴근 입력 + 학습 둘 다 → 남은 건 학습 기준<br>Q50·Q49 앱 이름 carplan(임시), 패키지 com.htb.carplan.car / .phone / .shared (2026-10-30)<br>Vercel 안 씀 — 초대 링크 페이지는 Firebase Hosting (2026-10-30)<br>Q01 나만 그룹 자동 생성 (2026-10-30)<br>Q48 데이터 구조 = 캘린더 중심, 모든 일정은 그룹 안의 event 하나로 통일 (18장, 2026-10-30)<br>Q04 여러 날 여행 = 이어진 여행 하나, 날짜별로 그날 일정 (2026-10-30)<br>제작 방식: 팀원 분담 없이 정원이 전부, 캘린더부터 단계별로 (2026-10-30)<br>Q03 기본 3개 고정 색, 추가는 8색 (2026-10-30)<br>Q09 한 줄 빠른 입력 + 칩, [장소]를 맨 앞에 (2026-10-30)<br>폰 캘린더 화면 = A안 오늘 카드 + 월 보기 + 그날 동선 (2026-10-30, 디자인은 추후 다시)<br>Q17 차주가 호스트, 그룹 일행은 차주와 같은 편집 권한 (2026-10-30)<br>Q19 차 화면에서도 일정 만들기(주차 중) (2026-10-30)<br>하단 바 캘린더·그룹·기록·차량·설정 (2026-10-30)<br>로그인은 맨 뒤, 그 전엔 익명 로그인 (2026-10-30)<br>Q06 시간 칸 = 도착 시각만 (2026-10-30)<br>Q07 동시 수정 = 나중 저장 우선 + "○○님이 방금 수정" (2026-10-30)<br>Q08 칸 추가·순서는 화면에만, 빼기만 푸시 (2026-10-30)<br>카카오 키 없이도 3장 전부 동작(이름 입력·직선거리), 키는 local.properties KAKAO_REST_KEY (2026-10-30)<br>Q21 음성 못 알아들으면 1번만 다시 묻고 버튼만 (2026-10-30)<br>Q22 내비엔 최대 3곳(경유지 2 + 목적지), 일정은 제한 없이 등록, 도착마다 하나씩 채움 (2026-10-30)<br>Q23 운전 중 변경은 음성으로 묻기, "아니"면 폰에 "운전자가 보류함" (2026-10-30)<br>Q24 답 없으면 10초 뒤 버튼만, 다음 정차 때 다시 (2026-10-30)<br>Q25 연달아 바뀌면 5초 모아 한 번만 (2026-10-30)<br>Q18 주행 중 운전자 폰 편집 잠금 (2026-10-30)<br>하루 화면 = 레일 타임라인(노드·상자·말풍선 코멘트 글타래·예상 도착 시각·[+] 노드), 계획·주행·기록 한 화면, 차는 도착 때 레일 채움만 움직임 (2026-10-30)<br>10장 구현: 5초 모아 묻기, 바꾸기/그대로, 차에 반영됨·다음 도착·운전자가 보류함 표시, 운전자 폰 잠금 (2026-10-30)<br>Q10 친구 = 그룹 이력 + 친구 코드 / Q11 만든 사람이 그룹장 / Q16 차에서 [새 그룹] / 여행 추가 창에 그룹 칩 / 초대 링크 Hosting 지금 / 이름은 임시 (2026-10-30)<br>4장·7장 구현: 그룹 탭·초대 3종·딥링크 참여·QR·오늘 이 차로 가요·착석 QR, 초대 페이지 배포 (2026-10-30)<br>Q34 P + 운전석 문(없으면 5분) / Q35 운전석 그대로면 칸 없음 / Q36 장소 바꾸기 후보 / Q37 여행 없는 날도 "일상 기록" 칸 / Q38 이동 줄에 실제 시간 / Q39 세로 이미지 / Q40 칸당 10장 / Blaze는 나중, 사진 코드는 미리 (2026-10-30)</div>
   </div>
 </div>
 

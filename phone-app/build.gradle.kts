@@ -71,6 +71,9 @@ dependencies {
     // QR: scanning the car's invite QR (7장) and drawing nothing on the phone; the car draws with zxing core.
     implementation(libs.zxing.embedded)
     implementation(libs.zxing.core)
+    // Record photos (14장)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)

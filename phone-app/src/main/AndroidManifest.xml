@@ -36,6 +36,14 @@
                 <data android:scheme="carplan" android:host="i" />
             </intent-filter>
         </activity>
+        <!-- 14장: sharing the exported day image -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.htb.carplan.phone.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

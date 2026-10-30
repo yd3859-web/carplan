@@ -70,6 +70,9 @@ class NaviRouter(private val context: Context) {
 
     fun addListener(listener: NaviHelperEventListener) = navi.addListener(listener)
 
+    /** Asks the navigation for the car's position; the answer arrives at onCurrentLocationInfo on the listeners. */
+    fun requestCurrentLocation() { if (ready) runCatching { navi.getCurrentLocationInfo() } }
+
     fun release() = navi.release()
 
     private fun Place.toRouteInfo() =

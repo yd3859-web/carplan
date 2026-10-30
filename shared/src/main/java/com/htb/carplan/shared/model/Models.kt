@@ -198,6 +198,10 @@ data class Pickup(
 )
 
 /** .../days/{date}/records/{id} — created when the car parks (13장). */
+/**
+ * .../days/{date}/records/{id} — one stop the car actually made (13장): created by the car at
+ * P + driver door (or P 5 min), linked to a planned stop when within 300 m of it, otherwise unplanned.
+ */
 data class Record(
     @DocumentId val id: String = "",
     val place: Place = Place(),
@@ -205,7 +209,12 @@ data class Record(
     val unplanned: Boolean = false,
     val arrivedAt: Timestamp? = null,
     val leftAt: Timestamp? = null,
+    /** Up to 10 (Q40), long edge 1600 px. */
     val photoUrls: List<String> = emptyList(),
+    /** 짧은 글 (14장); shown under the place in the timeline and the export image. */
+    val note: String = "",
+    /** The car id that created it, or a user uid for a manual record. */
+    val createdBy: String = "",
 )
 
 /**

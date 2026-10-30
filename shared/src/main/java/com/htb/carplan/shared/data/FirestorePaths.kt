@@ -28,6 +28,11 @@ object FirestorePaths {
     /** Member comments hanging under the day's stops (3장 말풍선). */
     fun dayComments(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/comments"
     fun records(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/records"
+    /** Auto event in the solo group that holds a non-trip day's records (Q37 "일상 기록"). */
+    fun dailyLogEventId(date: String) = "log-$date"
+    /** Storage path of one record photo. */
+    fun recordPhoto(groupId: String, eventId: String, date: String, recordId: String, fileName: String) =
+        "records/$groupId/$eventId/$date/$recordId/$fileName"
     fun comments(groupId: String, eventId: String, date: String, recordId: String) =
         "${records(groupId, eventId, date)}/$recordId/comments"
 }
