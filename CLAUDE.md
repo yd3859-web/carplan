@@ -95,12 +95,12 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 5·6장 코드 완료(shared `VoteRepository`·`DartRepository`·`Regions`, 폰 `vote/` 창, 차 다트). 에뮬 확인은 체크리스트 F5. 행정동 전체 목록 `assets/regions.csv`(읍·면·동 3,559곳, 폰·차 둘 다) 들어감 — 출처 vuski/admdongkor ver20261001 경계의 면적 가중 중심점.
 - 11장 코드 완료(shared `PickupRepository`, 폰 `trip/PickupSheet`+`ui/SimpleMap`(OSM 타일), 차 픽업 동의 질문·픽업 우선 경로·5초 공유·가짜 주행 보간). 에뮬 확인은 체크리스트 F6.
 - 16장 코드 완료(shared `Repeat`·`Commute` + 테스트, 반복 일정 펼치기, 차 "회사로 갈까요?", 폰 학습 띠). 에뮬 확인은 체크리스트 F7.
-- 17장 **배포됨**(2026-10-30): Functions 6개(kakaoLogin은 코드에서 뺌 — 다음 배포 때 삭제 확인 Y)(asia-northeast3, Node 22) + Storage 버킷 `carplan-htb.firebasestorage.app`(US-EAST1 무료 위치) + storage.rules(아직 dev: 로그인하면 5MB 이미지). 다시 배포는 정원이 `firebase deploy --only functions --force`.
+- 17장 **배포됨**(2026-10-30): Functions 6개(kakaoLogin은 코드에서 뺌 — 다음 배포 때 삭제 확인 Y)(asia-northeast3, Node 22) + Storage 버킷 `carplan-htb.firebasestorage.app`(US-EAST1 무료 위치) + storage.rules(18장 멤버만, 2026-10-30 배포됨). 다시 배포는 정원이 `firebase deploy --only functions --force`.
 - 폰 알림 탭 딥링크 `carplan://trip/{gid}/{eid}/{date}` 처리됨(`InviteInbox.offerTrip` → `AppRoot`가 그날 레일을 전체 화면으로). `hosting/public/.well-known/assetlinks.json`에 release·debug 키 SHA-256 들어감(release 키 `~/carplan-keys/carplan-release.jks`).
 - 설정 탭 완료(`phone/settings/SettingsTab.kt`: 이름·친구 코드·일정 알림 스위치·주유 알림 기준 `cars.fuelAlertPercent`·계정·버전). 일정 [알림] 칩은 `phone/push/Reminders.kt`(AlarmManager, 2주, 반복 포함)로 실제로 울림. 11장 픽업 순서(총 시간)·지도 경로선·ETA, 17장 "곧 도착"·"주차장" 푸시까지 코드 완료.
 - 18장 보안 규칙 = `firestore.rules`(= `firestore.prod.rules`, 에뮬레이터로 23개 경우 통과). 배포 완료(2026-10-30). 바꾸면 **정원이 직접** `firebase deploy --only firestore:rules`(Claude는 배포 권한 없음). 문제 생기면 `firestore.dev.rules`를 `firestore.rules`로 복사해 다시 배포. 규칙 테스트는 `firebase emulators:exec --only firestore "python3 -I <스크립트>"`로 가짜 JWT(alg none) + REST. 주의: v2 규칙에서 `{doc=**}`는 0단계도 잡아 부모 문서 규칙을 덮는다.
 - 14장 짧은 영상 내보내기 완료(`phone/record/DayVideo.kt`, MediaCodec YUV420 입력 → mp4, 에뮬 미확인). 기획서 대비 안 만든 기능 없음(2026-10-30 저녁 기준).
-- Q05 구글 캘린더 읽기 완료(`phone/calendar/GoogleCalendar.kt`, AuthorizationClient calendar.readonly, 설정 탭 스위치, 메모리에만). GCP `carplan-htb`에 Google Calendar API 사용 설정 필요(Chrome으로 켬). Storage 규칙은 멤버만(`storage.rules`, 배포는 정원이 `firebase deploy --only storage`).
+- Q05 구글 캘린더 읽기 완료(`phone/calendar/GoogleCalendar.kt`, AuthorizationClient calendar.readonly, 설정 탭 스위치, 메모리에만). GCP `carplan-htb`에 Google Calendar API 사용 설정 필요(Chrome으로 켬). Storage 규칙 멤버만 배포됨(2026-10-30).
 - 다음(순서): 정원이 규칙 배포(`firebase deploy --only firestore:rules`)·Blaze → Functions·Storage 배포 → 에뮬 테스트 F2~F10 → release APK(`apk/팀명_carplan_release.apk`)·심사용 README → 기획서 DOCX(접수양식 받으면) → 시연 영상 → 시간 남으면 구글 캘린더 불러오기(Q05).
 - Firestore 18장 규칙 **배포됨**(2026-10-30, 실서버 23개 경우 통과). 개발용으로 되돌리려면 `cp firestore.dev.rules firestore.rules` 후 정원이 다시 배포.
 
