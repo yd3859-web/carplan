@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -180,30 +181,75 @@ private data class HitSpot(val lat: Double, val lng: Double, val key: String)
 /** Simple projection with a fixed latitude correction; the camera (centre + px per degree) animates. */
 private const val COS_LAT = 0.80 // cos(36.5°)
 
+/** Boundary polylines from assets ("lng,lat;lng,lat…" per line) with a bounding box per line for culling. */
+private class GeoLines(val pts: List<FloatArray>, val box: List<FloatArray>)
+
+private object MapAssets {
+    @Volatile var sido: GeoLines? = null
+    @Volatile var sgg: GeoLines? = null
+    fun load(context: android.content.Context) {
+        if (sido == null) sido = read(context, "sido_lines.txt")
+        if (sgg == null) sgg = read(context, "sgg_lines.txt")
+    }
+    private fun read(context: android.content.Context, name: String): GeoLines {
+        val pts = ArrayList<FloatArray>(); val box = ArrayList<FloatArray>()
+        context.assets.open(name).bufferedReader().forEachLine { line ->
+            if (line.isBlank()) return@forEachLine
+            val parts = line.split(';')
+            val a = FloatArray(parts.size * 2)
+            var minX = 999f; var minY = 999f; var maxX = -999f; var maxY = -999f
+            parts.forEachIndexed { i, p ->
+                val c = p.indexOf(','); val x = p.substring(0, c).toFloat(); val y = p.substring(c + 1).toFloat()
+                a[i * 2] = x; a[i * 2 + 1] = y
+                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            }
+            pts += a; box += floatArrayOf(minX, minY, maxX, maxY)
+        }
+        return GeoLines(pts, box)
+    }
+}
+
+private data class Label(val name: String, val lat: Double, val lng: Double)
+
+/**
+ * The board: only 시·도 outlines and their names (calm, readable). When a dart sticks, the camera dives into
+ * that spot and the 시·군·구 lines, their names and the nearby 동네 names fade in — detail only where it matters.
+ */
 @Composable
 private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Boolean) -> Unit, onLanded: (Double, Double) -> Unit) {
+    val context = LocalContext.current
+    var assetsReady by remember { mutableStateOf(MapAssets.sgg != null) }
+    LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { MapAssets.load(context) }; assetsReady = true }
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val w = with(density) { maxWidth.toPx() }; val h = with(density) { maxHeight.toPx() }
-        val boardH = h * 0.86f // the bottom strip holds the dart
+        val boardH = h * 0.86f
         val all = Regions.all
-        val inPool = remember(pool) { pool.toHashSet() }
+        val sidoLabels = remember(all.size) { all.groupBy { it.sido }.map { (k, v) -> Label(shortSido(k), v.map { it.lat }.average(), v.map { it.lng }.average()) } }
+        val sggLabels = remember(all.size) { all.groupBy { it.sido + "|" + it.sigungu }.map { (_, v) -> Label(v.first().sigungu, v.map { it.lat }.average(), v.map { it.lng }.average()) } }
+        val poolSidos = remember(pool) { pool.map { shortSido(it.sido) }.toSet() }
 
-        // Camera that frames the pool, animated when the scope changes.
+        // Scope framing (whole pool) and detail framing (the dart's 동네).
         val south = pool.minOf { it.lat }; val north = pool.maxOf { it.lat }
         val west = pool.minOf { it.lng }; val east = pool.maxOf { it.lng }
         val spanLng = max(0.05, east - west); val spanLat = max(0.05, north - south)
-        val targetK = min(w * 0.86 / (spanLng * COS_LAT), boardH * 0.86 / spanLat).toFloat()
+        val scopeK = min(w * 0.86 / (spanLng * COS_LAT), boardH * 0.86 / spanLat).toFloat()
+        val detailK = max(scopeK * 2.2f, boardH / 0.6f) // about 65 km tall around the hit
+        var focus by remember { mutableStateOf<Pair<Double, Double>?>(null) }
         val camLat = remember { Animatable(((north + south) / 2).toFloat()) }
         val camLng = remember { Animatable(((east + west) / 2).toFloat()) }
-        val camK = remember { Animatable(targetK) }
-        val appear = remember { Animatable(0f) }
-        LaunchedEffect(pool) {
-            launch { camLat.animateTo(((north + south) / 2).toFloat(), tween(700)) }
-            launch { camLng.animateTo(((east + west) / 2).toFloat(), tween(700)) }
-            launch { camK.animateTo(targetK, tween(700)) }
+        val camK = remember { Animatable(scopeK) }
+        LaunchedEffect(pool, focus) {
+            val f = focus
+            val (tLat, tLng, tK) = if (f != null) Triple(f.first.toFloat(), f.second.toFloat(), detailK) else Triple(((north + south) / 2).toFloat(), ((east + west) / 2).toFloat(), scopeK)
+            val ms = if (f != null) 1100 else 600
+            launch { camLat.animateTo(tLat, tween(ms)) }
+            launch { camLng.animateTo(tLng, tween(ms)) }
+            launch { camK.animateTo(tK, tween(ms)) }
         }
-        LaunchedEffect(Unit) { appear.animateTo(1f, tween(1100, easing = LinearEasing)) }
+        val appear = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { appear.animateTo(1f, tween(900)) }
 
         fun toScreen(lat: Double, lng: Double) = Offset(
             (w / 2 + (lng - camLng.value) * camK.value * COS_LAT).toFloat(),
@@ -216,82 +262,119 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         val fly = remember { Animatable(0f) }
         val wobble = remember { Animatable(0f) }
         val impact = remember { Animatable(1f) }
-        var from by remember { mutableStateOf(launchAt) }
-        var to by remember { mutableStateOf<Offset?>(null) }
-        var toGeoPt by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+        var flightFrom by remember { mutableStateOf(launchAt) }
+        var flightTo by remember { mutableStateOf<Offset?>(null) }
+        var stuck by remember { mutableStateOf<Pair<Double, Double>?>(null) } // where the dart is, in geo
         var flying by remember { mutableStateOf(false) }
         val cs = rememberCoroutineScope()
 
         suspend fun throwTo(target: Offset, ms: Int) {
             flying = true; onFlying(true)
-            from = launchAt; to = target; toGeoPt = toGeo(target)
+            flightFrom = launchAt; flightTo = target; stuck = null
             fly.snapTo(0f); wobble.snapTo(0f); impact.snapTo(0f)
             fly.animateTo(1f, tween(ms, easing = FastOutLinearInEasing))
-            cs.launch { impact.animateTo(1f, tween(900)) }
+            stuck = toGeo(target)
+            cs.launch { impact.animateTo(1f, tween(800)) }
             wobble.snapTo(16f)
             wobble.animateTo(0f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMediumLow))
             flying = false; onFlying(false)
         }
 
-        // A throw by anyone (or my own result coming back) lands on the dot map.
         LaunchedEffect(hit?.key) {
             val s = hit ?: return@LaunchedEffect
-            val mine = toGeoPt?.let { (la, lo) -> sqrt((la - s.lat) * (la - s.lat) + (lo - s.lng) * (lo - s.lng)) < spanLat * 0.25 } == true
-            if (mine && !flying) { toGeoPt = s.lat to s.lng; to = toScreen(s.lat, s.lng) }
-            else { toGeoPt = s.lat to s.lng; throwTo(toScreen(s.lat, s.lng), 650) }
+            val mine = stuck?.let { (la, lo) -> sqrt((la - s.lat) * (la - s.lat) + (lo - s.lng) * (lo - s.lng)) < spanLat * 0.25 } == true
+            if (!(mine && !flying)) throwTo(toScreen(s.lat, s.lng), 650)
+            stuck = s.lat to s.lng
+            kotlinx.coroutines.delay(250)
+            focus = s.lat to s.lng // dive into the 동네
         }
 
-        // ---- the map (dots) + effects
+        val detail = ((camK.value / detailK - 0.45f) / 0.45f).coerceIn(0f, 1f) // 0 = overview, 1 = dived in
+        val ink = Palette.TextStrong
         Canvas(Modifier.fillMaxSize()) {
-            val r = (camK.value * 0.006f).coerceIn(1.4.dp.toPx(), 4.5.dp.toPx())
-            val centre = Offset(w / 2, boardH / 2)
-            val maxD = sqrt(w * w + boardH * boardH) / 2
-            val hitPt = toGeoPt?.let { toScreen(it.first, it.second) }
-            val rippleR = impact.value * 160.dp.toPx()
-            for (rg in all) {
-                val p = toScreen(rg.lat, rg.lng)
-                if (p.x < -10 || p.x > w + 10 || p.y < -10 || p.y > boardH + 10) continue
-                // intro: dots appear from the centre outwards
-                val a = ((appear.value * 1.3f - (p - centre).getDistance() / maxD)).coerceIn(0f, 1f)
-                if (a <= 0f) continue
-                val active = rg in inPool
-                var color = if (active) Palette.TextStrong else Color(0xFFD6DADF)
-                var rr = if (active) r else r * 0.8f
-                if (hitPt != null && impact.value < 1f && active) {
-                    val d = (p - hitPt).getDistance()
-                    val band = 1f - (kotlin.math.abs(d - rippleR) / 26.dp.toPx()).coerceIn(0f, 1f)
-                    if (band > 0f) { color = Palette.Teal; rr = r * (1f + band * 0.9f) }
+            val viewW0 = camLng.value - (w / 2) / (camK.value * COS_LAT); val viewW1 = camLng.value + (w / 2) / (camK.value * COS_LAT)
+            val viewS0 = camLat.value - (boardH / 2) / camK.value; val viewS1 = camLat.value + (boardH / 2) / camK.value
+            fun drawLines(g: GeoLines?, color: Color, width: Float) {
+                g ?: return
+                val path = Path()
+                g.pts.forEachIndexed { i, a ->
+                    val b = g.box[i]
+                    if (b[2] < viewW0 || b[0] > viewW1 || b[3] < viewS0 || b[1] > viewS1) return@forEachIndexed
+                    var k = 0
+                    while (k < a.size) {
+                        val p = toScreen(a[k + 1].toDouble(), a[k].toDouble())
+                        if (k == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                        k += 2
+                    }
                 }
-                drawCircle(color.copy(alpha = color.alpha * a), rr, p)
+                drawPath(path, color, style = Stroke(width, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
             }
-            if (hitPt != null && impact.value < 1f) {
-                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.8f), rippleR, hitPt, style = Stroke(2.5.dp.toPx()))
-                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.4f), rippleR * 0.6f, hitPt, style = Stroke(1.5.dp.toPx()))
+            if (assetsReady) {
+                // Overview: coarse 시·도 outline. Dived in: the finer 시·군·구 lines (coast included) take over.
+                if (detail > 0f) drawLines(MapAssets.sgg, ink.copy(alpha = 0.55f * detail * appear.value), 1.2.dp.toPx())
+                if (detail < 1f) drawLines(MapAssets.sido, ink.copy(alpha = 0.75f * (1f - detail) * appear.value), 1.6.dp.toPx())
             }
-            if (hitPt != null && !flying && fly.value >= 1f) drawCircle(Palette.Teal, 7.dp.toPx(), hitPt, style = Stroke(3.dp.toPx()))
-            // bottom strip
+            // NEAR scope: the 100 km circle
+            // names
+            val big = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Palette.TextSoft)
+            if (detail < 1f) sidoLabels.forEach { l ->
+                val p = toScreen(l.lat, l.lng)
+                if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
+                val on = l.name in poolSidos
+                val st = big.copy(color = (if (on) ink else Color(0xFFB9BEC4)).copy(alpha = (1f - detail) * appear.value), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                val m = measurer.measure(l.name, st)
+                drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
+            }
+            if (detail > 0f) {
+                sggLabels.forEach { l ->
+                    val p = toScreen(l.lat, l.lng)
+                    if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
+                    val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.ChipText.copy(alpha = detail)))
+                    drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
+                }
+                val st = stuck
+                if (st != null) all.asSequence()
+                    .map { it to RouteMathDeg(it.lat, it.lng, st.first, st.second) }
+                    .sortedBy { it.second }.take(14).forEach { (rg, _) ->
+                        val p = toScreen(rg.lat, rg.lng)
+                        if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
+                        val isHit = hit != null && kotlin.math.abs(rg.lat - hit.lat) < 1e-6 && kotlin.math.abs(rg.lng - hit.lng) < 1e-6
+                        drawCircle((if (isHit) Palette.Teal else Color(0xFF8A9096)).copy(alpha = detail), (if (isHit) 6 else 3).dp.toPx(), p)
+                        val m = measurer.measure(rg.dong ?: rg.sigungu, androidx.compose.ui.text.TextStyle(fontSize = if (isHit) 20.sp else 13.sp, fontWeight = if (isHit) FontWeight.Black else FontWeight.Normal, color = (if (isHit) ink else Palette.TextSoft).copy(alpha = detail)))
+                        drawText(m, topLeft = p + Offset(8.dp.toPx(), -m.size.height / 2f))
+                    }
+            }
+            // impact ripple
+            val sp = stuck?.let { toScreen(it.first, it.second) }
+            if (sp != null && impact.value < 1f) {
+                val r = impact.value * 140.dp.toPx()
+                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.8f), r, sp, style = Stroke(3.dp.toPx()))
+                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.35f), r * 0.55f, sp, style = Stroke(2.dp.toPx()))
+            }
             drawLine(Palette.Line, Offset(0f, boardH), Offset(w, boardH), 1.dp.toPx())
         }
 
-        // ---- gesture
+        // gesture
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { if (!flying) pull = Offset.Zero },
+                    onDragStart = { if (!flying) { pull = Offset.Zero; focus = null } },
                     onDrag = { c, d -> c.consume(); pull = pull?.plus(d) },
                     onDragCancel = { pull = null },
                     onDragEnd = {
                         val p = pull; pull = null
                         if (p == null || p.getDistance() < 24f || flying) return@detectDragGestures
-                        val reach = launchAt.y - boardH * 0.04f
-                        val power = min(1f, p.getDistance() / (h * 0.40f))
-                        val dir = Offset(-p.x, -p.y) / p.getDistance()
-                        val shake = Offset(gauss() * w * 0.025f, gauss() * boardH * 0.03f)
-                        val target = Offset(
-                            (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
-                            (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
-                        )
                         cs.launch {
+                            // let the camera finish zooming back out before the dart leaves the hand
+                            while (camK.isRunning) kotlinx.coroutines.delay(16)
+                            val reach = launchAt.y - boardH * 0.04f
+                            val power = min(1f, p.getDistance() / (h * 0.40f))
+                            val dir = Offset(-p.x, -p.y) / p.getDistance()
+                            val shake = Offset(gauss() * w * 0.025f, gauss() * boardH * 0.03f)
+                            val target = Offset(
+                                (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
+                                (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
+                            )
                             throwTo(target, 560)
                             val (lat, lng) = toGeo(target)
                             onLanded(lat, lng)
@@ -301,7 +384,7 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             },
         )
 
-        // ---- aim guide + dart + shadow
+        // aim guide + dart
         Canvas(Modifier.fillMaxSize()) {
             val p = pull
             if (p != null && p.getDistance() > 8f) {
@@ -310,22 +393,37 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                 val end = launchAt + dir * (launchAt.y - boardH * 0.04f) * power
                 drawLine(Palette.Teal, launchAt, end, 3.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
                 drawCircle(Palette.Teal, 14.dp.toPx(), end, style = Stroke(2.dp.toPx()))
-                // power ring around the hand
                 drawArc(Palette.Navy, -90f, 360f * power, false, launchAt - Offset(30.dp.toPx(), 30.dp.toPx()), androidx.compose.ui.geometry.Size(60.dp.toPx(), 60.dp.toPx()), style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
             }
-            val t = fly.value; val target = to
+            val t = fly.value; val target = flightTo
             when {
                 p != null -> drawDart(launchAt + p * 0.35f, atan2(-p.y, -p.x), 1.5f)
-                target != null && (flying || t > 0f) -> {
-                    val ground = from + (target - from) * t
-                    if (flying) drawOval(Color(0x33000000), ground - Offset(10.dp.toPx(), 3.dp.toPx()), androidx.compose.ui.geometry.Size(20.dp.toPx() * (0.6f + t * 0.4f), 6.dp.toPx()))
+                flying && target != null -> {
+                    val ground = flightFrom + (target - flightFrom) * t
+                    drawOval(Color(0x33000000), ground - Offset(10.dp.toPx(), 3.dp.toPx()), androidx.compose.ui.geometry.Size(20.dp.toPx() * (0.6f + t * 0.4f), 6.dp.toPx()))
                     val pos = ground + Offset(0f, -sin(PI * t).toFloat() * size.height * 0.22f)
-                    drawDart(pos, atan2(target.y - from.y, target.x - from.x) + (1 - t) * -0.4f, 1.5f - 0.75f * t, wobble.value)
+                    drawDart(pos, atan2(target.y - flightFrom.y, target.x - flightFrom.x) + (1 - t) * -0.4f, 1.5f - 0.75f * t, wobble.value)
+                }
+                stuck != null -> {
+                    val sp = toScreen(stuck!!.first, stuck!!.second)
+                    drawDart(sp, atan2(sp.y - launchAt.y, sp.x - launchAt.x), 0.75f + 0.25f * detail, wobble.value)
                 }
                 else -> drawDart(launchAt, (-PI / 2).toFloat(), 1.5f)
             }
         }
     }
+}
+
+private fun shortSido(s: String) = when {
+    s.startsWith("전남광주") -> "전남·광주"
+    else -> s.replace("특별자치도", "").replace("특별자치시", "").replace("광역시", "").replace("특별시", "")
+        .let { if (it.endsWith("도") && it.length == 4) it[0].toString() + it[2] else it } // 경상북도 → 경북
+}
+
+/** Cheap planar distance in degrees (latitude-corrected) for "nearest 동네" labels. */
+private fun RouteMathDeg(la1: Double, lo1: Double, la2: Double, lo2: Double): Double {
+    val dx = (lo1 - lo2) * COS_LAT; val dy = la1 - la2
+    return dx * dx + dy * dy
 }
 
 /** Steel tip, black barrel, blue flights — pointing along [heading] (radians, 0 = right). */
