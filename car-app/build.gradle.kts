@@ -79,5 +79,8 @@ dependencies {
     implementation(libs.pleos.speechtotext)
     // Invite QR on the car screen (7장)
     implementation(libs.zxing.core)
+    // 주행 화면의 간단 지도(OSM 타일)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network)
     testImplementation(libs.junit)
 }

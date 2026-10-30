@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.network.httpHeaders
 import kotlin.math.PI
 import kotlin.math.atan
 import kotlin.math.floor
@@ -60,7 +61,7 @@ fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: Lis
             val x = tx + dx; val y = ty + dy
             if (y < 0 || y >= n.toInt()) continue
             AsyncImage(
-                model = "https://tile.openstreetmap.org/$zoom/${Math.floorMod(x, n.toInt())}/$y.png",
+                model = tileRequest(zoom, Math.floorMod(x, n.toInt()), y),
                 contentDescription = null, contentScale = ContentScale.FillBounds,
                 modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset((ox + (dx + 1) * tilePx).toInt(), (oy + (dy + 1) * tilePx).toInt()) }.size(tile),
             )
@@ -93,9 +94,23 @@ fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: Lis
                 Text(m.label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.offset(x = size + 2.dp, y = (-2).dp).background(Color(0xCCFFFFFF)))
             }
         }
-        Text("© OpenStreetMap", fontSize = 9.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xAAFFFFFF)))
+        Text(TILE_ATTRIBUTION, fontSize = 9.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xAAFFFFFF)))
     }
 }
+
+
+/** Tile source: OpenStreetMap, identified with our app name as its usage policy asks (demo-scale use only). */
+internal const val TILE_URL = "https://tile.openstreetmap.org/%d/%d/%d.png"
+internal const val TILE_ATTRIBUTION = "© OpenStreetMap"
+internal const val TILE_USER_AGENT = "carplan/0.1 (Pleos Connect contest demo)"
+@Composable
+internal fun tileRequest(zoom: Int, x: Int, y: Int): coil3.request.ImageRequest =
+    coil3.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+        .data(TILE_URL.format(zoom, x, y))
+        // Cache key carries a version so tiles cached before the user-agent fix (block images) are not reused.
+        .memoryCacheKey(TILE_URL.format(zoom, x, y) + "#v2").diskCacheKey(TILE_URL.format(zoom, x, y) + "#v2")
+        .httpHeaders(coil3.network.NetworkHeaders.Builder().set("User-Agent", TILE_USER_AGENT).build())
+        .build()
 
 /** Latitude of a tile row's top edge (for completeness; not used by markers). */
 @Suppress("unused")

@@ -99,6 +99,8 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
             message.value = when {
                 e is GetCredentialCancellationException -> null
                 e is NoCredentialException -> "이 기기에 구글 계정이 없어요. 기기 설정에서 계정을 추가하거나 실제 폰에서 해 주세요."
+                e is androidx.credentials.exceptions.GetCredentialProviderConfigurationException || e.message?.contains("no provider dependencies") == true ->
+                    "이 기기엔 구글 계정 서비스가 없어요(에뮬레이터). 실제 폰에서 로그인해 주세요. 지금은 [나중에 할게요]로 쓰면 돼요."
                 e.message?.contains("취소") == true || e.message?.contains("cancel", true) == true -> null
                 else -> "$what 로그인 실패: ${e.message}"
             }

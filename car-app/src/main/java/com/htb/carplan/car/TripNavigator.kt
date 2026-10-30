@@ -1,6 +1,9 @@
 package com.htb.carplan.car
 
 import ai.pleos.playground.navi.data.CurrentLocationInfo
+import ai.pleos.playground.navi.data.DrivingInfo
+import ai.pleos.playground.navi.data.TBTInfo
+import ai.pleos.playground.navi.constants.TurnType
 import ai.pleos.playground.navi.data.DestinationArrivedInfo
 import ai.pleos.playground.navi.data.RouteStartInfo
 import ai.pleos.playground.navi.data.WaypointArrivedInfo
@@ -63,6 +66,20 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
 
 enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE }
 
+/** What the navigation tells us while guiding — the 주행 화면 draws this (the SDK has no map view to embed). */
+data class NaviLive(
+    val turn: TurnType? = null,
+    val turnMeters: Double? = null,
+    val turnText: String? = null,
+    val remainMeters: Int? = null,
+    val remainSeconds: Int? = null,
+    val nextName: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val heading: Double? = null,
+    val address: String? = null,
+)
+
 /**
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
  * "정원님이 서현역을 뺐어요" and the buttons read 바꾸기 / 그대로 instead of 가기 / 나중에.
@@ -114,6 +131,10 @@ class TripNavigator(
     val guiding: StateFlow<Boolean> = _guiding.asStateFlow()
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+    private val _live = MutableStateFlow(NaviLive())
+    /** 주행 화면: next turn, remaining distance/time, position (refreshed every few seconds while guiding). */
+    val live: StateFlow<NaviLive> = _live.asStateFlow()
+    private var liveJob: Job? = null
 
     /** Stop ids that are currently inside the navigation route, in order. */
     private var routed: List<String> = emptyList()
@@ -185,6 +206,16 @@ class TripNavigator(
             override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
                 lastLocation = info.latitude to info.longitude
                 lastAddress = info.address
+                _live.update { it.copy(lat = info.latitude, lng = info.longitude, heading = info.heading, address = info.address) }
+            }
+            override fun onTBTInfo(list: List<TBTInfo>) {
+                val t = list.firstOrNull()
+                _live.update { it.copy(turn = t?.type, turnMeters = t?.distance, turnText = t?.description) }
+            }
+            override fun onDrivingInfo(info: DrivingInfo) {
+                // The nearest point we are driving to: the first waypoint while any remain, else the destination.
+                val next = info.waypoints.firstOrNull() ?: info.destination
+                _live.update { it.copy(remainMeters = next.distance, remainSeconds = next.duration, nextName = next.name) }
             }
             override fun onRouteCancelled() {
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
@@ -195,6 +226,7 @@ class TripNavigator(
             }
         })
         scope.launch { guiding.collect { on -> if (on) startEtaLoop() else etaJob?.cancel() } }
+        scope.launch { guiding.collect { updateLiveLoop() } }
         scope.launch { carId.filterNotNull().flatMapLatest { calendar.observeCar(it) }.catch { }.collect { fuelAlertPercent = it?.fuelAlertPercent?.toDouble() ?: LOW_FUEL_PERCENT } }
         scope.launch {
             trip.filterNotNull().collect { t ->
@@ -307,12 +339,26 @@ class TripNavigator(
     // ---------- 12장: fuel / charge ----------
 
     /** Latest car state from the service (fuel %, range, EV?). Decides whether to ask about a station. */
+    /** 주행 화면 needs position + turns while a route is active or the car is moving (view-only mode). */
+    private var liveOn = false
+    private fun updateLiveLoop() {
+        val on = _guiding.value || carState.drivingRestricted
+        if (on == liveOn) return
+        liveOn = on
+        liveJob?.cancel()
+        if (on) liveJob = scope.launch { while (true) { router.requestCurrentLocation(); router.requestTbt(); delay(LIVE_INTERVAL_MS) } }
+        else _live.value = NaviLive()
+    }
+
     fun onCarState(state: CarState) {
         carState = state
+        updateLiveLoop()
         val fuel = state.fuelPercent ?: return
+        // A station question that is still open when the tank is clearly fuller is stale: drop it (the fill-up question follows).
+        _prompt.value?.let { p -> if (p.reason == PromptReason.FUEL && fuel >= (fuelAskedPercent ?: 0.0) + 5) { askJob?.cancel(); _prompt.value = null } }
         // 15장 Q44: parked and the tank/battery went up ≥ 5 points → "주유했어요?" once per parking.
         if (lastGear == Gear.P) {
-            val base = fuelAtPark ?: fuel.also { fuelAtPark = it }
+            val base = fuelAtPark?.let { minOf(it, fuel) }?.also { fuelAtPark = it } ?: fuel.also { fuelAtPark = it }
             if (!fueledAsked && fuel >= base + 5 && _prompt.value == null) { fueledAsked = true; askFueled(state.isEv == true) }
         }
         val range = state.rangeKm
@@ -320,8 +366,8 @@ class TripNavigator(
         val today = LocalDate.now().toString()
         val remainingKm = t?.remaining?.let { remainingKm(it) }
         val need = when {
-            _guiding.value && range != null && remainingKm != null -> range < remainingKm + ROUTE_MARGIN_KM
-            else -> fuel <= fuelAlertPercent || (range != null && range < LOW_RANGE_KM * fuelAlertPercent / LOW_FUEL_PERCENT)
+            _guiding.value && range != null && range > 0 && remainingKm != null -> range < remainingKm + ROUTE_MARGIN_KM
+            else -> fuel <= fuelAlertPercent || (range != null && range > 0 && range < LOW_RANGE_KM * fuelAlertPercent / LOW_FUEL_PERCENT)
         }
         if (!need) return
         if (_prompt.value != null) return
@@ -335,7 +381,8 @@ class TripNavigator(
 
     private fun askFuel(ev: Boolean, fuel: Double, range: Double?, remainingKm: Double?) {
         val what = if (ev) "충전소" else "주유소"
-        val why = if (remainingKm != null && range != null && _guiding.value) "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요" else "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
+        // A range of 0 means the car does not report one (the emulator): fall back to the percent wording.
+        val why = if (remainingKm != null && range != null && range > 0 && _guiding.value) "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요" else "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
         val message = "$why. ${what} 들를까요?"
         askJob?.cancel()
         _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message)
@@ -808,6 +855,8 @@ class TripNavigator(
         private const val ETA_INTERVAL_MS = 30_000L
         /** 12장: "주차장 찾아봐 주세요" this many seconds before the next stop. */
         private const val PARKING_HINT_S = 5 * 60
+        /** 주행 화면 refresh (position + next turn). */
+        private const val LIVE_INTERVAL_MS = 4_000L
 
         /** "해운대로" / "광안리로" / "감천문화마을로" — picks 로/으로 by the last syllable's final consonant. */
         fun withRo(name: String): String {

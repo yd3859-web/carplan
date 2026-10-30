@@ -99,10 +99,11 @@ class VehicleMonitor(private val context: Context) {
                     v.getSeat().registerSeatOccupancy(SeatArea(seat), object : SeatOccupancyListener {
                         override fun onSeatOccupancyUpdated(value: Boolean?) {
                             val now = value == true
-                            val was = occupied[seat] ?: false
+                            val was = occupied[seat]
                             occupied[seat] = now
                             _passengerCount.value = occupied.values.count { it }
-                            if (now && !was) _passengerSeated.tryEmit(seat)
+                            // Only a real change (someone sat down) counts; the first report is just the initial state.
+                            if (now && was == false) _passengerSeated.tryEmit(seat)
                         }
                         override fun onFailed(e: Exception) { Log.w(TAG, "seat $seat occupancy failed: ${e.message}") }
                     })

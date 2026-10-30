@@ -62,6 +62,8 @@ private fun nextDestination(upcoming: List<CalendarEvent>, today: LocalDate): Ca
     val now = LocalTime.now().toString().take(5)
     return MonthGrid.eventsOn(today, upcoming)
         .filter { it.event.categoryId != BuiltInCategory.CAR.id }
+        // A trip is a list of stops (shown on the rail), not a destination itself; the car asks about its stops.
+        .filter { it.event.categoryId != BuiltInCategory.TRIP.id || it.event.place != null }
         .filter { it.event.startTime == null || it.event.startTime!! >= now }
         .sortedWith(compareBy({ it.event.place == null }, { it.event.startTime ?: "99" }))
         .firstOrNull()

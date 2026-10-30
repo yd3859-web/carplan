@@ -73,6 +73,9 @@ class NaviRouter(private val context: Context) {
     /** Asks the navigation for the car's position; the answer arrives at onCurrentLocationInfo on the listeners. */
     fun requestCurrentLocation() { if (ready) runCatching { navi.getCurrentLocationInfo() } }
 
+    /** Asks for the next turns (주행 화면); the answer arrives at onTBTInfo. */
+    fun requestTbt() { if (ready) runCatching { navi.getTBTInfo() } }
+
     fun release() = navi.release()
 
     private fun Place.toRouteInfo() =
