@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -156,38 +157,33 @@ private fun CarHome(vm: CarHomeViewModel) {
         val next = vm.nextDestination(week)
         val tripNext = trip?.next
         val live by vm.live.collectAsStateWithLifecycle()
-        val homeWhileGuiding by vm.homeWhileGuiding.collectAsStateWithLifecycle()
         val restricted = vehicle.drivingRestricted
-        // 주행 화면: route active (or the car is moving) → 내비 반 · 일정 반. [일정표로] brings the home back while parked.
-        val driveMode = (guiding || restricted) && !(homeWhileGuiding && !restricted)
-        LaunchedEffect(guiding) { if (!guiding) vm.homeWhileGuiding.value = false }
         if (restricted) {
             Row(Modifier.fillMaxWidth().background(Color(0xFFF4F5F7)).padding(horizontal = 28.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("주행 중 · 화면은 보기만 돼요. 질문엔 말로 답하거나 위 버튼을 쓰세요", color = Ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                Text("주행 중 · 보기만 돼요. 바꿀 건 동승자 폰에서", color = Ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
                 TextButton(onClick = vm::openNavigation) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
             }
             HorizontalDivider(color = Line)
         }
-        Box(Modifier.fillMaxSize()) {
-        if (driveMode) {
-            DriveView(live, trip, restricted, stops = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    trip?.let { TripStops(it) } ?: Text(next?.event?.place?.name?.let { "$it 로 가는 중" } ?: "오늘 일정이 없어요", color = Soft, fontSize = 20.sp)
+        val forceSplit by vm.previewSplit.collectAsStateWithLifecycle()
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // Two shapes (정원 2026-10-30): alone → wide; next to the navigation (half the app area) → the day's timeline, big.
+            val wide = maxWidth >= 1100.dp
+            val compact = !wide || forceSplit
+            Row(Modifier.fillMaxSize()) {
+                if (forceSplit && wide) Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFE9ECEF)), contentAlignment = Alignment.Center) {
+                    Text("내비 자리\n(반반 미리보기)", color = Soft, fontSize = 22.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
-            }, buttons = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    BigButton("내비 열기", primary = true) { vm.openNavigation() }
-                    if (guiding && tripNext != null) BigButton("${tripNext.place.name} 도착 처리 (시연용)", enabled = !restricted) { vm.debugArrive() }
-                    BigButton("일정표로", enabled = !restricted) { vm.homeWhileGuiding.value = true }
-                    if (!restricted) BigButton("시연 메뉴") { debug = true }
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
+                    else HomeView(
+                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live,
+                        onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
+                        onNavi = { vm.openNavigation() },
+                        onMore = { more = true },
+                    )
                 }
-            })
-        } else HomeView(
-            today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding,
-            onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
-            onDriveView = { vm.homeWhileGuiding.value = false },
-            onMore = { more = true },
-        )
+            }
         // Pleos 주행 제한: nothing below the prompt bar takes touches while the car moves (view only).
         if (restricted) Box(Modifier.matchParentSize().pointerInput(Unit) { detectTapGestures { } })
         }
@@ -285,7 +281,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
  * thing to do next — where, when, one huge button. Everything else lives behind [더보기] (parked only).
  */
 @Composable
-private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, onGo: () -> Unit, onDriveView: () -> Unit, onMore: () -> Unit) {
+private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
     val todayEvents = vm.eventsOn(today, week)
     val others = todayEvents.filter { it.event.id != trip?.eventId }
     val nextName = trip?.next?.place?.name ?: next?.event?.place?.name
@@ -320,8 +316,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
         Column(Modifier.weight(1f).fillMaxHeight().padding(32.dp)) {
             Text(if (guiding) "가는 중" else "다음", color = Soft, fontSize = 20.sp)
             Text(nextName ?: "갈 곳이 없어요", color = if (nextName != null) Accent else Soft, fontSize = 44.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
-            val eta = trip?.day?.etaNext?.takeIf { guiding }
-            listOfNotNull(nextTime?.let { "$it 도착 예정" }, eta?.let { "내비 도착 $it" }).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
+            listOfNotNull(nextTime?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
             }
             Spacer(Modifier.weight(1f))
@@ -330,17 +325,55 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
             }
             Button(
-                onClick = { if (guiding) onDriveView() else onGo() },
+                onClick = { if (guiding) onNavi() else onGo() },
                 enabled = guiding || nextName != null,
                 modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White, disabledContainerColor = Color(0xFFD5D8DC), disabledContentColor = Soft),
-            ) { Text(if (guiding) "주행 화면" else "안내 시작", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+            ) { Text(if (guiding) "내비 보기" else "안내 시작", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
             Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onMore, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
             ) { Text("더보기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
         }
+    }
+}
+
+/** "남은 4.2 km · 12분 · 도착 19:43" from the navigation while guiding; the trip's own ETA otherwise. */
+private fun remainText(live: NaviLive, trip: TodayTrip?, guiding: Boolean): String? {
+    if (!guiding) return null
+    val parts = listOfNotNull(
+        live.remainMeters?.let { if (it >= 1000) "%.1f km".format(it / 1000.0) else "$it m" },
+        live.remainSeconds?.let { "${(it / 60).coerceAtLeast(1)}분" },
+        (live.remainSeconds?.let { java.time.LocalTime.now().plusSeconds(it.toLong()) }?.let { "도착 %02d:%02d".format(it.hour, it.minute) } ?: trip?.day?.etaNext?.let { "도착 $it" }),
+    )
+    return parts.joinToString(" · ").ifEmpty { null }
+}
+
+/**
+ * 반반 화면 (내비 옆): the day's timeline is the whole screen. No row of buttons — changes are made on the
+ * passengers' phones; the car only shows the day and answers the voice questions. One small [더보기] while parked.
+ */
+@Composable
+private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, onGo: () -> Unit, onMore: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                // The rail already names the next place (big, blue); the header only says what the day is and how far.
+                Text(trip?.title ?: "오늘", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(remainText(live, trip, guiding) ?: trip?.let { "${it.stops.count { s -> s.visited }}/${it.stops.size}곳 다녀옴" } ?: "", color = Soft, fontSize = 22.sp)
+            }
+            if (!restricted) TextButton(onClick = onMore) { Text("더보기", color = Soft, fontSize = 22.sp) }
+        }
+        HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 18.dp))
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            if (trip != null) TripStops(trip, big = true, foldVisited = true)
+            else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
+        }
+        if (!guiding && !restricted && (trip?.next != null || next != null)) Button(
+            onClick = onGo, modifier = Modifier.fillMaxWidth().height(100.dp), shape = Corner,
+            colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White),
+        ) { Text("안내 시작", fontSize = 30.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -457,12 +490,16 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
  * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
  */
 @Composable
-private fun TripStops(trip: TodayTrip, big: Boolean = false) {
+private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false) {
     val node = if (big) 30.dp else 22.dp; val small = if (big) 24.dp else 18.dp; val rail = if (big) 64.dp else 44.dp
     val fs = if (big) 28.sp else 21.sp; val fsNext = if (big) 34.sp else 21.sp; val gap = if (big) 22.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
     val nextId = trip.next?.id
     if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 · 폰에서 추가", color = Soft, fontSize = 19.sp)
+    val visitedCount = trip.stops.count { it.visited }
+    val hidden = if (foldVisited && visitedCount > 1) visitedCount - 1 else 0
+    if (hidden > 0) Text("✓  앞의 ${hidden}곳 다녀옴", color = Soft, fontSize = if (big) 20.sp else 16.sp, modifier = Modifier.padding(start = rail, bottom = 10.dp))
     trip.stops.forEachIndexed { i, s ->
+        if (i < hidden) return@forEachIndexed
         val isNext = s.id == nextId
         val color = when { s.visited -> Soft; isNext -> Accent; else -> Ink }
         val below = trip.stops.getOrNull(i + 1)
@@ -605,6 +642,9 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                     TextButton(onClick = { vm.stopFakeDrive() }) { Text("멈춤", fontSize = 18.sp, color = Soft) }
                 }
                 Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 16.sp, color = Soft)
+                HorizontalDivider(color = Line)
+                val split by vm.previewSplit.collectAsStateWithLifecycle()
+                FilterChip(selected = split, onClick = { vm.previewSplit.value = !split }, shape = Corner, colors = chipColors(), label = { Text("반반 미리보기 (내비 옆 화면)", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
             }
     }
 }

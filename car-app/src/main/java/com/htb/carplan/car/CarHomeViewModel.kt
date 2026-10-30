@@ -57,8 +57,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val notice: StateFlow<String?> = navigator.notice
     /** 주행 화면 data (next turn, remaining, position). */
     val live: StateFlow<NaviLive> = navigator.live
-    /** The driver pressed [일정표로] while parked: show the home screen even though a route is active. */
-    val homeWhileGuiding = MutableStateFlow(false)
+    /** 시연 메뉴: draw the half-width (next to the navigation) layout even on the full app area. */
+    val previewSplit = MutableStateFlow(false)
     val stations = navigator.stations
     private val monitor = CarRuntime.monitor(app)
 
