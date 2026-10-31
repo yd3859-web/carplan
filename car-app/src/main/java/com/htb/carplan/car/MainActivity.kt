@@ -150,6 +150,8 @@ private fun CarHome(vm: CarHomeViewModel) {
     /** Someone sat down while a question was on screen: the QR waits until it is answered. */
     var seatedWaiting by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
+    var pickTrip by remember { mutableStateOf(false) }
+    val allTrips by vm.tripsToday.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         vm.passengerSeated.collect {
             if (vm.vehicle.value.drivingRestricted) return@collect
@@ -204,9 +206,9 @@ private fun CarHome(vm: CarHomeViewModel) {
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
-                    if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
+                    if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
-                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D,
+                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true },
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
                         onNavi = { vm.openNavigation() },
                         onMore = { more = true },
@@ -231,6 +233,18 @@ private fun CarHome(vm: CarHomeViewModel) {
     )
     if (adding && !vehicle.drivingRestricted) {
         CarAddDialog(onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false })
+    }
+    if (pickTrip && trip != null && !vehicle.drivingRestricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { TextButton(onClick = { pickTrip = false }) { Text("닫기", fontSize = 22.sp, color = Ink) } }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        allTrips.forEach { e ->
+                            val on = e.event.id == trip?.eventId
+                            Button(
+                                onClick = { pickTrip = false; if (!on) vm.chooseTrip(e.groupId, e.event.id) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, if (on) Ink else Line, Corner), shape = Corner,
+                                colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
+                            ) { Text((if (on) "지금 · " else "") + e.event.title, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1) }
+                        }
+                        Text("고르면 그 여행의 칸을 따라가요. 안내 중이던 경로는 멈춰요.", fontSize = 20.sp, color = Soft)
+                    }
     }
     if (stations.isNotEmpty()) StationDialog(stations, onPick = vm::goViaStation, onDismiss = vm::dismissStations)
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
@@ -303,7 +317,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
  * thing to do next — where, when, one huge button. Everything else lives behind [더보기] (parked only).
  */
 @Composable
-private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
+private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onOtherTrip: () -> Unit, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
     // Parked at a stop with the route still on: the next place is "다음", not "가는 중".
     val goingLabel = if (guiding && moving) "가는 중" else "다음"
     val todayEvents = vm.eventsOn(today, week)
@@ -320,24 +334,11 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             if (trip != null) {
                 // ⑩: more than one trip today — say which one the car follows; parked, the others are one tap away.
                 val allTrips by vm.tripsToday.collectAsStateWithLifecycle()
-                var pickTrip by remember { mutableStateOf(false) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(trip.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
                     if (allTrips.size > 1) {
                         Text("  오늘 여행 ${allTrips.size}개 중", color = Soft, fontSize = 20.sp)
-                        if (!restricted) TextButton(onClick = { pickTrip = true }) { Text("다른 여행", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
-                    }
-                }
-                if (pickTrip && !restricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { TextButton(onClick = { pickTrip = false }) { Text("닫기", fontSize = 22.sp, color = Ink) } }) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        allTrips.forEach { e ->
-                            val on = e.event.id == trip.eventId
-                            Button(
-                                onClick = { pickTrip = false; if (!on) vm.chooseTrip(e.groupId, e.event.id) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, if (on) Ink else Line, Corner), shape = Corner,
-                                colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
-                            ) { Text((if (on) "지금 · " else "") + e.event.title, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1) }
-                        }
-                        Text("고르면 그 여행의 칸을 따라가요. 안내 중이던 경로는 멈춰요.", fontSize = 20.sp, color = Soft)
+                        if (!restricted) TextButton(onClick = onOtherTrip) { Text("다른 여행", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
                     }
                 }
                 Spacer(Modifier.height(18.dp))
@@ -482,7 +483,7 @@ private fun remainText(live: NaviLive, trip: TodayTrip?, guiding: Boolean): Stri
  * passengers' phones; the car only shows the day and answers the voice questions. One small [더보기] while parked.
  */
 @Composable
-private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, onGo: () -> Unit, onMore: () -> Unit) {
+private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -498,6 +499,8 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
                     trip != null -> Text("${trip.stops.count { s -> s.visited && !s.skipped }}/${trip.stops.size}곳 다녀옴", color = Soft, fontSize = 22.sp)
                 }
             }
+            // ⑩ in the half view too: more than one trip today → one tap to pick another (parked only).
+            if (!restricted && otherTrips > 0) TextButton(onClick = onOtherTrip) { Text("다른 여행", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
             if (!restricted) TextButton(onClick = onMore) { Text("더보기", color = Soft, fontSize = 22.sp) }
         }
         if (guiding) LegProgress(live, trip?.next?.place?.name)
