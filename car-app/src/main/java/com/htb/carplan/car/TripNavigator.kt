@@ -9,6 +9,7 @@ import ai.pleos.playground.navi.data.RouteStartInfo
 import ai.pleos.playground.navi.data.WaypointArrivedInfo
 import ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
 import android.util.Log
+import com.htb.carplan.shared.calendar.FuelPlan
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import com.htb.carplan.shared.data.CalendarRepository
 import com.htb.carplan.shared.data.CarRepository
@@ -179,6 +180,9 @@ class TripNavigator(
     private var fuelAskedPercent: Double? = null   // fuel % when we last asked (Q33: ask again 10 points lower)
     private var fuelDeclinedForRoute = false
     private var fuelAskedToday: String? = null      // date of the last "not guiding" ask
+    /** Q55: the fill-up planned at departure ("율동공원 지나서 ○○ 주유소"); while it stands, the plain low-fuel notice keeps quiet. */
+    private var fuelPlan: GasStation? = null
+    private var fuelPlanVersion = -1L
     private val _stations = MutableStateFlow<List<GasStation>>(emptyList())
     /** Cheapest stations near the car after "응" (12장); the screen lists the top 3. */
     val stations: StateFlow<List<GasStation>> = _stations.asStateFlow()
@@ -262,6 +266,8 @@ class TripNavigator(
                 if (t.day?.pickupSharing == true && t.waitingPickups.isNotEmpty() && shareJob?.isActive != true) startSharing(t)
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != revertedVersion) scheduleChangeCheck()
+                // A commute offer made while the trip was (briefly) empty gives way once the trip has stops again (9장 first).
+                if (_prompt.value?.reason == PromptReason.COMMUTE && (t.next != null || t.waitingPickups.isNotEmpty())) { askJob?.cancel(); commuteAskedDate = null; closePrompt(); askedOnStart = false }
                 // "다음 목적지 ○○로 갈까요?" follows the plan: when the next stop changed (edited on a phone), ask about the new one.
                 _prompt.value?.let { p ->
                     val start = p.reason == PromptReason.APP_START || p.reason == PromptReason.GEAR_D || p.reason == PromptReason.MANUAL
@@ -448,6 +454,7 @@ class TripNavigator(
             else -> fuel <= fuelAlertPercent || (range != null && range > 0 && range < LOW_RANGE_KM * fuelAlertPercent / LOW_FUEL_PERCENT)
         }
         if (!need) return
+        if (fuelPlanVersion == t?.version) return // Q55: this plan version was already looked at (a station found, or enough fuel)
         fuelAskedPercent?.let { asked -> if (fuel > asked - 10) return } // Q33
         if (!_guiding.value && fuelAskedToday == today && fuelAskedPercent != null && fuel > fuelAskedPercent!! - 10) return
         if (_guiding.value && fuelDeclinedForRoute && fuel > (fuelAskedPercent ?: 101.0) - 10) return
@@ -516,6 +523,55 @@ class TripNavigator(
         if (t != null) runCatching { pickupsRepo.setSharing(t.groupId, t.eventId, t.date, false) }
         carId.value?.let { id -> runCatching { cars.updateLocation(id, null, null) } }
         _notice.value = "픽업 끝 · 위치 공유 껐어요"
+    }
+
+    /**
+     * 12장 Q55 (가벼운 판): at departure, add up the day's legs by road (one Kakao call per leg, cached), see where the
+     * tank runs short, and look for the cheapest station near that one point — one Opinet call, once per plan.
+     * The result is spoken ("율동공원 지나서 ○○ 주유소에서 넣으면 좋아요") and offered as a notice with one button.
+     * Electric cars get the navigation's own charger search instead of a price.
+     */
+    private fun planFuel(t: TodayTrip) {
+        if (fuelPlanVersion == t.version && fuelPlan != null) return
+        val fuel = carState.fuelPercent ?: return
+        val reach = carState.rangeKm?.takeIf { it > 0 }?.times(1000.0) ?: return
+        val stops = t.remaining.filter { it.place.hasCoords() }
+        if (stops.isEmpty()) return
+        // Claim this version now so the plain low-fuel notice (onCarState) keeps quiet while the legs are measured.
+        fuelPlanVersion = t.version
+        _prompt.value?.takeIf { it.reason == PromptReason.FUEL }?.let { askJob?.cancel(); closePrompt() }
+        waiting.removeAll { it.first.reason == PromptReason.FUEL }
+        scope.launch {
+            val legs = ArrayList<FuelPlan.Leg>()
+            var from = lastLocation?.let { Place(name = "차", lat = it.first, lng = it.second) } ?: stops.first().place
+            for (s in stops) {
+                if (from.lat == s.place.lat && from.lng == s.place.lng) { from = s.place; continue }
+                val m = runCatching { kakao.directions(from, s.place).meters.toDouble() }.getOrElse { RouteMath.metersBetween(from.lat, from.lng, s.place.lat, s.place.lng) * 1.3 }
+                legs += FuelPlan.Leg(from, s, m)
+                from = s.place
+            }
+            val short = FuelPlan.shortfall(legs, reach, ROUTE_MARGIN_KM * 1000) ?: run { fuelPlan = null; return@launch }
+            val after = FuelPlan.afterName(legs, short)
+            val where = after?.let { "${it} 지나서" } ?: "출발하고 바로"
+            val ev = carState.isEv == true
+            if (ev || !opinet.available) {
+                val what = if (ev) "충전소" else "주유소"
+                val message = "오늘 남은 길이 ${(short.total / 1000).toInt()}km인데 ${(reach / 1000).toInt()}km밖에 못 가요. $where ${what}에 들러야 해요."
+                show(NextPrompt(t.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")) { askJob = scope.launch { voice.say(message) } }
+                return@launch
+            }
+            val at = FuelPlan.pointAt(legs, short.byMeters) ?: return@launch
+            val list = runCatching { opinet.around(at.lat, at.lng) }.getOrElse { emptyList() }
+            val best = list.minByOrNull { it.price } ?: run {
+                val message = "오늘 남은 길이 ${(short.total / 1000).toInt()}km인데 ${(reach / 1000).toInt()}km밖에 못 가요. $where 주유소에 들러야 해요."
+                show(NextPrompt(t.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "주유소 찾기")) { askJob = scope.launch { voice.say(message) } }
+                return@launch
+            }
+            fuelPlan = best
+            _stations.value = emptyList()
+            val message = "연료가 ${fuel.toInt()}%라 $where ${best.name}에서 넣으면 좋아요. 리터당 ${"%,d".format(best.price)}원이에요."
+            show(NextPrompt(t.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "경유지로 넣기")) { askJob = scope.launch { voice.say(message) } }
+        }
     }
 
     /** "응" to the station question: Opinet cheapest list (fuel car + key), else the navigation's own search. */
@@ -637,6 +693,7 @@ class TripNavigator(
         val t = trip.value ?: return
         if (t.waitingPickups.isNotEmpty() && t.day?.pickupSharing != true) { askPickup(t); return }
         val next = t.next ?: return
+        fuelPlanVersion = t.version // Q55: the plan speaks after "가기"; the plain notice stays quiet meanwhile
         show(NextPrompt(next, reason)) { askJob = scope.launch { answer(voice.ask("다음 목적지 ${withRo(next.place.name)} 갈까요?", ::listening)) } }
     }
 
@@ -652,7 +709,9 @@ class TripNavigator(
             askJob?.cancel(); closePrompt(); router.search("주차장"); return
         }
         if (_prompt.value?.reason == PromptReason.FUEL) {
-            askJob?.cancel(); closePrompt(); findStation(); return
+            askJob?.cancel(); closePrompt()
+            fuelPlan?.let { goViaStation(it); return }
+            findStation(); return
         }
         if (_prompt.value?.reason == PromptReason.FUELED) {
             askJob?.cancel(); closePrompt(); logFuel(); return
@@ -672,6 +731,7 @@ class TripNavigator(
         closePrompt()
         revertedVersion = -1
         routeWithPickups(t)
+        planFuel(t)
         scope.launch {
             runCatching {
                 trips.setDayStatus(t.groupId, t.eventId, t.date, DayStatus.DRIVING)
