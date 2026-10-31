@@ -148,12 +148,12 @@ class TripNavigator(
     private var routedPlan: List<Stop> = emptyList()
     private var routedVersion = -1L
     /** A change the driver has not accepted yet; asked again at the next P (Q24). */
-    private var pendingChange = false
-    private val _held = MutableStateFlow<String?>(null)
-    /** 10장 [그대로]: the change the navigation does not have yet ("정자역을 뺐어요"), shown until it is applied. */
-    val held: StateFlow<String?> = _held.asStateFlow()
-    /** The plan version the driver answered "그대로" to: not asked again until the plan changes or the car stops. */
-    private var heldVersion = -1L
+    /** 10장 (정원 2026-10-31): changes go to the navigation by themselves; [원래대로] puts this route back for a while. */
+    private var previousRoute: List<Place> = emptyList()
+    private var previousVersion = -1L
+    /** The plan version the driver reverted: the navigation keeps the old route until the plan changes again. */
+    private var revertedVersion = -1L
+    private var revertJob: Job? = null
     private var askJob: Job? = null
     private var changeJob: Job? = null
     private var askedOnStart = false
@@ -251,7 +251,7 @@ class TripNavigator(
                 // 9장 1: ask once when the app starts and today has stops left.
                 if (!askedOnStart && t.next != null) { askedOnStart = true; ask(PromptReason.APP_START) }
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
-                if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
+                if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != revertedVersion) scheduleChangeCheck()
                 // "다음 목적지 ○○로 갈까요?" follows the plan: when the next stop changed (edited on a phone), ask about the new one.
                 _prompt.value?.let { p ->
                     val start = p.reason == PromptReason.APP_START || p.reason == PromptReason.GEAR_D || p.reason == PromptReason.MANUAL
@@ -271,7 +271,6 @@ class TripNavigator(
         val prev = lastGear
         lastGear = gear
         if (prev == Gear.P && gear == Gear.D && !_guiding.value && trip.value?.next != null) ask(PromptReason.GEAR_D)
-        if (prev == Gear.D && gear == Gear.P && pendingChange) { heldVersion = -1; scheduleChangeCheck(delayMs = 0) }
         // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
         if (gear == Gear.P && prev != Gear.P) {
             // Parked = arrived: "근처 주차장 찾아볼까요?" is no longer a question.
@@ -641,48 +640,34 @@ class TripNavigator(
             _notice.value = "${commuteEvent?.title ?: "출근"} · ${commuteEvent?.place?.name} 안내"
             return
         }
+        if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE) { revertRoute(); return }
         val wasPickup = _prompt.value?.reason == PromptReason.PICKUP
         val t = trip.value ?: return
         if (wasPickup) startSharing(t)
         askJob?.cancel()
-        val wasChange = _prompt.value?.reason == PromptReason.ROUTE_CHANGE
         _prompt.value = null
-        pendingChange = false
-        _held.value = null
-        heldVersion = -1
+        revertedVersion = -1
         routeWithPickups(t)
         scope.launch {
             runCatching {
-                if (!wasChange) {
-                    trips.setDayStatus(t.groupId, t.eventId, t.date, DayStatus.DRIVING)
-                    carId.value?.let { cars.setActiveTrip(it, t.groupId, t.eventId) }
-                }
+                trips.setDayStatus(t.groupId, t.eventId, t.date, DayStatus.DRIVING)
+                carId.value?.let { cars.setActiveTrip(it, t.groupId, t.eventId) }
                 trips.setRouteSync(t.groupId, t.eventId, t.date, t.version, hold = false, etaNext = t.day?.etaNext)
             }.onFailure { _error.value = it.message }
         }
     }
 
-    /** "아니" / [나중에] (9장): keep today's plan. [그대로] (10장): hold the change, phones show "운전자가 보류함". */
+    /** "아니" / [나중에] (9장): keep today's plan. For a notice (연료·주차장·경로 바뀜) just closes it. */
     fun later() {
         askJob?.cancel()
         if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
-        if (_prompt.value?.reason == PromptReason.FUELED || _prompt.value?.reason == PromptReason.PARKING) { _prompt.value = null; return }
+        if (_prompt.value?.reason == PromptReason.FUELED || _prompt.value?.reason == PromptReason.PARKING || _prompt.value?.reason == PromptReason.ROUTE_CHANGE) { _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.COMMUTE) { commuteDeclinedDate = LocalDate.now().toString(); _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.PICKUP) {
             // "아니": still drive to the pickups, just without sharing the position.
             _prompt.value = null
             trip.value?.let { routeWithPickups(it); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
             return
-        }
-        val t = trip.value
-        if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE && t != null) {
-            _held.value = _prompt.value?.message
-            pendingChange = true
-            heldVersion = t.version
-            scope.launch {
-                runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, routedVersion.coerceAtLeast(0), hold = true, etaNext = t.day?.etaNext) }
-                    .onFailure { _error.value = it.message }
-            }
         }
         _prompt.value = null
     }
@@ -707,40 +692,64 @@ class TripNavigator(
             val t = trip.value ?: return@launch
             if (!_guiding.value) return@launch
             val diff = describeChange(routedPlan, t.remaining)
-            if (diff == null) {
-                // Nothing the navigation cares about (e.g. a memo): just mark the version as reflected.
-                _held.value = null
+            // What the navigation actually holds (the next few places): a change further back needs no new route.
+            val inNavi = describeChange(routedPlan.take(MAX_PLACES), t.remaining.take(MAX_PLACES))
+            if (diff == null || inNavi == null) {
+                // A memo, a time, or a stop beyond the routed ones: the plan is reflected, the car says nothing.
+                routedPlan = t.remaining
                 routedVersion = t.version
                 runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, t.version, hold = false, etaNext = t.day?.etaNext) }
                 return@launch
             }
             val who = t.day?.lastChangedBy?.let { nameOf(it) } ?: "일행"
-            askChange(t, "${who}님이 $diff")
+            applyChange(t, who, diff)
         }
     }
 
-    private fun askChange(t: TodayTrip, message: String) {
-        val next = t.next ?: run {
+    /**
+     * 10장 (정원 2026-10-31, Q23·Q24 바꿈): no question — the navigation takes the new plan right away, the car says
+     * what changed, and [원래대로] stays on screen for [REVERT_WINDOW_MS] to put the old route back.
+     */
+    private fun applyChange(t: TodayTrip, who: String, diff: String) {
+        val next = t.next
+        if (next == null) {
             // Everything left was removed: stop guiding.
             router.route(emptyList()); routed = emptyList(); routedPlan = emptyList(); _guiding.value = false
+            scope.launch { voice.say("${who}님이 남은 일정을 모두 뺐어요. 안내를 끝낼게요.") }
             return
         }
+        val nextChanged = routedPlan.firstOrNull()?.id != next.id
+        previousRoute = routedPlan.take(MAX_PLACES).map { it.place }
+        previousVersion = routedVersion
         askJob?.cancel()
-        _prompt.value = NextPrompt(next, PromptReason.ROUTE_CHANGE, message = message)
-        askJob = scope.launch {
-            val answer = voice.ask("$message. 경로를 바꿀까요?") { listening, heard ->
-                _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) }
-            }
-            when (answer) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> {
-                    // Q24: no answer → the two buttons stay; the question returns at the next P.
-                    pendingChange = true
-                    heldVersion = t.version
-                    _prompt.update { it?.copy(listening = false) }
-                }
-            }
+        revertedVersion = -1
+        routeWithPickups(t)
+        scope.launch {
+            runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, t.version, hold = false, etaNext = t.day?.etaNext) }
+        }
+        val message = if (nextChanged) "${who}님이 $diff. 다음 목적지가 ${withRo(next.place.name)} 바뀌었어요." else "${who}님이 $diff. 경로를 바꿨어요."
+        _prompt.value = NextPrompt(next, PromptReason.ROUTE_CHANGE, message = message, single = true, button = "원래대로")
+        askJob = scope.launch { voice.say(message) }
+        revertJob?.cancel()
+        revertJob = scope.launch {
+            delay(REVERT_WINDOW_MS)
+            _prompt.update { p -> if (p?.reason == PromptReason.ROUTE_CHANGE) null else p }
+        }
+    }
+
+    /** [원래대로]: the navigation drives the previous places again; the plan on the phones stays as the group made it. */
+    private fun revertRoute() {
+        val t = trip.value ?: return
+        askJob?.cancel(); revertJob?.cancel()
+        _prompt.value = null
+        if (previousRoute.isEmpty()) return
+        router.route(previousRoute)
+        lastRouteSentAt = System.currentTimeMillis()
+        revertedVersion = t.version
+        _notice.value = "이전 경로로 돌아갔어요 · 일정은 그대로"
+        scope.launch {
+            voice.say("이전 경로로 돌아갈게요.")
+            runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, previousVersion.coerceAtLeast(0), hold = true, etaNext = t.day?.etaNext) }
         }
     }
 
@@ -905,8 +914,10 @@ class TripNavigator(
         /** 2 waypoints + destination (SDK names only FIRST and SECOND waypoint). */
         const val MAX_PLACES = 3
         private const val OWN_CANCEL_WINDOW_MS = 5_000L
-        /** Q25: several quick edits become one question. */
+        /** Q25: several quick edits become one change. */
         private const val CHANGE_SETTLE_MS = 5_000L
+        /** 10장: how long [원래대로] stays after the navigation took a change. */
+        private const val REVERT_WINDOW_MS = 10_000L
         /** Q34: P without a door signal counts as arrived after this long. */
         private const val PARK_CONFIRM_MS = 5 * 60_000L
         /** 13장 4: within this of the next planned stop = that stop. */
