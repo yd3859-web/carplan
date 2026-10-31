@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>carplan — 지금까지 만든 것 정리 (2026-10-30)</title>
+<title>carplan — 지금까지 만든 것 정리 (2026-10-31)</title>
 <style>
   :root { --ink:#111; --soft:#6b7177; --line:#e4e6e9; --blue:#0066B3; --bg:#fff; --panel:#f4f5f7; --ok:#1f7a3f; --warn:#b4531a; }
   * { box-sizing:border-box; }
@@ -39,10 +39,10 @@
 <div class="wrap">
 
 <h1>carplan — 지금까지 만든 것</h1>
-<p class="sub">2026-10-30 기준. "무슨 기능이 있고, 눌렀을 때 뒤에서 어떻게 돌아가는지"를 정원이 이해하기 위한 정리. 기능 명세 원본은 <code>작동시나리오.html</code>, 직접 돌려볼 목록은 <code>테스트체크리스트.md</code>.</p>
+<p class="sub">2026-10-31 밤 기준 (10/31은 차 앱만 고침 — 폰 화면은 10/30 그대로). "무슨 기능이 있고, 눌렀을 때 뒤에서 어떻게 돌아가는지"를 정원이 이해하기 위한 정리. 기능 명세 원본은 <code>작동시나리오.html</code>, 직접 돌려볼 목록은 <code>테스트체크리스트.md</code>.</p>
 
 <div class="toc">
-  <a href="#big">0 전체 그림</a><a href="#login">1 로그인</a><a href="#cal">2 캘린더</a><a href="#trip">3 여행·레일</a><a href="#group">4·7 그룹·초대·차 연결</a><a href="#vote">5·6 투표·다트</a><a href="#car">8·9 차 화면·다음 목적지</a><a href="#change">10 일정 변경→내비</a><a href="#pickup">11 픽업</a><a href="#fuel">12 주유</a><a href="#record">13·14 기록</a><a href="#maint">15 차량 관리</a><a href="#commute">16 출퇴근</a><a href="#push">17 알림</a><a href="#data">18 데이터·규칙</a><a href="#keys">19 키</a><a href="#demo">20 시연</a><a href="#left">남은 것</a>
+  <a href="#big">0 전체 그림</a><a href="#login">1 로그인</a><a href="#cal">2 캘린더</a><a href="#trip">3 여행·레일</a><a href="#group">4·7 그룹·초대·차 연결</a><a href="#vote">5·6 투표·다트</a><a href="#car">8·9 차 화면·다음 목적지</a><a href="#cardesign">차 디자인·반반·움직임</a><a href="#change">10 일정 변경→내비</a><a href="#pickup">11 픽업</a><a href="#fuel">12 주유</a><a href="#record">13·14 기록</a><a href="#maint">15 차량 관리</a><a href="#commute">16 출퇴근</a><a href="#push">17 알림</a><a href="#data">18 데이터·규칙</a><a href="#keys">19 키</a><a href="#demo">20 시연</a><a href="#left">남은 것</a>
 </div>
 
 <!-- ============================================================ -->
@@ -59,9 +59,9 @@
 </div>
 <table>
 <tr><th style="width:140px">모듈</th><th>역할</th><th>핵심 파일</th></tr>
-<tr><td><code>shared</code></td><td>두 앱이 같이 쓰는 데이터 형식(<code>model/Models.kt</code>), Firestore 경로(<code>FirestorePaths</code>), 저장소 클래스들(<code>*Repository</code>), 계산(<code>calendar/</code>: 예상 도착·반복·정비 주기·출퇴근 학습), 외부 API(<code>net/</code>: 카카오·오피넷·좌표 변환)</td><td>58개 코틀린 파일 중 24개</td></tr>
+<tr><td><code>shared</code></td><td>두 앱이 같이 쓰는 데이터 형식(<code>model/Models.kt</code>), Firestore 경로(<code>FirestorePaths</code>), 저장소 클래스들(<code>*Repository</code>), 계산(<code>calendar/</code>: 예상 도착·반복·정비 주기·출퇴근 학습), 외부 API(<code>net/</code>: 카카오·오피넷·좌표 변환)</td><td>공용 데이터·계산</td></tr>
 <tr><td><code>phone-app</code></td><td>화면 전부 Compose. 탭 5개(캘린더·그룹·기록·차량·설정) + 여행 레일 전체 화면 + 가운데 대화창들</td><td><code>ui/AppRoot.kt</code>(탭·로그인 게이트), <code>calendar/</code>, <code>trip/</code>, <code>group/</code>, <code>vote/</code>, <code>record/</code>, <code>car/</code>, <code>settings/</code>, <code>login/</code>, <code>push/</code></td></tr>
-<tr><td><code>car-app</code></td><td>화면 하나(<code>MainActivity</code>) + 뒤에서 계속 돌아가는 <code>TripSyncService</code>(포그라운드 서비스). 두뇌는 <code>TripNavigator</code></td><td><code>TripNavigator.kt</code>(질문·경로·도착·기록·주유·픽업·출퇴근), <code>VehicleMonitor.kt</code>(기어·연료·문·좌석·주행거리), <code>NaviRouter.kt</code>(내비), <code>VoicePrompt.kt</code>(TTS→STT)</td></tr>
+<tr><td><code>car-app</code></td><td><b>주행 중</b>엔 "오늘" 한 화면(다음·그다음·말하기), <b>주차 중</b>엔 아래 둥근 탭 바 5칸(오늘·캘린더·같이 탈 사람·기록·차량)으로 폰 앱 수준. 뒤에서 <code>TripSyncService</code>(포그라운드 서비스)가 계속 돌고, 두뇌는 <code>TripNavigator</code></td><td><code>MainActivity.kt</code>(오늘·창들), <code>CarCalendar.kt</code>(탭 바·캘린더), <code>CarTripEdit.kt</code>(칸 편집), <code>CarPeople.kt</code>, <code>CarRecords.kt</code>(기록·차량), <code>CarDartGame.kt</code>, <code>TripNavigator.kt</code>(질문·경로·도착·기록·주유·픽업·출퇴근), <code>VehicleMonitor.kt</code>, <code>NaviRouter.kt</code>, <code>VoicePrompt.kt</code>·<code>VoiceCommand.kt</code>(음성), <code>CarTheme.kt</code>(낮/밤 색), <code>CarMotion.kt</code>(움직임), <code>DriveSimulator.kt</code>·<code>DemoSeed.kt</code>(시연)</td></tr>
 </table>
 <div class="note"><b>한 가지 원칙:</b> 모든 일정은 <code>groups/{그룹}/events/{일정}</code> 하나의 모양이다. 혼자 쓰면 자동으로 생긴 "나만" 그룹에 들어가고, 여행·차량 관리·다른 일정은 카테고리만 다르다. 캘린더 = 내가 속한 모든 그룹의 일정.</div>
 
@@ -112,34 +112,58 @@
 <tr><td>참여 창 (<code>JoinDialog</code>)</td><td>링크·코드·QR 어느 쪽이든 "그룹 초대 · 이름 · n명 · 그룹장" 가운데 창 → 참여 → 그 그룹으로</td></tr>
 <tr><td>차 연결 (7장)</td><td>차 앱 첫 실행 때 6자리 <code>linkCode</code> 표시 → 폰 차량 탭에 입력 → <code>cars/{차}.ownerUid</code> = 나. 차는 차주 계정 하나에 묶이고, 차주가 호스트</td></tr>
 <tr><td>"오늘 이 차로 가요"</td><td>여행 레일에서 누르면 그 여행에 <code>carId·driverUid</code>. 차는 그 여행을 우선 고른다</td></tr>
-<tr><td>차 QR</td><td>차 화면 [같이 탄 사람 추가] → 오늘 여행 그룹 초대 QR(나만 그룹이면 [새 그룹]). 조수석·뒷좌석 <b>착석 신호</b>가 오면 주차 중에 저절로 "같이 타셨나요?" QR</td></tr>
+<tr><td>초대 모델 (10/31 정함)</td><td><b>초대 = 일정</b>, <b>친구 = 한 번</b>, <b>그룹 = "자주 타는 사람" 묶음</b>. 혼자 쓰던 일정에 처음 초대하면 <code>GroupRepository.shareEvent</code>가 그 일정 전용 그룹을 만들고 날·칸·코멘트·기록째 옮긴다</td></tr>
+<tr><td>차 QR (차에선 QR로만)</td><td>차 <b>같이 탈 사람 탭</b>: 오늘 여행이 있으면 여행 QR(혼자 여행이면 [이 여행 QR 띄우기]), 없으면 <b>차주와 친구 맺기 QR</b>(같은 /i/ 링크, 폰은 그룹 코드가 아니면 친구로). 오른쪽엔 오늘 같이 가는 사람·친구 이름만(채팅·묶음 관리는 폰). 누가 들어오거나 친구가 되면 차가 말해 준다. 조수석·뒷좌석 <b>착석 신호</b>면 주차 중에 저절로 "같이 타셨나요?" QR</td></tr>
 </table>
 
 <!-- ============================================================ -->
 <h2 id="vote">5 · 6 · 투표 · 다트 <span class="tag warn">에뮬 미확인</span></h2>
 <p><b>투표</b> (<code>vote/VoteDartSheets.kt</code>, <code>VoteRepository</code>): 질문("점심 뭐 먹지?") + 후보 2~5개(후보마다 [장소]로 검색). 멤버가 한 칸씩 고르고(다시 고르면 바뀜), <b>과반이면 자동 마감</b>, 과반 없이 전원이 찍으면 최다 득표, 동점은 둘 다 남김, 그룹장·만든 사람은 [지금 마감]. 당선 후보가 장소면 [칸으로] → 그날 레일에 추가.</p>
-<p><b>다트</b> (<code>DartRepository</code>, <code>Regions.kt</code>): 범위 전국 / 내 위치 100km / 지역(시·도) → 바늘이 도는 판 → 동네 이름 + "n번째 다트! · 누가". <b>다트 방</b>(<code>groups/{gid}/darts</code>)이라 그룹 전원 폰·차 화면에 같은 결과가 실시간으로. 차에서는 주차 중만. 동네 목록은 전국 읍·면·동 3,559곳(<code>assets/regions.csv</code>, 행정동 경계 데이터의 중심점).</p>
+<p><b>다트</b> (<code>DartRepository</code>, <code>Regions.kt</code>): 범위 전국 / 내 위치 <b>10·30·50·100·200km</b>(Q56, 차는 내비 위치) / 지역(시·도) → 바늘이 도는 판 → 동네 이름 + "n번째 다트! · 누가". <b>다트 방</b>(<code>groups/{gid}/darts</code>)이라 그룹 전원 폰·차 화면에 같은 결과가 실시간으로. 차에서는 주차 중만. <b>차 결과 카드</b>(Q57): [맛집][카페][관광지] → 누를 때 카카오 1번(그 동네 2km 안 4곳) → 고르면 오늘 칸으로, [이 동네 그대로 넣기]도. 동네 목록은 전국 읍·면·동 3,559곳(<code>assets/regions.csv</code>, 행정동 경계 데이터의 중심점).</p>
 
 <!-- ============================================================ -->
 <h2 id="car">8 · 9 · 차 화면 · "다음 목적지로 갈까요?" <span class="tag ok">에뮬 확인</span></h2>
-<p><b>차 화면</b>(<code>car/MainActivity.kt</code>): 상태 띠(연료·주행가능·기어·주행거리·그룹 이름·동승자 수·주행 중) / 왼쪽 오늘 일정표(번호·✓·▶) / 가운데 이번 주 / 오른쪽 큰 버튼(○○로 안내 · 다음 목적지 묻기 · 내비 열기 · 같이 탄 사람 추가 · 다트 · 일정 추가 · 시연 메뉴). 주행 중(Pleos 주행 제한)엔 보기만.</p>
-<p><b>질문이 나오는 때</b>: 차 앱 켜질 때 오늘 칸이 남아 있으면 / 기어 P → D. <b>흐름</b>:</p>
+<p><b>주행 중</b>(Pleos 주행 제한): "오늘" 한 화면만 — 상태 띠(연료·주유 필요·주행가능·그룹·[말하기]) + 오늘 레일(다음·그다음만) + 가는 곳·남은 거리·도착 시각·진행 막대. 버튼은 숨고 [말하기]와 질문 버튼만. <b>주차 중</b>: 화면 아래 가운데 <b>둥근 탭 바</b>(넷플릭스 하단 바 참고, 화면과 같은 색, 옆으로 미끄러지는 전환)로 5칸.</p>
+<table>
+<tr><th style="width:150px">탭</th><th>무엇</th></tr>
+<tr><td>오늘</td><td>오늘 여행 레일을 <b>폰 타임라인처럼</b>: 칸마다 메모, 시간 빈 칸은 예상 시각, 늦어서 밀린 시각 아래 "예정 hh:mm", 칸 사이 "이동 약 n분 · x km"(직선, API 없음), 일행 코멘트 말풍선(보기만). 제목 아래 "남은 길 n km · 연료 n% 써요". 제목 옆 [칸 편집] [다른 여행](오늘 여행 여럿). 오른쪽에 다음 목적지·[안내 시작]·[주유소·충전소][주차장]·[더보기]</td></tr>
+<tr><td>캘린더</td><td>월 보기(칸마다 일정 이름 3개 + 카테고리 색 막대, 폰과 같은 색, 시연용 시험 출근은 안 띄움) + 고른 날 일정 목록 + [이 날 일정 추가] + 오늘 장소는 [안내]</td></tr>
+<tr><td>같이 탈 사람</td><td>QR(4·7장) + 같이 가는 사람·친구 이름</td></tr>
+<tr><td>기록</td><td>13·14장 — 달력(기록 있는 날 표시, 사진 있으면 그날 사진) + 그날 레일: 칸마다 사진·내가 남긴 한 줄(큰 글씨)·친구 코멘트(이름 말풍선), 시각·머문 시간·주차·이동은 작게. 반반에서 위로 밀면 달력이 접힘</td></tr>
+<tr><td>차량</td><td>15장 — 연료·주행가능·주행거리·이번 달 주유비 + 항목별 다음 예정(지남·오늘만 경고색) + [했어요](오늘·차 주행거리로 기록)</td></tr>
+</table>
+<p><b>칸 편집</b>(<code>CarTripEdit.kt</code>, 주차 중): 장소 찾기(카카오 1번, 없으면 이름만) → 맨 뒤에 넣기, 칸 눌러 도착 시간(6~22시·30분·없음), [위]/[아래](미끄러지며 자리 바꿈), [빼기] → [되살리기]. 바꾸면 그날 version +1 → 10장으로.</p>
+<p><b>질문이 나오는 때</b>: 차 앱 켜질 때 오늘 칸이 남아 있으면 / 기어 P → D / [더보기]→[다음 목적지 다시 묻기]. 질문은 <code>show()</code> 줄로 한 번에 하나, 우선순위대로. <b>주차 중엔 레일의 그 장소 아래에서 펼쳐서</b> 묻는다("여기로 갈까요? · 지금 출발하면 hh:mm 도착 · [가기][나중에]", 0.3초), 주행 중·경로 바뀜·주차장·픽업·출근 질문은 위 띠. <b>흐름</b>:</p>
 <ol class="steps">
-  <li>TTS "다음 목적지 ○○로 갈까요?" → 말이 끝나면 STT 7초 듣기(동시에 켜면 TTS가 막혀서 순서대로). 못 알아들으면 1번 더, 그 뒤엔 [가기] [나중에] 버튼만.</li>
-  <li>"응"/[가기] → 남은 칸 중 앞 3곳을 <b>경유지 2개 + 목적지</b>로 내비에 넣는다(SDK가 경유지 이름을 첫째·둘째만 주기 때문). 일정엔 칸을 개수 제한 없이 등록하고, <b>하나 도착할 때마다 다음 칸을 하나 채워 넣는다</b>.</li>
-  <li>내비 도착 신호(<code>onWayPointArrived</code>/<code>onDestinationArrived</code>)마다 그 칸 <code>visited=true</code> → 폰 레일이 ✓로 채워진다. 다 돌면 그날 <code>status=DONE</code>.</li>
-  <li>좌표 없는 칸(이름만)은 내비 검색 화면으로 넘긴다.</li>
+  <li>TTS로 묻고 말이 끝나면 STT로 듣기(동시에 켜면 TTS가 막혀서 순서대로). 못 알아들으면 1번 더, 그 뒤엔 버튼만.</li>
+  <li>"응"/[가기] → 남은 칸 중 앞 3곳을 <b>경유지 2개 + 목적지</b>로 내비에(SDK가 경유지 이름을 첫째·둘째만 주기 때문). 칸은 개수 제한 없이 등록하고 <b>하나 도착할 때마다 다음 칸을 채운다</b>. 내비에 든 곳은 한 목록(<code>inNavi</code>: 칸·픽업·주유소·들른 곳)으로 관리.</li>
+  <li>내비 도착 신호마다 그 칸 <code>visited=true</code> → 폰 레일이 ✓로. 다 돌면 그날 <code>status=DONE</code>, 차 화면 "오늘 일정 끝 · n곳 다녀왔어요(· n곳 건너뜀)".</li>
+  <li>좌표 없는 칸(이름만)은 내비 검색 화면으로. 내비는 운전자가 [안내 시작]·[내비 보기]를 눌렀을 때만 앞으로(경로 바꾸기·채우기·주유소는 carplan 화면 그대로).</li>
 </ol>
-<p class="sub">에뮬레이터는 GPS로 차가 안 움직여서 [도착 처리 (시연용)] 버튼과 시연 메뉴 가짜 주행으로 도착을 흉내 낸다. 에뮬 TTS는 "끝났다" 신호가 안 와서 문장 길이만큼 기다렸다가 듣기로 넘어간다.</p>
+<p><b>음성 명령</b>([말하기], 주행 중에도): "주유소/충전소", "주차장", "맛집", "다음 어디야", "건너뛰기", "원래대로", "안내 시작"(<code>VoiceCommand</code>, 테스트 있음). 못 알아들으면 버튼 5개.</p>
+<p><b>찾기</b>: [주유소·충전소][주차장][맛집] → 카카오(주유소는 오피넷) 1번 → <b>carplan 안 목록</b> → 고르면 다음 경유지 + 레일 "다음"에 표시.</p>
+<p class="sub">에뮬레이터는 GPS로 차가 안 움직여서 시연 메뉴 시뮬레이션(20장)으로 도착을 흉내 낸다. 에뮬 TTS는 "끝났다" 신호가 안 와서 문장 길이만큼 기다렸다가 듣기로 넘어간다.</p>
+
+<!-- ============================================================ -->
+<h2 id="cardesign">차 디자인 · 반반 화면 · 움직임 <span class="tag ok">에뮬 확인</span></h2>
+<table>
+<tr><th style="width:150px">무엇</th><th>어떻게</th></tr>
+<tr><td>현대(Pleos) 기준</td><td>document.pleos.ai 기준 글자 단계(Label 20·24 / Body 26~30 / Title 32~40 / Headline 48~, 최소 20), 대비 4.5:1, 3줄 이하, 버튼 76dp 이상. 색은 현대 디자인 에셋 토큰(낮/밤), 글꼴은 차 시스템 Asta Sans</td></tr>
+<tr><td>다크 모드</td><td>차가 밤 모드면 검정 바탕(<code>CarTheme.kt</code>), 시연 메뉴 미리보기</td></tr>
+<tr><td>뒤로·닫기</td><td>차엔 시스템 뒤로 버튼이 없어서 전체 화면은 왼쪽 위 [← 뒤로], 창은 왼쪽 아래 [닫기]. 창 바깥 눌러 닫기 없음(흔들려도 안 닫힘)</td></tr>
+<tr><td>반반 화면</td><td>운전자가 창 막대 ⋮를 끌면 내비(또는 다른 앱)와 1:1. 창 폭이 1100dp 아래면 <code>LocalCompact</code>로 모든 화면이 좁은 모양(캘린더·기록 위아래, QR 위·이름 아래, 칸 편집 한 패널씩, 상태 띠 줄임, 창 폭 94%). 앱이 강제로 나눌 순 없음</td></tr>
+<tr><td>움직임</td><td><code>CarMotion.kt</code> 하나(0.25초): 창은 살짝 커지며, 전체 화면은 옆에서, 띠·알림은 위→아래로, 선택 색은 서서히, 달·탭은 옆으로, 칸 순서는 미끄러짐. <b>주행 중엔 전부 멈춤</b>(Pleos)</td></tr>
+<tr><td>속도</td><td>debug 빌드는 Compose가 느려 버벅임 → 매끄러움은 <code>assembleFast</code>(debug 키·디버그 아님)로 확인, 탭 전환 거의 60fps</td></tr>
+</table>
 
 <!-- ============================================================ -->
 <h2 id="change">10 · 일정 변경 → 내비 갱신 <span class="tag ok">에뮬 확인</span></h2>
 <ol class="steps">
-  <li>동승자가 폰에서 칸을 빼거나/넣거나/바꾸거나/순서를 바꾼다 → 그날 <code>version +1</code>.</li>
-  <li>차(<code>TripNavigator</code>)는 안내 중에 version이 바뀌면 <b>5초 모아서</b> 남은 칸을 비교. 경로에 영향 없는 변경(메모)은 조용히 "반영됨" 표시만.</li>
-  <li>영향 있으면 TTS + 검정 띠 "○○님이 △△를 뺐어요. 경로를 바꿀까요?" [바꾸기] [그대로].</li>
-  <li>[바꾸기] → 경유지 다시 넣고 <code>routeSyncedVersion</code>·<code>etaNext</code>(내비가 준 소요 시간) 기록 → 폰에 "차에 반영됨 · 다음 도착 12:11".</li>
-  <li>[그대로] → <code>holdByDriver</code> → 폰에 "운전자가 보류함". 같은 version이면 다시 안 묻고, 다음 정차(D→P) 때 다시 묻는다. 답이 없으면 10초 뒤 버튼만 남긴다.</li>
+  <li>동승자가 폰(또는 차 칸 편집)에서 칸을 빼거나/넣거나/바꾸거나/순서를 바꾼다 → 그날 <code>version +1</code>.</li>
+  <li>차(<code>TripNavigator</code>)는 안내 중에 version이 바뀌면 <b>5초 모아서</b> 남은 칸을 비교. 내비에 안 들어간 뒤쪽 칸만 바뀌면 조용히 반영.</li>
+  <li>앞쪽이 바뀌면 <b>묻지 않고 바로</b> 내비 경로를 바꾸고 말해 준다("○○님이 △△를 뺐어요. 경로를 바꿨어요") + 띠에 <b>[원래대로]</b> 10초 (Q23·Q24, 10/31 바꿈).</li>
+  <li>[원래대로] → 내비만 옛 경로, <code>holdByDriver</code> → 폰에 "운전자가 이전 경로 유지". 반영되면 <code>routeSyncedVersion</code>·<code>etaNext</code> → 폰에 "차에 반영됨 · 다음 도착 12:11".</li>
+  <li>건너뛰기(음성 "건너뛰기")는 <code>Stop.skipped</code>로 따로 센다(다녀옴과 구분).</li>
 </ol>
 
 <!-- ============================================================ -->
@@ -153,18 +177,20 @@
 </ol>
 
 <!-- ============================================================ -->
-<h2 id="fuel">12 · 주유 · 충전 · 주차 <span class="tag warn">에뮬 미확인</span></h2>
-<p>차가 연료(안드로이드 표준 <code>FUEL_LEVEL</code>; 에뮬은 전기차라 배터리)와 주행가능거리를 계속 본다.</p>
+<h2 id="fuel">12 · 주유 · 충전 · 주차 <span class="tag ok">에뮬 확인(연료차 시험값)</span></h2>
+<p>차가 연료(안드로이드 표준 <code>FUEL_LEVEL</code>; 에뮬은 전기차라 배터리)와 주행가능거리를 계속 본다. 연료·주차장은 <b>질문 대신 말하기 + 버튼 하나</b>(차 화면 원칙).</p>
 <table>
-<tr><th style="width:170px">언제</th><th>기준</th></tr>
-<tr><td>안내 중</td><td>주행가능거리 &lt; 남은 칸까지 거리(직선×1.3) + 30km</td></tr>
-<tr><td>안내 없을 때</td><td>연료 ≤ <b>설정 탭 기준</b>(기본 20%, <code>cars.fuelAlertPercent</code>) 또는 주행가능 50km 아래, 하루 한 번</td></tr>
-<tr><td>한 번 "아니요" 뒤</td><td>그 경로에선 다시 안 묻고, 연료가 10%p 더 줄면 한 번 더</td></tr>
+<tr><th style="width:190px">무엇</th><th>어떻게</th></tr>
+<tr><td>오늘 사용량 한 줄 (항상)</td><td>오늘 화면 제목 아래: 출발 전 "남은 길 약 n km · 연료 약 n% 써요"(직선×1.3, API 없음), [가기] 뒤 도로 거리로 "… · 도착 때 n%" 또는 "중간에 넣어야 해요"</td></tr>
+<tr><td>주유하기 임시 칸</td><td>일정 사이 기름이 모자라는 곳(여유 30km)에 레일 회색 "주유하기 · 임시" 칸 + [최저가 주유소 찾기] → 가는 길 3곳 오피넷 → "가는 길 최저가 주유소" 목록(○○ 지나서/곧) → 고르면 경유지, 칸이 "주유 · ○○ · 경유지로 넣었어요"로, 주유소 도착하면 사라짐. 전기차는 충전하기·충전소</td></tr>
+<tr><td>출발 때 주유 계획 (Q55)</td><td>[가기] 뒤 도로 거리 합 vs 주행가능거리. <b>모자라거나 연료 50% 이하</b>일 때만(85%에선 안 넣음): 50% 되는 지점~모자라기 전 구간 3곳(곧·중간·직전)에서 오피넷, 3km 안, 최저가(10원 차이면 뒤쪽) → "○○ 지나서 연료 17%쯤일 때 △△에서 넣으면 가장 싸요. 리터당 1,824원" + 레일 "추천 주유" 칸 [경유지로]. 10km마다 조회는 안 함(API 한도)</td></tr>
+<tr><td>안내 없을 때</td><td>연료 ≤ 설정 기준(기본 20%, <code>cars.fuelAlertPercent</code>)이면 상태 띠 "주유 필요"</td></tr>
+<tr><td>주차장</td><td>다음 칸 5분 전 말해 주기 + [근처 주차장 찾기], 운전자 아닌 멤버 폰엔 "주차장 찾아봐 주세요" 푸시</td></tr>
 </table>
-<p>"연료가 n%예요. 주유소 들를까요?" [들를게요] → <b>오피넷</b> API로 현재 위치 반경 5km를 가격순으로 받아 가까운 최저가 3곳 목록(좌표는 WGS84⇄KATEC 변환 <code>net/Katec.kt</code>) → 고르면 다음 경유지로 넣고 그다음 원래 일정. 전기차거나 키가 없으면 현대 내비 검색 화면 "충전소/주유소". 차 안 장소 찾기(주차장 등)는 내비 검색 화면. 다음 칸 5분 전엔 운전자 아닌 멤버 폰에 "주차장 찾아봐 주세요" 푸시.</p>
+<p>좌표는 WGS84⇄KATEC 변환(<code>net/Katec.kt</code>). 경로 계산은 <code>shared/calendar/FuelPlan.kt</code>(테스트 있음).</p>
 
 <!-- ============================================================ -->
-<h2 id="record">13 · 14 · P단 → 기록 칸 · 기록 탭 · 내보내기 <span class="tag warn">일부 에뮬 확인</span></h2>
+<h2 id="record">13 · 14 · P단 → 기록 칸 · 기록 탭 · 내보내기 <span class="tag warn">일부 에뮬 확인 · 사진 업로드 403(규칙 배포 필요)</span></h2>
 <p>시동 상태는 앱이 못 받아서(확인됨) <b>차가 주는 신호 여러 개</b>로 "사람이 내렸다"를 판단한다.</p>
 <ol class="steps">
   <li>기어 <b>P</b> → "섰다" 후보. P 상태에서 <b>운전석 문</b>이 열리면 바로 도착 확정(신호등은 자동으로 걸러짐). 문 신호 없이 P만 계속이면 5분 뒤 확정.</li>
@@ -173,7 +199,7 @@
   <li>기록 칸(<code>days/{날짜}/records</code>: 장소·도착·떠난 시각·사진·한 줄) 생성 → 그룹 전원 푸시 "○○ 도착! 사진이랑 한 줄". P → D 되면 떠난 시각.</li>
   <li>주유소면 15장 "주유했어요?"로 이어진다.</li>
 </ol>
-<p><b>폰</b>: 레일 안에 기록 칸이 같은 그림으로 채워진다(계획 밖은 다른 모양, 이동 줄엔 실제 걸린 시간). 사진은 칸당 10장, 긴 변 1600px로 줄여 Firebase Storage(Blaze 뒤). 장소 이름이 틀리면 "장소 바꾸기". 기록 탭은 날짜별 모음. <b>내보내기</b> = 하루를 세로 긴 이미지 1장(칸마다 대표 사진·장소·시간·한 줄) 또는 짧은 영상(사진 슬라이드 2.5초씩 + 장소·시간 자막, mp4) → 공유 시트.</p>
+<p><b>폰</b>: 레일 안에 기록 칸이 같은 그림으로 채워진다(계획 밖은 다른 모양, 이동 줄엔 실제 걸린 시간). 사진은 칸당 10장, 긴 변 1600px로 줄여 Firebase Storage(Blaze 뒤). 장소 이름이 틀리면 "장소 바꾸기". 기록 탭은 날짜별 모음. <b>차 기록 탭</b>(10/31): 달력(기록 있는 날 굵게 + 여행 파랑/일상 회색, 사진 있으면 그날 첫 사진) + 고른 날 레일(✓ 노드, 사진·한 줄 큰 글씨·친구 코멘트 이름 말풍선이 주인공, 시각·머문 시간·주차·이동은 작게), 반반에선 위로 밀면 달력이 접힘. 보기만(사진·한 줄은 폰). 기록 칸에 <b>주차 위치</b>(<code>parkedLat/Lng</code>, 폰에서 "B2 C-14" 같은 <code>parkingNote</code>). <b>내보내기</b> = 하루를 세로 긴 이미지 1장(칸마다 대표 사진·장소·시간·한 줄) 또는 짧은 영상(사진 슬라이드 2.5초씩 + 장소·시간 자막, mp4) → 공유 시트.</p>
 
 <!-- ============================================================ -->
 <h2 id="maint">15 · 차량 관리 <span class="tag warn">에뮬 미확인</span></h2>
@@ -181,6 +207,7 @@
 <ul>
   <li><b>다음 예정</b> = km 주기와 날짜 주기 중 <b>먼저 오는 쪽</b>(<code>MaintenanceRules</code>). km는 차가 1분마다 올리는 주행거리(Odometer)로, 하루 평균을 모르면 40km/일로 날짜 환산. 기본 주기: 엔진오일 1만km·1년, 점검 1.5만km·1년, 공기압 1달, 타이어 5만km, 세차 2주, 보험은 갱신일 직접. 항목별로 고칠 수 있음(<code>cars.intervals</code>).</li>
   <li>기록하면 나만 그룹에 차량 관리 일정 + <code>due-항목</code> 예정 일정이 생겨 캘린더와 오늘 헤더에 뜬다. 예정 7일 안이면 아침 9시 푸시(Functions).</li>
+  <li><b>차 차량 탭</b>(10/31): 상태 4칸 + 항목별 "n일 남음/지남" + [했어요](오늘·차 주행거리). 금액·주기는 폰.</li>
   <li><b>"주유했어요?"</b>: P단 정차 중 연료가 5%p 이상 오르면 차가 묻고, 예 → 주유 기록 자동(주행거리 포함, 금액·리터는 폰에서 나중에).</li>
 </ul>
 
@@ -212,14 +239,14 @@ cars/{carId}                     ownerUid, linkCode(6자리), activeGroupId/Even
 groups/{gid}                     이름, memberIds[], ownerUid(그룹장), inviteCode, solo(나만?)
   /events/{eid}                  모든 일정: 카테고리, 제목, 시작·끝 날짜, 시간, 장소, 반복, 알림(분), 메모, 체크리스트, carId, driverUid, maintenance
     /days/{yyyy-MM-dd}           여행의 하루: version, status(READY/DRIVING/DONE), routeSyncedVersion, holdByDriver, etaNext, pickupSharing, parkingHintStopId
-      /stops/{id}                장소 칸: order, place{이름·좌표·주소·kakaoId}, time, memo, visited, deleted, updatedBy/At
+      /stops/{id}                장소 칸: order, place{이름·좌표·주소·kakaoId}, time, memo, visited, skipped(건너뜀), deleted, updatedBy/At
       /comments/{id}             말풍선 코멘트: stopId, uid, text
-      /records/{id}              기록 칸: place, stopId?, unplanned, arrivedAt, leftAt, photos[], note
+      /records/{id}              기록 칸: place, stopId?, unplanned, arrivedAt, leftAt, photoUrls[], note, parkedLat/Lng, parkingNote
       /pickups/{uid}             픽업: place, order, status, etaSeconds, arrivedAt, name
   /votes/{id}  /darts/{id}       투표, 다트 방
   /events/log-{날짜}             여행 없는 날의 "일상 기록" 일정(나만 그룹)   /events/due-{항목}  차량 관리 예정(자동)
 </pre>
-<p><b>보안 규칙</b>(<code>firestore.rules</code>, 23가지 경우 에뮬레이터 테스트 통과, 배포는 정원이): 그룹 문서는 로그인한 누구나 읽기(초대 코드 조회용)지만, 그 아래 일정·칸·코멘트·기록·픽업·투표·다트는 <b>멤버와 멤버의 차</b>만. 차 계정은 uid가 <code>cars/{id}</code>인 걸로 알아보고 차주 권한을 준다. 그룹 수정은 멤버는 이름·초대·나가기, 그룹장만 내보내기, 멤버 아닌 사람은 "나만 추가"(코드 참여)만. users는 본인(+본인 차), cars는 차 자신·차주·주인 없는 차만.</p>
+<p><b>보안 규칙</b>(<code>firestore.rules</code>, 23가지 경우 에뮬레이터 테스트 통과, 배포는 정원이): 그룹 문서는 로그인한 누구나 읽기(초대 코드 조회용)지만, 그 아래 일정·칸·코멘트·기록·픽업·투표·다트는 <b>멤버와 멤버의 차</b>만. 차 계정은 uid가 <code>cars/{id}</code>인 걸로 알아보고 차주 권한을 준다. 그룹 수정은 멤버는 이름·초대·나가기, 그룹장만 내보내기, 멤버 아닌 사람은 "나만 추가"(코드 참여)만. users는 본인(+본인 차), cars는 차 자신·차주·주인 없는 차만. 친구 목록은 본인 + <b>본인 차</b>(10/31 고침, <b>배포 전</b>). 사진(Storage)은 그룹 멤버와 멤버의 차만, 이미지 5MB까지 — 지금 업로드가 403으로 거부됨(Storage 규칙이 Firestore를 읽는 권한 확인 필요).</p>
 
 <!-- ============================================================ -->
 <h2 id="keys">19 · 외부 서비스 · 키</h2>
@@ -235,22 +262,29 @@ groups/{gid}                     이름, memberIds[], ownerUid(그룹장), invit
 
 <!-- ============================================================ -->
 <h2 id="demo">20 · 시연 · 에뮬레이터 대응</h2>
-<p>차 화면 [시연 메뉴]: 연료 10/20/50/100% 강제, 연료차/전기차 전환, <b>가짜 주행 재생</b>(픽업부터 1초마다 좌표를 보간해 올림 → 폰 지도의 차가 다가옴, 6초마다 다음 칸 도착 + 기록 칸, "곧 도착"·"주차장" 푸시도 일으킴), 도착 처리. Virtual Console(<code>adb forward tcp:8088</code>)로 기어 P/D·운전석 문·배터리·주행거리를 바꾼다. 에뮬은 Cold boot 필수.</p>
+<p><b>시연 메뉴</b> = 차 화면 왼쪽 위 "carplan" <b>길게 누르기</b>(운전자 눈에 안 띄게).</p>
+<table>
+<tr><th style="width:190px">버튼</th><th>하는 일</th></tr>
+<tr><td>연료 10/20/50/100%, 연료차/전기차</td><td>연료·차 종류 강제(주유 기능 확인용)</td></tr>
+<tr><td>시뮬레이션 재생 (<code>DriveSimulator</code>)</td><td>앱이 에뮬 안 Virtual Console(127.0.0.1:8088)에 기어·속도·문을 직접 보내고, 위치는 카카오 도로 좌표로 이동 → 타기 → D → 이동 → 도착 → P → 문 열고 내림. 확인용(시연 대본 아님)</td></tr>
+<tr><td>시험 여행·처음으로 / 두 번째 여행 / 시험 출근(만들기·지우기) / 시험 일행 픽업</td><td>각 장 확인용 데이터</td></tr>
+<tr><td>오래 쓴 것처럼 채우기 (<code>DemoSeed</code>)</td><td>두 달 쓴 것처럼: 친구 4명(각자 익명 계정), 그룹 3개, 지난 여행 5개(칸·기록·한 줄·주차·친구 코멘트), 일상 기록, 주유 6번·정비 이력·보험 갱신일, 평일 출근, 앞으로 일정 7개. 사진은 macOS 기본 풍경 10장(debug만). 다시 누르면 빠진 사진만 채움. [데모 지우기]는 일정만 지움</td></tr>
+<tr><td>반반 / 다크 모드 미리보기</td><td>화면 모양 확인</td></tr>
+</table>
+<p>Virtual Console(<code>adb forward tcp:8088</code>)은 1초마다 하트비트를 보내야 켜진다. 에뮬은 Cold boot 필수. 폰 앱도 같은 에뮬에 깔려 있음(차 연결 계정이라 지우지 않음).</p>
 
 <!-- ============================================================ -->
 <h2 id="left">남은 것</h2>
 <table>
 <tr><th style="width:230px">무엇</th><th>누가</th><th>메모</th></tr>
-<tr><td>보안 규칙 배포</td><td>정원</td><td>완료(2026-10-30, 실서버 23개 통과)</td></tr>
-<tr><td>Blaze 전환 → Functions·Storage 배포</td><td>정원 → 명령어는 Claude가</td><td>완료(2026-10-30)</td></tr>
-<tr><td>에뮬 테스트 F2~F10</td><td>정원 + Claude</td><td><code>테스트체크리스트.md</code> 그대로</td></tr>
-<tr><td>release APK</td><td>Claude (팀명 필요)</td><td><code>apk/팀명_carplan_release.apk</code>, 심사용 README</td></tr>
-<tr><td>기획서 DOCX</td><td>Claude 초안 → 정원 검토</td><td>접수양식 파일 필요</td></tr>
-<tr><td>시연 영상</td><td>정원 (순서 Q52)</td><td>폰 일정 짜기 → 차 질문 → 동승자 변경·경로 바뀜 → P단 기록·사진 → 주유 추천 → 타임라인 이미지/영상</td></tr>
-<tr><td>실차에서만 볼 수 있는 것</td><td>—</td><td>TTS 소리·STT 인식, 진짜 도착 신호, 좌석 착석 QR, 경유지 최대 개수</td></tr>
+<tr><td>규칙 다시 배포</td><td>정원</td><td><code>firebase deploy --only storage,firestore:rules</code> (Storage가 Firestore 읽는 권한 물으면 Y) → 사진 업로드 403·차 친구 목록 해결, 그 뒤 [오래 쓴 것처럼 채우기] 한 번 더</td></tr>
+<tr><td>폰 화면 정리</td><td>Claude</td><td>차와 같은 기준으로(하단 바·캘린더 표시·[같이 갈 사람] 창·건너뜀/원래대로 표시·움직임). <code>다음작업_플랜.md</code> P-a~P-h</td></tr>
+<tr><td>차 작은 것</td><td>Claude</td><td>칸 편집 중 질문 끼어듦, 주유소 경유지 직후 "0 m · 1분", 다녀온 칸 실제 도착 시각 표시</td></tr>
+<tr><td>에뮬 확인 남은 것</td><td>정원 + Claude</td><td><code>테스트체크리스트.md</code> F 항목</td></tr>
+<tr><td>실차·실폰에서만 볼 수 있는 것</td><td>—</td><td>TTS 소리·STT 인식, 진짜 도착 신호, 좌석 착석 QR, 경유지 최대 개수, 구글 로그인, 푸시, 사진</td></tr>
 </table>
 
-<p class="sub" style="margin-top:40px">코드 전체 약 9,100줄(코틀린) + Functions. 결정 기록은 <code>작동시나리오.html</code> 22장 "✓ 정함".</p>
+<p class="sub" style="margin-top:40px">코드 전체 약 14,500줄(코틀린) + Functions. 결정 기록은 <code>작동시나리오.html</code> 22장 "✓ 정함".</p>
 </div>
 </body>
 </html>
