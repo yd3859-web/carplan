@@ -15,6 +15,7 @@ import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.DeviceFontFamilyName
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 
 /**
  * Car colours in two sets (정원 2026-10-31: 다크 모드, 현대 기준). Day = the Pleos look (white ground, near-black text,
@@ -69,6 +70,12 @@ val DarkCarColors = CarColors(
 )
 
 val LocalCarColors = staticCompositionLocalOf { LightCarColors }
+
+/** Our window is half the screen (next to the navigation, Pleos 1:1): every screen has a narrow layout (정원 2026-10-31). */
+val LocalCompact = androidx.compose.runtime.compositionLocalOf { false }
+
+/** Narrower than this = the half-screen layout. */
+val CompactBelow = 1100.dp
 
 /** The car's own UI font when present (Pleos: Asta Sans as "pretendard"); Typeface.create falls back to the default. */
 @OptIn(ExperimentalTextApi::class)

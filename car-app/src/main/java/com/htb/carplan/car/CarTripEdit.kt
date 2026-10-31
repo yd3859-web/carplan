@@ -61,11 +61,14 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
     val t = trip
     var selectedId by remember { mutableStateOf<String?>(null) }
     var removed by remember { mutableStateOf<Stop?>(null) }
+    // Half screen: one panel at a time — the list, or (after a tap) the time / add panel full width.
+    val compact = LocalCompact.current
+    var adding by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.requestLocation() } // search near the car
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Column(Modifier.fillMaxSize().background(c.bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CarBackButton(onBack = onDismiss)
+                CarBackButton(onBack = { if (compact && (adding || selectedId != null)) { adding = false; selectedId = null } else onDismiss() })
                 Text("칸 편집", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = c.ink, modifier = Modifier.padding(start = 16.dp))
                 t?.let { Text("  ${it.title}", fontSize = 26.sp, color = c.soft, maxLines = 1) }
             }
@@ -75,9 +78,10 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
             }
             val selected = t.stops.firstOrNull { it.id == selectedId && !it.visited }
             Row(Modifier.fillMaxSize().padding(top = 12.dp)) {
-                Column(Modifier.weight(1.2f).fillMaxHeight().padding(end = 28.dp)) {
+                val panel = compact && (selected != null || adding)
+                if (!panel) Column(Modifier.weight(1.2f).fillMaxHeight().padding(end = if (compact) 0.dp else 28.dp)) {
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        if (t.stops.isEmpty()) Text("아직 칸이 없어요 · 오른쪽에서 장소를 넣어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
+                        if (t.stops.isEmpty()) Text(if (compact) "아직 칸이 없어요 · 아래 [장소 넣기]" else "아직 칸이 없어요 · 오른쪽에서 장소를 넣어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
                         val ahead = t.remaining
                         t.stops.forEachIndexed { i, s ->
                             val on = s.id == selectedId
@@ -113,9 +117,13 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                             EditButton("되살리기") { vm.restoreStop(r.id); removed = null }
                         }
                     }
+                    if (compact) Button(
+                        onClick = { adding = true }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = 88.dp), shape = Corner,
+                        colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
+                    ) { Text("장소 넣기", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
                 }
-                VerticalDivider(color = c.line)
-                Column(Modifier.weight(1f).fillMaxHeight().padding(start = 28.dp)) {
+                if (!compact) VerticalDivider(color = c.line)
+                if (!compact || panel) Column(Modifier.weight(1f).fillMaxHeight().padding(start = if (compact) 0.dp else 28.dp)) {
                     if (selected != null) TimePanel(selected, onTime = { vm.setStopTime(selected, it); selectedId = null }, onClose = { selectedId = null })
                     else AddPanel(vm)
                 }
@@ -185,7 +193,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.AddPanel(vm: CarHomeV
     }
     fun add(p: Place) { vm.addStop(p, null); added = p.name; query = ""; results = null }
     Text("장소 넣기", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-    Text("맨 뒤에 들어가요 · 시간과 순서는 왼쪽에서", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
+    Text(if (LocalCompact.current) "맨 뒤에 들어가요 · 시간과 순서는 목록에서" else "맨 뒤에 들어가요 · 시간과 순서는 왼쪽에서", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
     Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
             query, { query = it; results = null }, placeholder = { Text("어디로 갈까요?", fontSize = 26.sp, color = c.soft) }, singleLine = true, shape = Corner,

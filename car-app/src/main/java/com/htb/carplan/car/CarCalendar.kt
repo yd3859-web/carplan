@@ -75,7 +75,7 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
     val bar = if (c.dark) c.sheet else c.bg
     val chosen = if (c.dark) c.sheetEdge else c.sheet
     // The grey patch slides to the chosen tab (정원 2026-10-31: 순간이동 말고 옆으로 흐르게). Tabs are one width so it can.
-    val tabW = 220.dp
+    val tabW = if (LocalCompact.current) 180.dp else 220.dp
     val gap = 4.dp
     val x by androidx.compose.animation.core.animateDpAsState((tabW + gap) * tab.ordinal, androidx.compose.animation.core.tween(TAB_SLIDE_MS), label = "tab")
     Box(
@@ -112,33 +112,50 @@ const val TAB_SLIDE_MS = 300
  */
 @Composable
 fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoTo: (CalendarEvent) -> Unit) {
-    val c = LocalCarColors.current
     val month by vm.calMonth.collectAsStateWithLifecycle()
-    val events by vm.monthEvents.collectAsStateWithLifecycle()
-    val categories by vm.categories.collectAsStateWithLifecycle()
     val today = LocalDate.now()
     var picked by remember { mutableStateOf(today) }
     // Paging months moves the chosen day along (else the right side would show a day from another month, half-loaded).
     androidx.compose.runtime.LaunchedEffect(month) {
         if (java.time.YearMonth.from(picked) != month) picked = if (java.time.YearMonth.from(today) == month) today else month.atDay(1)
     }
+    val c = LocalCarColors.current
+    // Wide: month left, the day right. Half screen (next to the navigation): month on top, the day below.
+    if (!LocalCompact.current) {
+        MonthBlock(vm, picked, { picked = it }, Modifier.weight(1.35f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
+        VerticalDivider(color = c.line)
+        DayBlock(vm, picked, onAdd, onGoTo, Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
+    } else Column(Modifier.weight(1f).fillMaxHeight()) {
+        MonthBlock(vm, picked, { picked = it }, Modifier.weight(1.15f).padding(horizontal = 20.dp, vertical = 12.dp))
+        HorizontalDivider(color = c.line)
+        DayBlock(vm, picked, onAdd, onGoTo, Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 12.dp))
+    }
+}
 
-    Column(Modifier.weight(1.35f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp)) {
+@Composable
+private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDate) -> Unit, modifier: Modifier) {
+    val c = LocalCarColors.current
+    val compact = LocalCompact.current
+    val month by vm.calMonth.collectAsStateWithLifecycle()
+    val events by vm.monthEvents.collectAsStateWithLifecycle()
+    val categories by vm.categories.collectAsStateWithLifecycle()
+    val today = LocalDate.now()
+    Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { vm.calMonth.value = month.minusMonths(1) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
-                Text("‹ 이전", color = c.ink, fontSize = 24.sp)
+            OutlinedButton(onClick = { vm.calMonth.value = month.minusMonths(1) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
+                Text(if (compact) "‹" else "‹ 이전", color = c.ink, fontSize = 24.sp)
             }
-            Text("${month.year}년 ${month.monthValue}월", color = c.ink, fontSize = 36.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { vm.calMonth.value = month.plusMonths(1) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
-                Text("다음 ›", color = c.ink, fontSize = 24.sp)
+            Text(if (compact) "${month.monthValue}월" else "${month.year}년 ${month.monthValue}월", color = c.ink, fontSize = if (compact) 32.sp else 36.sp, maxLines = 1, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { vm.calMonth.value = month.plusMonths(1) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
+                Text(if (compact) "›" else "다음 ›", color = c.ink, fontSize = 24.sp)
             }
             Spacer(Modifier.width(12.dp))
-            OutlinedButton(onClick = { vm.calMonth.value = java.time.YearMonth.now(); picked = today }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
+            OutlinedButton(onClick = { vm.calMonth.value = java.time.YearMonth.now(); onPick(today) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
                 Text("오늘", color = c.ink, fontSize = 24.sp)
             }
         }
         // What the colours mean (정원 2026-10-31: 개수 대신 무슨 일정인지 — 여행과 차량 관리는 다른 색).
-        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (!compact) Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             (BuiltInCategory.entries.map { it.id } + categories.map { it.id }).forEach { id ->
                 Box(Modifier.width(8.dp).height(24.dp).background(Color(CategoryColors.of(id, categories))))
                 Text(CategoryColors.label(id, categories), color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp, end = 20.dp))
@@ -170,12 +187,15 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
                                     Modifier.fillMaxSize()
                                         .background(if (isPicked) c.ink else c.bg, Corner)
                                         .then(if (d == today && !isPicked) Modifier.border(2.dp, c.ink, Corner) else Modifier)
-                                        .clickable { picked = d }
-                                        .padding(8.dp),
+                                        .clickable { onPick(d) }
+                                        .padding(if (compact) 4.dp else 8.dp),
                                 ) {
                                     Text("$n", color = if (isPicked) c.onInk else if (col == 0) c.warn else c.ink, fontSize = 24.sp, fontWeight = if (d == today) FontWeight.Bold else FontWeight.Normal)
                                     // Up to three events as "colour bar + name"; the rest as "+n".
-                                    dayEvents.take(3).forEach { e ->
+                                    // Half screen: a cell is too narrow for names — one colour bar per event, the names are below.
+                                    if (compact) dayEvents.take(3).forEach { e ->
+                                        Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(6.dp).background(Color(CategoryColors.of(e.event.categoryId, categories))))
+                                    } else dayEvents.take(3).forEach { e ->
                                         Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Box(Modifier.width(8.dp).height(24.dp).background(Color(CategoryColors.of(e.event.categoryId, categories))))
                                             Text(e.event.title, color = if (isPicked) c.onInk else c.ink, fontSize = 20.sp, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, modifier = Modifier.padding(start = 6.dp))
@@ -190,12 +210,20 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
             }
         }
     }
-    VerticalDivider(color = c.line)
-    // The chosen day: what is on it, and the two things the car can do with it.
-    Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp)) {
-        Text("${picked.monthValue}월 ${picked.dayOfMonth}일 (${picked.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+}
+
+/** The chosen day: what is on it, and the two things the car can do with it. */
+@Composable
+private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate) -> Unit, onGoTo: (CalendarEvent) -> Unit, modifier: Modifier) {
+    val c = LocalCarColors.current
+    val compact = LocalCompact.current
+    val events by vm.monthEvents.collectAsStateWithLifecycle()
+    val categories by vm.categories.collectAsStateWithLifecycle()
+    val today = LocalDate.now()
+    Column(modifier) {
+        Text("${picked.monthValue}월 ${picked.dayOfMonth}일 (${picked.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})", color = c.ink, fontSize = if (compact) 28.sp else 32.sp, fontWeight = FontWeight.Bold)
         val dayEvents = vm.eventsOn(picked, events).filterNot { vm.isTestEvent(it.event) }
-        Column(Modifier.weight(1f).padding(top = 12.dp).verticalScroll(rememberScrollState())) {
+        Column(Modifier.weight(1f).padding(top = if (compact) 4.dp else 12.dp).verticalScroll(rememberScrollState())) {
             if (dayEvents.isEmpty()) Text("일정이 없어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
             dayEvents.forEach { item ->
                 val e = item.event
@@ -218,8 +246,9 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
             }
         }
         Button(
-            onClick = { onAdd(picked) }, modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp), shape = Corner,
+            onClick = { onAdd(picked) }, modifier = Modifier.fillMaxWidth().heightIn(min = if (compact) 76.dp else 96.dp), shape = Corner,
             colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
         ) { Text("이 날 일정 추가", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+    
     }
 }

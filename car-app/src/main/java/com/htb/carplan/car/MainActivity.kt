@@ -128,7 +128,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val forceDark by vm.previewDark.collectAsStateWithLifecycle()
             CarTheme(forceDark = forceDark) {
-                Surface(Modifier.fillMaxSize(), color = Bg) { CarHome(vm) }
+                Surface(Modifier.fillMaxSize(), color = Bg) {
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        androidx.compose.runtime.CompositionLocalProvider(LocalCompact provides (maxWidth < CompactBelow)) { CarHome(vm) }
+                    }
+                }
             }
         }
     }
@@ -259,7 +263,7 @@ private fun CarHome(vm: CarHomeViewModel) {
             when (what) {
                 "find:fuel" -> vm.runCommand(VoiceCommand.FUEL); "find:parking" -> vm.runCommand(VoiceCommand.PARKING); "find:food" -> vm.runCommand(VoiceCommand.FOOD)
                 "qr" -> qr = true; "dart" -> dartOpen = true; "add" -> adding = true; "navi" -> vm.openNavigation()
-                "ask" -> vm.askNow(); "debug" -> debug = true; "arrive" -> vm.debugArrive()
+                "ask" -> vm.askNow(); "edit" -> editing = true; "debug" -> debug = true; "arrive" -> vm.debugArrive()
             }
         },
         onDismiss = { more = false },
@@ -299,7 +303,7 @@ private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, 
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                Modifier.widthIn(max = width).fillMaxWidth(0.72f).shadow(24.dp, Corner).clip(Corner).background(Sheet).border(1.dp, SheetEdge, Corner)
+                Modifier.widthIn(max = width).fillMaxWidth(if (LocalCompact.current) 0.94f else 0.72f).shadow(24.dp, Corner).clip(Corner).background(Sheet).border(1.dp, SheetEdge, Corner)
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
                     .padding(28.dp),
             ) {
@@ -599,6 +603,8 @@ private fun MoreDialog(guidingNext: String?, hasTrip: Boolean, onPick: (String) 
             add("add" to "일정 추가")
             add("navi" to "내비 열기")
             if (hasTrip) add("ask" to "다음 목적지 다시 묻기")
+            // The half screen has no room for [칸 편집] next to the title: it lives here too.
+            if (hasTrip) add("edit" to "칸 편집")
         }
         tiles.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

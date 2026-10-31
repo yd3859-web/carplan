@@ -46,7 +46,29 @@ fun RowScope.CarPeople(vm: CarHomeViewModel) {
     val members by vm.memberNames.collectAsStateWithLifecycle()
     val friends by vm.friendNames.collectAsStateWithLifecycle()
     val friendCode = vm.ownerFriendCode
+    val compact = LocalCompact.current
+    // Half screen: the QR on top, the names under it (one scroll), instead of side by side.
+    if (compact) {
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { QrPart(vm, trip, group, friendCode, fill = false) }
+            HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
+            NamesPart(trip != null, members, friends)
+        }
+        return
+    }
     Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 40.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        QrPart(vm, trip, group, friendCode, fill = true)
+    }
+    VerticalDivider(color = c.line)
+    Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 40.dp, vertical = 24.dp).verticalScroll(rememberScrollState())) {
+        NamesPart(trip != null, members, friends)
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.QrPart(vm: CarHomeViewModel, trip: TodayTrip?, group: com.htb.carplan.shared.model.Group?, friendCode: String?, fill: Boolean) {
+    val c = LocalCarColors.current
+    run {
         val g = group
         val t = trip
         when {
@@ -59,13 +81,13 @@ fun RowScope.CarPeople(vm: CarHomeViewModel) {
             t != null -> {
                 // The trip is still the owner's alone: the first press gives it its own group (A안), then the QR shows.
                 Text("${t.title}에 같이 갈 사람", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
+                if (fill) Spacer(Modifier.weight(1f))
                 Text("누르면 QR이 떠요. 들어온 사람은 칸을 같이 보고 고칠 수 있어요.", color = c.soft, fontSize = 24.sp)
                 Button(
                     onClick = vm::inviteToTodayTrip, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 96.dp), shape = RoundedCornerShape(4.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
                 ) { Text("이 여행 QR 띄우기", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
-                Spacer(Modifier.weight(1f))
+                if (fill) Spacer(Modifier.weight(1f))
             }
             friendCode != null -> {
                 Text("${vm.ownerName}님과 친구 맺기", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
@@ -76,10 +98,14 @@ fun RowScope.CarPeople(vm: CarHomeViewModel) {
             else -> Text("QR을 준비하고 있어요", color = c.soft, fontSize = 26.sp)
         }
     }
-    VerticalDivider(color = c.line)
-    Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 40.dp, vertical = 24.dp).verticalScroll(rememberScrollState())) {
-        if (trip != null) {
-            Names("오늘 같이 가는 사람", members, empty = "아직 없어요 · 왼쪽 QR을 찍으면 들어와요")
+}
+
+@Composable
+private fun NamesPart(hasTrip: Boolean, members: List<String>, friends: List<String>) {
+    val c = LocalCarColors.current
+    run {
+        if (hasTrip) {
+            Names("오늘 같이 가는 사람", members, empty = if (LocalCompact.current) "아직 없어요 · 위 QR을 찍으면 들어와요" else "아직 없어요 · 왼쪽 QR을 찍으면 들어와요")
             HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
         }
         Names("친구", friends, empty = "아직 없어요 · 여행 없는 날 QR을 찍으면 친구가 돼요")

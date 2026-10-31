@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -111,18 +112,22 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Box(Modifier.fillMaxSize().background(Palette.Background)) {
             Column(Modifier.fillMaxSize()) {
+                val compact = LocalCompact.current
+                val scopes: @Composable () -> Unit = {
+                    CarScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
+                    CarScopeChip("내 위치 100km", scope == DartScope.NEAR) { scope = DartScope.NEAR }
+                    CarScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
+                }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     CarBackButton(onBack = onDismiss)
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
                         Text("다트 — 동네 뽑기", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                        Text("다트를 아래로 당겼다 놓으세요 · 폰에도 같이 떠요", fontSize = 20.sp, color = Palette.TextSoft)
+                        Text(if (compact) "아래로 당겼다 놓으세요" else "다트를 아래로 당겼다 놓으세요 · 폰에도 같이 떠요", fontSize = 20.sp, color = Palette.TextSoft, maxLines = 1)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CarScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
-                        CarScopeChip("내 위치 100km", scope == DartScope.NEAR) { scope = DartScope.NEAR }
-                        CarScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
-                    }
+                    if (!compact) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { scopes() }
                 }
+                // Half screen: the three choices get their own line under the title.
+                if (compact) Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { scopes() }
                 if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Regions.sidoNames.forEach { s -> CarScopeChip(shortSido(s), region == s) { region = s } }
                 }
@@ -138,7 +143,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                     androidx.compose.animation.AnimatedVisibility(
                         visible = shown != null && !flying,
                         enter = slideInVertically(tween(420)) { it } + fadeIn(tween(300)),
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 28.dp, bottom = 110.dp),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(start = 20.dp, end = if (LocalCompact.current) 20.dp else 28.dp, bottom = 110.dp),
                     ) {
                         val d = shown ?: return@AnimatedVisibility
                         Column(
@@ -163,7 +168,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
 
 @Composable
 private fun CarScopeChip(label: String, selected: Boolean, onClick: () -> Unit) = FilterChip(
-    selected = selected, onClick = onClick, shape = Corner, label = { Text(label, fontSize = 20.sp, modifier = Modifier.padding(6.dp)) },
+    selected = selected, onClick = onClick, shape = Corner, modifier = Modifier.heightIn(min = 64.dp), label = { Text(label, fontSize = 24.sp, modifier = Modifier.padding(horizontal = 6.dp)) },
     colors = FilterChipDefaults.filterChipColors(containerColor = Palette.Background, labelColor = Palette.TextStrong, selectedContainerColor = Palette.Navy, selectedLabelColor = Palette.OnNavy),
 )
 
