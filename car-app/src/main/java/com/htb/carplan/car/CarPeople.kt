@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -115,9 +116,10 @@ private fun NamesPart(hasTrip: Boolean, members: List<String>, friends: List<Str
 
 @Composable
 private fun Qr(link: String) {
-    val bitmap = remember(link) { qrBitmap(link, 640) }
+    val bitmap = rememberQr(link, 640)
     // White quiet zone even at night: phones read a dark-on-light code best.
-    Image(bitmap.asImageBitmap(), contentDescription = "초대 QR", modifier = Modifier.padding(vertical = 16.dp).background(Color.White).padding(12.dp).size(320.dp))
+    val m = Modifier.padding(vertical = 16.dp).background(Color.White).padding(12.dp).size(320.dp)
+    if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = "초대 QR", modifier = m) else Box(m)
 }
 
 @Composable

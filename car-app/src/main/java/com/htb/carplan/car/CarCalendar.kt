@@ -91,7 +91,8 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
             .border(1.dp, c.sheetEdge, RoundedCornerShape(50))
             .padding(8.dp),
     ) {
-        Box(Modifier.offset(x = x).width(tabW).height(100.dp).background(chosen, RoundedCornerShape(50)))
+        // Read in the layout phase: the slide moves the patch without recomposing the bar each frame.
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(x.roundToPx(), 0) }.width(tabW).height(100.dp).background(chosen, RoundedCornerShape(50)))
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             CarTab.entries.forEach { t ->
                 val on = t == tab
@@ -184,6 +185,10 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                     androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MOTION_MS / 2))
             },
         ) { month ->
+        // Each day's events once per month (not 42 filters on every draw).
+        val byDay = remember(events, month) {
+            (1..month.lengthOfMonth()).associate { n -> month.atDay(n).let { d -> d to vm.eventsOn(d, events).filterNot { vm.isTestEvent(it.event) } } }
+        }
         val first = month.atDay(1)
         val lead = first.dayOfWeek.value % 7 // Sunday first
         val days = month.lengthOfMonth()
@@ -197,7 +202,7 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                             if (n in 1..days) {
                                 val d = month.atDay(n)
                                 // What the user registered shows, repeating ones too; the 시연 메뉴 test commute doesn't (정원 2026-10-31).
-                                val dayEvents = vm.eventsOn(d, events).filterNot { vm.isTestEvent(it.event) }
+                                val dayEvents = byDay[d].orEmpty()
                                 val isPicked = d == picked
                                 // The chosen day fades to ink instead of flipping (정원 2026-10-31: 부드럽게).
                                 val cellBg by carColor(if (isPicked) c.ink else c.bg, "cellBg")

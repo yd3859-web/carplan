@@ -129,3 +129,10 @@ carplan 앱 켜는 법 (2026-10-30 정리)
       → 인터넷 연결 확인. 계속이면 앱 데이터 지우기(설정 → 앱 → carplan → 저장공간 → 캐시 삭제)
   - 차와 폰이 안 이어짐
       → 폰 앱 차량 탭에 차 화면 6자리 코드를 넣었는지. 같은 Firebase인지(google-services.json)
+
+
+[움직임이 매끄러운지 볼 때 — 2026-10-31]
+- debug 빌드는 화면 전환이 버벅여 보인다(Compose 디버그 모드). 매끄러움은 fast 빌드로 본다:
+  ./gradlew :car-app:assembleFast
+  adb install -r car-app/build/outputs/apk/fast/car-app-fast.apk
+- fast = release처럼 빠르지만 debug 키로 서명 → debug 앱 위에 덮어 설치되고 데이터(차 연결)도 그대로. 다시 debug를 깔아도 된다.

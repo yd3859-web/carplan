@@ -49,6 +49,13 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
         }
+        // Speed check on the emulator: release-like (not debuggable — Compose runs at real speed) but signed with
+        // the debug key, so it installs over the debug app and keeps its data (and the car's link to its owner).
+        create("fast") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            matchingFallbacks += listOf("debug")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

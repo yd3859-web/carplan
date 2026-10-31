@@ -1014,8 +1014,8 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, f
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (friendQr) {
                     val link = InviteLinks.url(friendCode!!)
-                    val bitmap = remember(link) { qrBitmap(link, 560) }
-                    Image(bitmap.asImageBitmap(), contentDescription = "친구 QR", modifier = Modifier.size(280.dp))
+                    val bitmap = rememberQr(link, 560)
+                    if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = "친구 QR", modifier = Modifier.size(280.dp)) else Spacer(Modifier.size(280.dp))
                     Text("폰으로 찍으면 ${ownerName}님과 친구가 돼요", fontSize = 24.sp, color = Ink)
                     Text("다음 일정부터는 이름만 눌러 초대해요 · 코드 $friendCode", fontSize = 20.sp, color = Soft)
                 } else if (group == null) {
@@ -1028,8 +1028,8 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, f
                     }
                 } else {
                     val link = InviteLinks.url(group.inviteCode)
-                    val bitmap = remember(link) { qrBitmap(link, 560) }
-                    Image(bitmap.asImageBitmap(), contentDescription = "초대 QR", modifier = Modifier.size(280.dp))
+                    val bitmap = rememberQr(link, 560)
+                    if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = "초대 QR", modifier = Modifier.size(280.dp)) else Spacer(Modifier.size(280.dp))
                     Text("폰으로 QR을 찍으면 바로 들어와요", fontSize = 20.sp, color = Ink)
                     // Same invite without a camera: the link (carplan-htb.web.app/i/CODE) or the code typed in the app.
                     Text("링크  ${link.removePrefix("https://")}", fontSize = 20.sp, color = Ink)
@@ -1160,13 +1160,21 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
     }
 }
 
-/** zxing core → black-on-white bitmap. */
-internal fun qrBitmap(text: String, size: Int): Bitmap {
+/** zxing core → black-on-white bitmap, filled in one go (setPixel per pixel stalled the tab switch) and kept. */
+internal fun qrBitmap(text: String, size: Int): Bitmap = qrCache.getOrPut("$size@$text") {
     val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 1))
-    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    for (x in 0 until size) for (y in 0 until size) bmp.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-    return bmp
+    val px = IntArray(size * size) { i -> if (matrix[i % size, i / size]) android.graphics.Color.BLACK else android.graphics.Color.WHITE }
+    Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
 }
+
+private val qrCache = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+
+/** The QR made off the main thread: null for the first frame or two, then the code (no stall when a screen opens). */
+@Composable
+internal fun rememberQr(text: String, size: Int): Bitmap? =
+    androidx.compose.runtime.produceState(qrCache["$size@$text"], text, size) {
+        if (value == null) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { qrBitmap(text, size) }
+    }.value
 
 /** 차에서 일정 만들기 (Q19): full screen, big fields, hours as buttons, never closed by a stray tap. */
 @Composable
