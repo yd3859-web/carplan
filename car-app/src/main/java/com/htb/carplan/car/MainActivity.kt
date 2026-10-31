@@ -184,7 +184,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
-                    if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
+                    if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, held = vm.heldChange.collectAsStateWithLifecycle().value, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
                         today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D,
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
@@ -345,6 +345,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
             }
             if (guiding) LegProgress(live, nextName)
+            HeldLine(vm)
             trip?.next?.memo?.let { com.htb.carplan.shared.calendar.StopMemo.split(it).second }?.takeIf { it.isNotBlank() }?.let {
                 Text(it, color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp), maxLines = 2)
             }
@@ -400,6 +401,17 @@ private fun drivenTimes(trip: TodayTrip, live: NaviLive, guiding: Boolean): Map<
     return com.htb.carplan.shared.calendar.Schedule.asDriven(trip.stops, trip.next?.id, eta)
 }
 
+/** 10장 [그대로]: the rail already shows the new plan, the navigation still drives the old one — say so. */
+@Composable
+private fun HeldLine(vm: CarHomeViewModel) {
+    val held by vm.heldChange.collectAsStateWithLifecycle()
+    held?.let { HeldText(it) }
+}
+
+@Composable
+private fun HeldText(message: String) =
+    Text("보류 중 · ${message.substringAfter("님이 ")} · 내비는 그대로, 세우면 다시 물어요", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
+
 /** How much of this leg is behind us: a thin blue line (blue = where the car goes). The leg's length is the
  * largest distance seen since the target changed, so it needs no extra data from the navigation. */
 @Composable
@@ -429,7 +441,7 @@ private fun remainText(live: NaviLive, trip: TodayTrip?, guiding: Boolean): Stri
  * passengers' phones; the car only shows the day and answers the voice questions. One small [더보기] while parked.
  */
 @Composable
-private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, onGo: () -> Unit, onMore: () -> Unit) {
+private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, held: String?, onGo: () -> Unit, onMore: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -447,6 +459,7 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
             if (!restricted) TextButton(onClick = onMore) { Text("더보기", color = Soft, fontSize = 22.sp) }
         }
         if (guiding) LegProgress(live, trip?.next?.place?.name)
+        held?.let { HeldText(it) }
         HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 18.dp))
         prompt?.let { it(); Spacer(Modifier.height(18.dp)) }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {

@@ -145,6 +145,9 @@ class TripNavigator(
     private var routedVersion = -1L
     /** A change the driver has not accepted yet; asked again at the next P (Q24). */
     private var pendingChange = false
+    private val _held = MutableStateFlow<String?>(null)
+    /** 10장 [그대로]: the change the navigation does not have yet ("정자역을 뺐어요"), shown until it is applied. */
+    val held: StateFlow<String?> = _held.asStateFlow()
     /** The plan version the driver answered "그대로" to: not asked again until the plan changes or the car stops. */
     private var heldVersion = -1L
     private var askJob: Job? = null
@@ -651,6 +654,7 @@ class TripNavigator(
         val wasChange = _prompt.value?.reason == PromptReason.ROUTE_CHANGE
         _prompt.value = null
         pendingChange = false
+        _held.value = null
         heldVersion = -1
         routeWithPickups(t)
         scope.launch {
@@ -678,6 +682,7 @@ class TripNavigator(
         }
         val t = trip.value
         if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE && t != null) {
+            _held.value = _prompt.value?.message
             pendingChange = true
             heldVersion = t.version
             scope.launch {
@@ -710,6 +715,7 @@ class TripNavigator(
             val diff = describeChange(routedPlan, t.remaining)
             if (diff == null) {
                 // Nothing the navigation cares about (e.g. a memo): just mark the version as reflected.
+                _held.value = null
                 routedVersion = t.version
                 runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, t.version, hold = false, etaNext = t.day?.etaNext) }
                 return@launch
