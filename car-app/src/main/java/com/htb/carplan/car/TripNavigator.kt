@@ -132,6 +132,8 @@ class TripNavigator(
 
     private val carId = MutableStateFlow<String?>(null)
     private val _prompt = MutableStateFlow<NextPrompt?>(null)
+    /** 묶음 7: one thing on screen at a time. A lower-priority prompt waits here until the current one is answered. */
+    private val waiting = ArrayDeque<Pair<NextPrompt, () -> Unit>>()
     val prompt: StateFlow<NextPrompt?> = _prompt.asStateFlow()
     private val _guiding = MutableStateFlow(false)
     /** True once a route for today's trip has been sent to the navigation. */
@@ -236,6 +238,7 @@ class TripNavigator(
                 // The nearest point we are driving to: the first waypoint while any remain, else the destination.
                 val next = info.waypoints.firstOrNull() ?: info.destination
                 _live.update { it.copy(remainMeters = next.distance, remainSeconds = next.duration, nextName = next.name) }
+                publishEta(next.duration)
             }
             override fun onRouteCancelled() {
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
@@ -273,6 +276,41 @@ class TripNavigator(
 
     fun bind(carId: String) { this.carId.value = carId }
 
+    /**
+     * Puts [p] on screen now if nothing is there or it outranks what is; otherwise it waits its turn (묶음 7). [start]
+     * is what speaks/listens for it and runs when it actually appears. Start/pickup questions beat notices; a route
+     * change beats everything (the navigation already turned). Same reason twice → the newer replaces the older.
+     */
+    private fun show(p: NextPrompt, start: () -> Unit) {
+        val cur = _prompt.value
+        waiting.removeAll { it.first.reason == p.reason }
+        // Same reason again (the next stop changed under a start question): the newer one takes the screen.
+        if (cur == null || rank(p.reason) > rank(cur.reason) || cur.reason == p.reason) {
+            if (cur != null && cur.single) waiting.addFirst(cur to {}) // a bumped notice comes back; a bumped question is dropped (stale answer)
+            askJob?.cancel()
+            _prompt.value = p
+            start()
+        } else waiting.addLast(p to start)
+    }
+
+    /** The prompt on screen is gone: the next one waiting comes up. Call after every `closePrompt()`. */
+    private fun closePrompt() { _prompt.value = null; takeNext() }
+
+    private fun takeNext() {
+        if (_prompt.value != null) return
+        val (p, start) = waiting.removeFirstOrNull() ?: return
+        _prompt.value = p
+        start()
+    }
+
+    private fun rank(r: PromptReason) = when (r) {
+        PromptReason.ROUTE_CHANGE -> 5
+        PromptReason.APP_START, PromptReason.GEAR_D, PromptReason.MANUAL, PromptReason.PICKUP, PromptReason.COMMUTE -> 4
+        PromptReason.FUELED -> 3
+        PromptReason.FUEL -> 2
+        PromptReason.PARKING -> 1
+    }
+
     /** Gear events from [VehicleMonitor]: P → D asks "다음 목적지로 갈까요?"; D → P re-asks a held change (Q24). */
     fun onGear(gear: Gear) {
         val prev = lastGear
@@ -281,7 +319,7 @@ class TripNavigator(
         // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
         if (gear == Gear.P && prev != Gear.P) {
             // Parked = arrived: "근처 주차장 찾아볼까요?" is no longer a question.
-            if (_prompt.value?.reason == PromptReason.PARKING) { askJob?.cancel(); _prompt.value = null }
+            if (_prompt.value?.reason == PromptReason.PARKING) { askJob?.cancel(); closePrompt() }
             fuelAtPark = carState.fuelPercent; fueledAsked = false
             router.requestCurrentLocation()
             parkTimer?.cancel()
@@ -362,20 +400,18 @@ class TripNavigator(
         commuteEvent = e
         val today = LocalDate.now().toString()
         if (commuteAskedDate == today || commuteDeclinedDate == today) return
-        if (trip.value?.next != null || _guiding.value || _prompt.value != null) return
+        if (trip.value?.next != null || _guiding.value) return
         val place = e.place ?: return
         commuteAskedDate = today
         val message = "${withRo(place.name)} 갈까요?"
-        askJob?.cancel()
-        _prompt.value = NextPrompt(Stop(place = place), PromptReason.COMMUTE, message = message)
-        askJob = scope.launch {
-            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
-            when (answer) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
-            }
-        }
+        show(NextPrompt(Stop(place = place), PromptReason.COMMUTE, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }
+    }
+
+    private fun listening(listening: Boolean, heard: String?) { _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
+    private fun answer(a: VoicePrompt.Answer) = when (a) {
+        VoicePrompt.Answer.YES -> go()
+        VoicePrompt.Answer.NO -> later()
+        VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) } // buttons stay (Q21)
     }
 
     // ---------- 12장: fuel / charge ----------
@@ -397,11 +433,11 @@ class TripNavigator(
         updateLiveLoop()
         val fuel = state.fuelPercent ?: return
         // A station question that is still open when the tank is clearly fuller is stale: drop it (the fill-up question follows).
-        _prompt.value?.let { p -> if (p.reason == PromptReason.FUEL && fuel >= (fuelAskedPercent ?: 0.0) + 5) { askJob?.cancel(); _prompt.value = null } }
+        _prompt.value?.let { p -> if (p.reason == PromptReason.FUEL && fuel >= (fuelAskedPercent ?: 0.0) + 5) { askJob?.cancel(); closePrompt() } }
         // 15장 Q44: parked and the tank/battery went up ≥ 5 points → "주유했어요?" once per parking.
         if (lastGear == Gear.P) {
             val base = fuelAtPark?.let { minOf(it, fuel) }?.also { fuelAtPark = it } ?: fuel.also { fuelAtPark = it }
-            if (!fueledAsked && fuel >= base + 5 && _prompt.value == null) { fueledAsked = true; askFueled(state.isEv == true) }
+            if (!fueledAsked && fuel >= base + 5) { fueledAsked = true; askFueled(state.isEv == true) }
         }
         val range = state.rangeKm
         val t = trip.value
@@ -412,7 +448,6 @@ class TripNavigator(
             else -> fuel <= fuelAlertPercent || (range != null && range > 0 && range < LOW_RANGE_KM * fuelAlertPercent / LOW_FUEL_PERCENT)
         }
         if (!need) return
-        if (_prompt.value != null) return
         fuelAskedPercent?.let { asked -> if (fuel > asked - 10) return } // Q33
         if (!_guiding.value && fuelAskedToday == today && fuelAskedPercent != null && fuel > fuelAskedPercent!! - 10) return
         if (_guiding.value && fuelDeclinedForRoute && fuel > (fuelAskedPercent ?: 101.0) - 10) return
@@ -427,23 +462,12 @@ class TripNavigator(
         val why = if (remainingKm != null && range != null && range > 0 && _guiding.value) "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요" else "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
         // Not a question (차 화면 원칙): say it once, leave one button; passengers can look on their phones.
         val message = "$why. ${what}${ga(what)} 필요해요."
-        askJob?.cancel()
-        _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")
-        askJob = scope.launch { voice.say(message) }
+        show(NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")) { askJob = scope.launch { voice.say(message) } }
     }
 
     private fun askFueled(ev: Boolean) {
         val message = if (ev) "충전했어요? 충전 기록을 남길까요?" else "주유했어요? 주유 기록을 남길까요?"
-        askJob?.cancel()
-        _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUELED, message = message)
-        askJob = scope.launch {
-            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
-            when (answer) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
-            }
-        }
+        show(NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUELED, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }
     }
 
     /** "네" to 주유했어요?: a 주유 record in the owner's solo group with today's odometer (15장). */
@@ -465,16 +489,7 @@ class TripNavigator(
     private fun askPickup(t: TodayTrip) {
         val names = t.waitingPickups.joinToString(", ") { it.name.ifBlank { "일행" } }
         val message = "$names 태우러 가요. 위치를 일행에게 보여 줄까요?"
-        askJob?.cancel()
-        _prompt.value = NextPrompt(t.next ?: Stop(place = t.waitingPickups.first().place), PromptReason.PICKUP, message = message)
-        askJob = scope.launch {
-            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
-            when (answer) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
-            }
-        }
+        show(NextPrompt(t.next ?: Stop(place = t.waitingPickups.first().place), PromptReason.PICKUP, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }
     }
 
     /** Sharing loop: every 5 s ask the navigation for the position and publish it, until nobody is waiting. */
@@ -561,6 +576,7 @@ class TripNavigator(
     fun simMove(lat: Double, lng: Double, remainMeters: Int, remainSeconds: Int, nextName: String) {
         lastLocation = lat to lng
         _live.update { it.copy(lat = lat, lng = lng, remainMeters = remainMeters, remainSeconds = remainSeconds, nextName = nextName) }
+        publishEta(remainSeconds)
     }
 
     /** Parked: the leg is over, so no "0 m · 1분" left on screen. */
@@ -621,41 +637,28 @@ class TripNavigator(
         val t = trip.value ?: return
         if (t.waitingPickups.isNotEmpty() && t.day?.pickupSharing != true) { askPickup(t); return }
         val next = t.next ?: return
-        askJob?.cancel()
-        _prompt.value = NextPrompt(next, reason)
-        askJob = scope.launch {
-            val answer = voice.ask("다음 목적지 ${withRo(next.place.name)} 갈까요?") { listening, heard ->
-                _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) }
-            }
-            when (answer) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) } // buttons stay (Q21)
-            }
-        }
+        show(NextPrompt(next, reason)) { askJob = scope.launch { answer(voice.ask("다음 목적지 ${withRo(next.place.name)} 갈까요?", ::listening)) } }
     }
 
     /** 12장: five minutes out — passengers get a push; the car offers the navigation's own parking search. */
     private fun askParking(next: Stop) {
-        if (_prompt.value != null) return
         val message = "곧 ${next.place.name} 도착이에요."
-        _prompt.value = NextPrompt(next, PromptReason.PARKING, message = message, single = true, button = "근처 주차장 찾기")
-        askJob = scope.launch { voice.say(message) }
+        show(NextPrompt(next, PromptReason.PARKING, message = message, single = true, button = "근처 주차장 찾기")) { askJob = scope.launch { voice.say(message) } }
     }
 
     /** "응" / [가기] (9장) or [바꾸기] (10장): route the remaining stops and open the navigation. */
     fun go() {
         if (_prompt.value?.reason == PromptReason.PARKING) {
-            askJob?.cancel(); _prompt.value = null; router.search("주차장"); return
+            askJob?.cancel(); closePrompt(); router.search("주차장"); return
         }
         if (_prompt.value?.reason == PromptReason.FUEL) {
-            askJob?.cancel(); _prompt.value = null; findStation(); return
+            askJob?.cancel(); closePrompt(); findStation(); return
         }
         if (_prompt.value?.reason == PromptReason.FUELED) {
-            askJob?.cancel(); _prompt.value = null; logFuel(); return
+            askJob?.cancel(); closePrompt(); logFuel(); return
         }
         if (_prompt.value?.reason == PromptReason.COMMUTE) {
-            askJob?.cancel(); _prompt.value = null
+            askJob?.cancel(); closePrompt()
             commuteEvent?.place?.let { p -> if (p.hasCoords()) { router.route(listOf(p)); router.openNavigation() } else router.search(p.name) }
             lastRouteSentAt = System.currentTimeMillis()
             _notice.value = "${commuteEvent?.title ?: "출근"} · ${commuteEvent?.place?.name} 안내"
@@ -666,7 +669,7 @@ class TripNavigator(
         val t = trip.value ?: return
         if (wasPickup) startSharing(t)
         askJob?.cancel()
-        _prompt.value = null
+        closePrompt()
         revertedVersion = -1
         routeWithPickups(t)
         scope.launch {
@@ -681,16 +684,16 @@ class TripNavigator(
     /** "아니" / [나중에] (9장): keep today's plan. For a notice (연료·주차장·경로 바뀜) just closes it. */
     fun later() {
         askJob?.cancel()
-        if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
-        if (_prompt.value?.reason == PromptReason.FUELED || _prompt.value?.reason == PromptReason.PARKING || _prompt.value?.reason == PromptReason.ROUTE_CHANGE) { _prompt.value = null; return }
-        if (_prompt.value?.reason == PromptReason.COMMUTE) { commuteDeclinedDate = LocalDate.now().toString(); _prompt.value = null; return }
+        if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; closePrompt(); return }
+        if (_prompt.value?.reason == PromptReason.FUELED || _prompt.value?.reason == PromptReason.PARKING || _prompt.value?.reason == PromptReason.ROUTE_CHANGE) { closePrompt(); return }
+        if (_prompt.value?.reason == PromptReason.COMMUTE) { commuteDeclinedDate = LocalDate.now().toString(); closePrompt(); return }
         if (_prompt.value?.reason == PromptReason.PICKUP) {
             // "아니": still drive to the pickups, just without sharing the position.
-            _prompt.value = null
+            closePrompt()
             trip.value?.let { routeWithPickups(it); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
             return
         }
-        _prompt.value = null
+        closePrompt()
     }
 
     fun dismiss() = later()
@@ -750,12 +753,11 @@ class TripNavigator(
             runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, t.version, hold = false, etaNext = t.day?.etaNext) }
         }
         val message = if (nextChanged) "${who}님이 $diff. 다음 목적지가 ${withRo(next.place.name)} 바뀌었어요." else "${who}님이 $diff. 경로를 바꿨어요."
-        _prompt.value = NextPrompt(next, PromptReason.ROUTE_CHANGE, message = message, single = true, button = "원래대로")
-        askJob = scope.launch { voice.say(message) }
+        show(NextPrompt(next, PromptReason.ROUTE_CHANGE, message = message, single = true, button = "원래대로")) { askJob = scope.launch { voice.say(message) } }
         revertJob?.cancel()
         revertJob = scope.launch {
             delay(REVERT_WINDOW_MS)
-            _prompt.update { p -> if (p?.reason == PromptReason.ROUTE_CHANGE) null else p }
+            if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE) closePrompt()
         }
     }
 
@@ -763,7 +765,7 @@ class TripNavigator(
     private fun revertRoute() {
         val t = trip.value ?: return
         askJob?.cancel(); revertJob?.cancel()
-        _prompt.value = null
+        closePrompt()
         if (previousRoute.isEmpty()) return
         router.route(previousRoute)
         lastRouteSentAt = System.currentTimeMillis()
@@ -892,12 +894,24 @@ class TripNavigator(
 
     /** The navigation computed a route: publish when it expects to reach the next stop (10장 7·8). */
     private fun onRouteStarted(durationSeconds: Int) {
+        Log.i(TAG, "route started, next in ${durationSeconds}s")
+        publishEta(durationSeconds, force = true)
+    }
+
+    private var etaPublishedAt = 0L
+    private var etaPublished: String? = null
+    /**
+     * 묶음 5: the car's ETA is the one source phones read (days/{date}.etaNext, pickups/{uid}.etaSeconds come from the
+     * same number). Written when the minute changes, at most every [ETA_PUBLISH_MS], so the day document is not spammed.
+     */
+    private fun publishEta(seconds: Int?, force: Boolean = false) {
         val t = trip.value ?: return
-        val eta = LocalTime.now().plusSeconds(durationSeconds.toLong()).let { "%02d:%02d".format(it.hour, it.minute) }
-        Log.i(TAG, "route started, next eta $eta")
-        scope.launch {
-            runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, routedVersion.coerceAtLeast(0), hold = false, etaNext = eta) }
-        }
+        seconds ?: return
+        val eta = LocalTime.now().plusSeconds(seconds.toLong()).let { "%02d:%02d".format(it.hour, it.minute) }
+        val now = System.currentTimeMillis()
+        if (!force && (eta == etaPublished || now - etaPublishedAt < ETA_PUBLISH_MS)) return
+        etaPublished = eta; etaPublishedAt = now
+        scope.launch { runCatching { trips.setRouteSync(t.groupId, t.eventId, t.date, routedVersion.coerceAtLeast(0), hold = revertedVersion >= 0, etaNext = eta) } }
     }
 
     /** One place reached: mark it visited, then top the route up while more stops remain (Q22). */
@@ -972,6 +986,8 @@ class TripNavigator(
         private const val SAME_PARKING_MS = 30 * 60_000L
         /** Kakao Mobility fallback for the ETA when the navigation gives no driving info: at most this often. */
         private const val KAKAO_ETA_MIN_MS = 5 * 60_000L
+        /** How often the car's ETA goes to the day document at most (묶음 5). */
+        private const val ETA_PUBLISH_MS = 20_000L
         /** ETA refresh while guiding (navigation driving info; Kakao only as the fallback above). */
         private const val ETA_INTERVAL_MS = 30_000L
         /** 12장: "주차장 찾아봐 주세요" this many seconds before the next stop. */
