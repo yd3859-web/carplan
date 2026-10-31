@@ -9,6 +9,7 @@ enum class VoiceCommand(val words: List<String>) {
     SKIP(listOf("건너뛰", "건너 뛰", "다음칸", "빼줘", "패스")),
     FUEL(listOf("주유소", "충전소", "기름", "주유", "충전")),
     PARKING(listOf("주차장", "주차", "파킹")),
+    FOOD(listOf("맛집", "식당", "밥집", "먹을")),
     WHERE(listOf("어디", "얼마나", "몇분", "언제도착", "남았", "다음은", "다음 목적지")),
     START(listOf("안내", "출발", "가자", "길안내")),
     ;
@@ -22,6 +23,6 @@ enum class VoiceCommand(val words: List<String>) {
         }
 
         /** What to say when the words did not match. */
-        const val HELP = "주유소, 주차장, 다음 어디야, 건너뛰기, 원래대로 중에 말해 주세요."
+        const val HELP = "주유소, 주차장, 맛집, 다음 어디야, 건너뛰기, 원래대로 중에 말해 주세요."
     }
 }

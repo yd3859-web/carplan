@@ -453,6 +453,7 @@ class TripNavigator(
         when (cmd) {
             VoiceCommand.FUEL -> { scope.launch { voice.say(if (carState.isEv == true) "충전소를 찾을게요." else "주유소를 찾을게요.") }; fuelPlan?.let { goViaStation(it) } ?: findStation() }
             VoiceCommand.PARKING -> { scope.launch { voice.say("근처 주차장을 찾을게요.") }; router.search("주차장") }
+            VoiceCommand.FOOD -> { scope.launch { voice.say("근처 맛집을 찾을게요.") }; router.search("맛집") }
             VoiceCommand.WHERE -> scope.launch { voice.say(whereSentence(t)) }
             VoiceCommand.REVERT -> if (previousRoute.isNotEmpty() && _guiding.value) revertRoute() else scope.launch { voice.say("되돌릴 경로가 없어요.") }
             VoiceCommand.SKIP -> skipNext(t)
@@ -865,6 +866,7 @@ class TripNavigator(
     }
 
     fun clearNotice() { _notice.value = null }
+    fun notify(text: String) { _notice.value = text }
 
     // ---------- 10장: plan changed while guiding ----------
 

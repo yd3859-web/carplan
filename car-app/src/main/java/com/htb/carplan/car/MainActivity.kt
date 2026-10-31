@@ -225,6 +225,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         onPick = { what ->
             more = false
             when (what) {
+                "find:fuel" -> vm.runCommand(VoiceCommand.FUEL); "find:parking" -> vm.runCommand(VoiceCommand.PARKING); "find:food" -> vm.runCommand(VoiceCommand.FOOD)
                 "qr" -> qr = true; "dart" -> dartOpen = true; "add" -> adding = true; "navi" -> vm.openNavigation()
                 "ask" -> vm.askNow(); "debug" -> debug = true; "arrive" -> vm.debugArrive()
             }
@@ -524,6 +525,10 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
 private fun MoreDialog(guidingNext: String?, hasTrip: Boolean, onPick: (String) -> Unit, onDismiss: () -> Unit) {
     CarDialog(onDismiss = onDismiss, title = "더보기", width = 900.dp, buttons = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) } }) {
         val tiles = buildList {
+            // C1 (차 화면 원칙: 혼자여도 버튼 하나로 찾기) — each opens the navigation's own search once.
+            add("find:fuel" to "주유소·충전소 찾기")
+            add("find:parking" to "주차장 찾기")
+            add("find:food" to "근처 맛집 찾기")
             add("qr" to "같이 탄 사람 추가")
             if (hasTrip) add("dart" to "다트 — 동네 뽑기")
             add("add" to "일정 추가")
@@ -758,13 +763,13 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, o
         buttons = {
             // Car-sized buttons: the main one filled black, the other outlined (디자인 규칙).
             val closeBtn: @Composable () -> Unit = {
-                OutlinedButton(onClick = onDismiss, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, SheetEdge), modifier = Modifier.height(72.dp)) { Text("닫기", fontSize = 24.sp, color = Ink) }
+                OutlinedButton(onClick = onDismiss, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, SheetEdge), modifier = Modifier.height(76.dp)) { Text("닫기", fontSize = 24.sp, color = Ink) }
             }
             if (group == null) {
                 closeBtn()
                 Spacer(Modifier.width(12.dp))
-                if (tripTitle != null) Button(onClick = onShareTrip, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(72.dp)) { Text("이 여행에 초대하기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
-                else Button(onClick = onNewGroup, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(72.dp)) { Text("새 그룹 만들고 QR 보기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                if (tripTitle != null) Button(onClick = onShareTrip, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(76.dp)) { Text("이 여행에 초대하기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                else Button(onClick = onNewGroup, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(76.dp)) { Text("새 그룹 만들고 QR 보기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             } else closeBtn()
         },
     ) {
@@ -824,7 +829,7 @@ private fun VoiceBar(state: VoiceState, onCommand: (VoiceCommand) -> Unit, onClo
             }
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(VoiceCommand.FUEL to "주유소", VoiceCommand.PARKING to "주차장", VoiceCommand.WHERE to "다음 어디", VoiceCommand.SKIP to "건너뛰기", VoiceCommand.REVERT to "원래대로").forEach { (c, label) ->
-                    Button(onClick = { onCommand(c) }, modifier = Modifier.weight(1f).height(72.dp), shape = Corner,
+                    Button(onClick = { onCommand(c) }, modifier = Modifier.weight(1f).height(76.dp), shape = Corner,
                         colors = ButtonDefaults.buttonColors(containerColor = OnBand, contentColor = Color(0xFF111111))) { Text(label, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
                 }
             }

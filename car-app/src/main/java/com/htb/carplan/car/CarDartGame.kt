@@ -150,7 +150,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                             Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 18.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
                             Button(
                                 onClick = { vm.addDartAsStop(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
-                                modifier = Modifier.padding(top = 14.dp).fillMaxWidth().height(72.dp),
+                                modifier = Modifier.padding(top = 14.dp).fillMaxWidth().height(76.dp),
                             ) { Text("오늘 일정에 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
                         }
                     }

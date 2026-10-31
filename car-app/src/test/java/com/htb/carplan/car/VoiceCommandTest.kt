@@ -15,6 +15,7 @@ class VoiceCommandTest {
         assertEquals(VoiceCommand.SKIP, VoiceCommand.parse("여기 건너뛰자"))
         assertEquals(VoiceCommand.REVERT, VoiceCommand.parse("원래대로 해 줘"))
         assertEquals(VoiceCommand.START, VoiceCommand.parse("안내 시작"))
+        assertEquals(VoiceCommand.FOOD, VoiceCommand.parse("근처 맛집"))
     }
 
     @Test

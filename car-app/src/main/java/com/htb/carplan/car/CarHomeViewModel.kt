@@ -371,6 +371,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         val u = owner.value ?: return
         viewModelScope.launch {
             runCatching { calendar.addEvent(u.soloGroupId, event.copy(createdBy = u.uid)) }
+                .onSuccess { if (event.place != null) navigator.notify("${event.title} 추가 · 장소는 갈 때 내비 검색으로 찾아요") }
                 .onFailure { _error.value = it.message }
         }
     }
