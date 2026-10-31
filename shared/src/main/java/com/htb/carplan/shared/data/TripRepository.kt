@@ -128,9 +128,9 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
     }
 
     /** The car reached (or skipped) a stop (9장). Does not bump the version: the itinerary itself did not change. */
-    suspend fun setVisited(groupId: String, eventId: String, date: String, stopId: String, visited: Boolean, nextIndex: Int) {
+    suspend fun setVisited(groupId: String, eventId: String, date: String, stopId: String, visited: Boolean, nextIndex: Int, skipped: Boolean = false) {
         db.runBatch { batch ->
-            batch.update(db.document("${FirestorePaths.stops(groupId, eventId, date)}/$stopId"), "visited", visited)
+            batch.update(db.document("${FirestorePaths.stops(groupId, eventId, date)}/$stopId"), mapOf("visited" to visited, "skipped" to (visited && skipped)))
             batch.set(
                 db.document(FirestorePaths.day(groupId, eventId, date)),
                 mapOf("currentStopIndex" to nextIndex, "updatedAt" to FieldValue.serverTimestamp()),

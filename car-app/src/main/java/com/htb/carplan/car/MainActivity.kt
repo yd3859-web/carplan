@@ -383,7 +383,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             if (dayDone) {
                 Text(trip!!.title, color = Soft, fontSize = 20.sp)
                 Text("오늘 일정 끝", color = Ink, fontSize = 44.sp, fontWeight = FontWeight.Black)
-                Text("${trip.stops.size}곳 다녀왔어요", color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(doneLine(trip), color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
                 Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp))
             } else {
             Text(goingLabel, color = Soft, fontSize = 20.sp)
@@ -447,6 +447,12 @@ private fun drivenTimes(trip: TodayTrip, live: NaviLive, guiding: Boolean): Map<
     return com.htb.carplan.shared.calendar.Schedule.asDriven(trip.stops, trip.next?.id, eta)
 }
 
+/** "3곳 다녀왔어요" / "2곳 다녀왔어요 · 1곳 건너뜀" */
+private fun doneLine(t: TodayTrip): String {
+    val skipped = t.stops.count { it.skipped }
+    return "${t.stops.size - skipped}곳 다녀왔어요" + if (skipped > 0) " · ${skipped}곳 건너뜀" else ""
+}
+
 /** How much of this leg is behind us: a thin blue line (blue = where the car goes). The leg's length is the
  * largest distance seen since the target changed, so it needs no extra data from the navigation. */
 @Composable
@@ -488,8 +494,8 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
                 when {
                     // Driving: how far and when — the one line the driver glances at, so not grey.
                     remain != null -> Text(remain, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-                    done -> Text("오늘 일정 끝 · ${trip!!.stops.size}곳 다녀왔어요", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-                    trip != null -> Text("${trip.stops.count { s -> s.visited }}/${trip.stops.size}곳 다녀옴", color = Soft, fontSize = 22.sp)
+                    done -> Text("오늘 일정 끝 · ${doneLine(trip!!)}", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    trip != null -> Text("${trip.stops.count { s -> s.visited && !s.skipped }}/${trip.stops.size}곳 다녀옴", color = Soft, fontSize = 22.sp)
                 }
             }
             if (!restricted) TextButton(onClick = onMore) { Text("더보기", color = Soft, fontSize = 22.sp) }
@@ -684,6 +690,7 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     (times[s.id] ?: s.time)?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = if (big) 22.sp else 21.sp, modifier = Modifier.width(if (big) 84.dp else 64.dp)) }
                     Text(s.place.name, color = color, fontSize = if (isNext) fsNext else fs, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                    if (s.skipped) Text("  건너뜀", color = Soft, fontSize = if (big) 20.sp else 16.sp)
                     if (isNext && !big) Text("  다음", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
                 if (s.memo.isNotBlank() && (isNext || !big)) {

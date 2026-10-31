@@ -203,6 +203,8 @@ data class Stop(
     /** Soft delete: kept for undo and "○○님이 뺐어요" notices. */
     val deleted: Boolean = false,
     val visited: Boolean = false,
+    /** Passed over on purpose ("건너뛰기", 차 음성 명령): done for the route, but not "다녀옴". */
+    val skipped: Boolean = false,
 )
 
 enum class PickupStatus { WAITING, ON_BOARD, DONE }

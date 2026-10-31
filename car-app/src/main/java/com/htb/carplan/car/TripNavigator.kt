@@ -476,7 +476,7 @@ class TripNavigator(
         val after = t.remaining.filterNot { it.id == next.id }
         scope.launch {
             voice.say("${next.place.name}은 건너뛸게요." + (after.firstOrNull()?.let { " ${withRo(it.place.name)} 갈게요." } ?: ""))
-            runCatching { trips.setVisited(t.groupId, t.eventId, t.date, next.id, true, t.stops.indexOfFirst { it.id == after.firstOrNull()?.id }.coerceAtLeast(0)) }
+            runCatching { trips.setVisited(t.groupId, t.eventId, t.date, next.id, true, t.stops.indexOfFirst { it.id == after.firstOrNull()?.id }.coerceAtLeast(0), skipped = true) }
             if (after.isEmpty()) { router.route(emptyList()); inNavi = emptyList(); _guiding.value = false; return@launch }
             if (_guiding.value) sendRoute(t.copy(stops = t.stops.map { if (it.id == next.id) it.copy(visited = true) else it }))
         }
