@@ -251,7 +251,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
     if (dartOpen && !vehicle.drivingRestricted) CarDartGame(vm, onDismiss = { dartOpen = false })
     if (qr && !vehicle.drivingRestricted) {
-        InviteQrDialog(qrGroup, seated = seatedPrompt, tripTitle = trip?.title, onShareTrip = vm::inviteToTodayTrip, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
+        InviteQrDialog(qrGroup, seated = seatedPrompt, tripTitle = trip?.title, friendCode = vm.ownerFriendCode, ownerName = vm.ownerName, onShareTrip = vm::inviteToTodayTrip, onDismiss = { qr = false; seatedPrompt = false })
     }
 }
 
@@ -769,25 +769,37 @@ private fun BigButton(label: String, enabled: Boolean = true, primary: Boolean =
  * No trip today → [새 그룹] makes one on the spot (Q16).
  */
 @Composable
-private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, onShareTrip: () -> Unit, onNewGroup: () -> Unit, onDismiss: () -> Unit) {
+private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, friendCode: String?, ownerName: String, onShareTrip: () -> Unit, onDismiss: () -> Unit) {
+    // No trip today: the QR adds the owner as a friend instead of making an empty group (정원 2026-10-31).
+    val friendQr = group == null && tripTitle == null && friendCode != null
     CarDialog(
         onDismiss = onDismiss,
-        title = if (seated) "같이 타셨나요? QR 찍고 들어오세요" else if (group == null) "같이 탄 사람 추가" else "${group.name}에 같이 가기",
+        title = when {
+            friendQr -> "${ownerName}님과 친구 맺기"
+            seated -> "같이 타셨나요? QR 찍고 들어오세요"
+            group == null -> "같이 탄 사람 추가"
+            else -> "${group.name}에 같이 가기"
+        },
         buttons = {
             // Car-sized buttons: the main one filled black, the other outlined (디자인 규칙).
             val closeBtn: @Composable () -> Unit = {
                 OutlinedButton(onClick = onDismiss, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, SheetEdge), modifier = Modifier.height(76.dp)) { Text("닫기", fontSize = 24.sp, color = Ink) }
             }
-            if (group == null) {
+            if (group == null && tripTitle != null) {
                 closeBtn()
                 Spacer(Modifier.width(12.dp))
-                if (tripTitle != null) Button(onClick = onShareTrip, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(76.dp)) { Text("이 여행에 초대하기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
-                else Button(onClick = onNewGroup, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(76.dp)) { Text("새 그룹 만들고 QR 보기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                Button(onClick = onShareTrip, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(76.dp)) { Text("이 여행에 초대하기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             } else closeBtn()
         },
     ) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (group == null) {
+                if (friendQr) {
+                    val link = InviteLinks.url(friendCode!!)
+                    val bitmap = remember(link) { qrBitmap(link, 560) }
+                    Image(bitmap.asImageBitmap(), contentDescription = "친구 QR", modifier = Modifier.size(280.dp))
+                    Text("폰으로 찍으면 ${ownerName}님과 친구가 돼요", fontSize = 24.sp, color = Ink)
+                    Text("다음 일정부터는 이름만 눌러 초대해요 · 코드 $friendCode", fontSize = 20.sp, color = Soft)
+                } else if (group == null) {
                     if (tripTitle != null) {
                         Text("“$tripTitle”에 같이 갈 사람을 초대해요.", fontSize = 26.sp, color = Ink, modifier = Modifier.fillMaxWidth())
                         Text("QR이 뜨면 폰으로 찍거나, 링크·코드로 들어와요. 칸·코멘트도 같이 보고 고칠 수 있어요.", fontSize = 20.sp, color = Soft, modifier = Modifier.fillMaxWidth())

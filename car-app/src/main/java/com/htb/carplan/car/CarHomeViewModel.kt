@@ -279,14 +279,26 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Q16: no trip today → make a group on the spot (owned by the car's host) and show its QR. */
-    fun newGroupForQr() {
-        val u = owner.value ?: return
+    /**
+     * 정원 2026-10-31: no trip today → no empty group; the QR makes the passenger the owner's friend, so the next
+     * event invites them with one tap (초대 = 일정, 친구 = 한 번만). The link is the same /i/ invite link.
+     */
+    val ownerFriendCode: String? get() = owner.value?.friendCode?.ifBlank { null }
+    val ownerName: String get() = owner.value?.name?.ifBlank { null } ?: "차주"
+    private var lastFriends: Set<String>? = null
+    init {
         viewModelScope.launch {
-            val today = LocalDate.now()
-            runCatching { groups.createGroup("${today.monthValue}/${today.dayOfMonth} 같이 탄 사람들", u.uid) }
-                .onSuccess { qrGroupId.value = it }
-                .onFailure { _error.value = it.message }
+            owner.filterNotNull().flatMapLatest { groups.observeFriends(it.uid) }.catch { }.collect { list ->
+                val now = list.map { it.uid }.toSet()
+                val before = lastFriends
+                lastFriends = now
+                if (before == null) return@collect
+                for (uid in now - before) {
+                    val name = runCatching { groups.user(uid)?.name }.getOrNull()?.ifBlank { null } ?: "새 친구"
+                    navigator.notify("$name 님과 친구가 됐어요 · 다음 일정에 이름만 눌러 초대해요")
+                    navigator.sayOut("$name 님과 친구가 됐어요.")
+                }
+            }
         }
     }
 

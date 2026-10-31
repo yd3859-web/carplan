@@ -333,7 +333,26 @@ fun JoinDialog(vm: GroupViewModel, onJoined: (String) -> Unit) {
     val c = code ?: return
     var group by remember(c) { mutableStateOf<Group?>(null) }
     var missing by remember(c) { mutableStateOf(false) }
-    LaunchedEffect(c) { group = vm.groupForCode(c); missing = group == null }
+    // The same link/QR can carry a friend code (car QR on a day without a trip, 정원 2026-10-31).
+    var friend by remember(c) { mutableStateOf<com.htb.carplan.shared.model.User?>(null) }
+    LaunchedEffect(c) {
+        group = vm.groupForCode(c)
+        if (group == null) friend = vm.userForFriendCode(c)
+        missing = group == null && friend == null
+    }
+    friend?.let { f ->
+        CenterSheet(onDismiss = { InviteInbox.clear() }) {
+            Column {
+                Text("친구 추가", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+                Text("${f.name.ifBlank { "이 사람" }}님과 친구가 될까요? 다음 일정부터 이름만 눌러 초대할 수 있어요.", fontSize = 17.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { InviteInbox.clear() }) { Text("닫기", color = Palette.TextSoft, fontSize = 17.sp) }
+                    Button(onClick = { vm.addFriendByCode(c); InviteInbox.clear() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("친구 추가", fontSize = 17.sp) }
+                }
+            }
+        }
+        return
+    }
     CenterSheet(onDismiss = { InviteInbox.clear() }) {
         Column {
             Text(if (missing) "초대를 찾지 못했어요" else "그룹 초대", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)

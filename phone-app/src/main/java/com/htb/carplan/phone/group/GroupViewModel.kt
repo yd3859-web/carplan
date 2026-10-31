@@ -126,6 +126,7 @@ class GroupViewModel : ViewModel() {
     }
 
     suspend fun groupForCode(code: String): Group? = runCatching { groups.findByCode(code) }.getOrNull()
+    suspend fun userForFriendCode(code: String) = runCatching { groups.findUserByFriendCode(code) }.getOrNull()
 
     fun leave(groupId: String) = act {
         val s = _session.value ?: return@act

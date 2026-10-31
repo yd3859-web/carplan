@@ -107,6 +107,11 @@ class GroupRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
         awaitClose { reg.remove() }
     }
 
+    /** Who owns friend code [code] (the same link/QR carries group invite codes and friend codes). */
+    suspend fun findUserByFriendCode(code: String): User? =
+        db.collection(FirestorePaths.USERS).whereEqualTo("friendCode", Codes.normalize(code)).limit(1)
+            .get().await().toObjects(User::class.java).firstOrNull()
+
     /** Adds the person whose friend code is [code] (both directions). Returns their uid, or null if no match. */
     suspend fun addFriendByCode(code: String, myUid: String): String? {
         val other = db.collection(FirestorePaths.USERS).whereEqualTo("friendCode", Codes.normalize(code)).limit(1)
