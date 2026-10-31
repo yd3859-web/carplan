@@ -198,6 +198,18 @@ class TripNavigator(
     /** Short status for the screen ("기록 칸: 서현역 12:40"). */
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
+    private val _tripsToday = MutableStateFlow<List<com.htb.carplan.shared.data.CalendarEvent>>(emptyList())
+    /** ⑩: every trip today (the car follows one of them; the screen offers the others while parked). */
+    val tripsToday: StateFlow<List<com.htb.carplan.shared.data.CalendarEvent>> = _tripsToday.asStateFlow()
+
+    /** ⑩ 주차 중 [다른 여행]: the car follows this trip from now on (cars/{id}.activeEventId — the latest choice wins). */
+    fun chooseTrip(groupId: String, eventId: String) {
+        val id = carId.value ?: return
+        if (_guiding.value) { router.route(emptyList()); inNavi = emptyList(); _guiding.value = false }
+        askedOnStart = false
+        scope.launch { runCatching { cars.setActiveTrip(id, groupId, eventId) }.onFailure { _error.value = it.message } }
+    }
+
     /** Today's trip of the car owner: prefers the one the car already marked active, else the first trip of the day. */
     val trip: StateFlow<TodayTrip?> = carId.filterNotNull()
         .flatMapLatest { id -> calendar.observeCar(id) }
@@ -208,9 +220,11 @@ class TripNavigator(
                 .flatMapLatest { groups -> calendar.observeEvents(groups.map { it.id }, today, today) }
                 .map { events ->
                     val tripsToday = events.filter { it.event.categoryId == BuiltInCategory.TRIP.id && !it.event.deleted }
-                    // 7장 2: a trip that says "오늘 이 차로 가요" wins, then the one already active, then the first.
-                    tripsToday.firstOrNull { it.event.carId == car.id }
-                        ?: tripsToday.firstOrNull { it.event.id == car.activeEventId }
+                    _tripsToday.value = tripsToday
+                    // ⑩: the latest explicit choice wins — the one chosen in the car (activeEventId), then a phone's
+                    // "오늘 이 차로 가요" (7장 2), then the first trip of the day.
+                    tripsToday.firstOrNull { it.event.id == car.activeEventId }
+                        ?: tripsToday.firstOrNull { it.event.carId == car.id }
                         ?: tripsToday.firstOrNull()
                 }
                 .flatMapLatest { ev ->

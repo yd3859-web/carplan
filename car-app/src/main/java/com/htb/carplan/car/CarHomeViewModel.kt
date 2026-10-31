@@ -280,6 +280,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun go() = navigator.go()
     fun later() = navigator.later()
     fun askNow() = navigator.askNow()
+    val tripsToday = navigator.tripsToday
+    fun chooseTrip(groupId: String, eventId: String) = navigator.chooseTrip(groupId, eventId)
     val voiceState: StateFlow<VoiceState> = navigator.voiceState
     fun listen() = navigator.listenForCommand()
     fun runCommand(c: VoiceCommand) = navigator.runCommand(c)
@@ -336,6 +338,21 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                     startTime = "%02d:%02d".format(now.hour, now.minute), repeat = "DAILY",
                     place = Place(name = "회사", lat = 37.4012, lng = 127.1086, address = "판교 테크노밸리"), createdBy = u.uid,
                 ))
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
+    /** 시연 메뉴: a second trip today (⑩ — the car follows one, [다른 여행] switches). Made once. */
+    fun makeSecondTestTrip() {
+        val u = owner.value ?: return
+        if (navigator.tripsToday.value.any { it.event.title == "시험 여행 2" }) return
+        val today = LocalDate.now().toString()
+        viewModelScope.launch {
+            runCatching {
+                val eventId = calendar.addEvent(u.soloGroupId, Event(categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id, title = "시험 여행 2", startDate = today, endDate = today, createdBy = u.uid))
+                val trips = TripRepository()
+                trips.addStop(u.soloGroupId, eventId, today, Place(name = "서현역", lat = 37.3850, lng = 127.1235), "14:00", "", u.uid)
+                trips.addStop(u.soloGroupId, eventId, today, Place(name = "중앙공원", lat = 37.3726, lng = 127.1302), "15:00", "", u.uid)
             }.onFailure { _error.value = it.message }
         }
     }

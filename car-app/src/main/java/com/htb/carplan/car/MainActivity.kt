@@ -318,7 +318,28 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             Text("오늘  ${dayTitle(today)}", color = Soft, fontSize = 20.sp)
             Spacer(Modifier.height(10.dp))
             if (trip != null) {
-                Text(trip.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                // ⑩: more than one trip today — say which one the car follows; parked, the others are one tap away.
+                val allTrips by vm.tripsToday.collectAsStateWithLifecycle()
+                var pickTrip by remember { mutableStateOf(false) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(trip.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
+                    if (allTrips.size > 1) {
+                        Text("  오늘 여행 ${allTrips.size}개 중", color = Soft, fontSize = 20.sp)
+                        if (!restricted) TextButton(onClick = { pickTrip = true }) { Text("다른 여행", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                    }
+                }
+                if (pickTrip && !restricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { TextButton(onClick = { pickTrip = false }) { Text("닫기", fontSize = 22.sp, color = Ink) } }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        allTrips.forEach { e ->
+                            val on = e.event.id == trip.eventId
+                            Button(
+                                onClick = { pickTrip = false; if (!on) vm.chooseTrip(e.groupId, e.event.id) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, if (on) Ink else Line, Corner), shape = Corner,
+                                colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
+                            ) { Text((if (on) "지금 · " else "") + e.event.title, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1) }
+                        }
+                        Text("고르면 그 여행의 칸을 따라가요. 안내 중이던 경로는 멈춰요.", fontSize = 20.sp, color = Soft)
+                    }
+                }
                 Spacer(Modifier.height(18.dp))
                 TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving)
             } else if (todayEvents.isEmpty()) {
@@ -847,6 +868,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.makeSecondTestTrip(); onDismiss() }) { Text("두 번째 여행", fontSize = 20.sp, color = Ink) }
                 }
                 Text("출근: 매일 반복·장소 회사, 오늘 남은 여행이 없을 때 \"회사로 갈까요?\" / 픽업: 백현동에서 기다리는 일행, 시뮬이 먼저 태우러 감", fontSize = 18.sp, color = Soft)
                 HorizontalDivider(color = Line)
