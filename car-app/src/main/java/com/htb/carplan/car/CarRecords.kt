@@ -77,7 +77,7 @@ fun RowScope.CarRecords(vm: CarHomeViewModel) {
     var picked by remember { mutableStateOf<LocalDate?>(null) }
     val shown = picked ?: days.firstOrNull()?.date ?: LocalDate.now()
     androidx.compose.runtime.LaunchedEffect(days.firstOrNull()?.date) { if (picked == null) days.firstOrNull()?.date?.let { month = java.time.YearMonth.from(it) } }
-    val cal: @Composable (Modifier) -> Unit = { m -> RecordMonth(month, { month = it }, byDate, shown, { picked = it }, m) }
+    val cal: @Composable (Modifier) -> Unit = { m -> RecordMonth(vm::coverOf, month, { month = it }, byDate, shown, { picked = it }, m) }
     val line: @Composable (Modifier) -> Unit = { m ->
         androidx.compose.animation.Crossfade(shown, m, animationSpec = carSpec(), label = "recordDay") { d -> DayTimeline(vm, d, byDate[d].orEmpty()) }
     }
@@ -140,7 +140,7 @@ fun RowScope.CarRecords(vm: CarHomeViewModel) {
 
 /** The month with the days that have records marked (one bar per trip; 일상 기록 grey). */
 @Composable
-private fun RecordMonth(month: java.time.YearMonth, onMonth: (java.time.YearMonth) -> Unit, byDate: Map<LocalDate, List<RecordDay>>, picked: LocalDate, onPick: (LocalDate) -> Unit, modifier: Modifier) {
+private fun RecordMonth(coverOf: suspend (RecordDay) -> String?, month: java.time.YearMonth, onMonth: (java.time.YearMonth) -> Unit, byDate: Map<LocalDate, List<RecordDay>>, picked: LocalDate, onPick: (LocalDate) -> Unit, modifier: Modifier) {
     val c = LocalCarColors.current
     val compact = LocalCompact.current
     val today = LocalDate.now()
@@ -172,13 +172,18 @@ private fun RecordMonth(month: java.time.YearMonth, onMonth: (java.time.YearMont
                             val on = d == picked
                             val bg by carColor(if (on) c.ink else c.bg, "recCell")
                             val fg by carColor(if (on) c.onInk else if (here.isEmpty()) c.soft else c.ink, "recText")
+                            // An album: a day with a photo shows it; the chosen day gets a thick ink frame.
+                            val cover by androidx.compose.runtime.produceState<String?>(null, here) { value = here.firstNotNullOfOrNull { coverOf(it) } }
+                            if (cover != null) Photo(cover!!, Modifier.fillMaxSize())
                             Column(
-                                Modifier.fillMaxSize().background(bg, Corner)
-                                    .then(if (d == today && !on) Modifier.border(2.dp, c.ink, Corner) else Modifier)
+                                Modifier.fillMaxSize().background(if (cover != null && !on) androidx.compose.ui.graphics.Color.Transparent else bg, Corner)
+                                    .then(if (on && cover != null) Modifier.border(4.dp, c.ink, Corner) else if (d == today && !on) Modifier.border(2.dp, c.ink, Corner) else Modifier)
                                     .clickable(enabled = here.isNotEmpty()) { onPick(d) }.padding(if (compact) 4.dp else 6.dp),
                             ) {
-                                Text("$dn", color = fg, fontSize = 24.sp, fontWeight = if (here.isNotEmpty()) FontWeight.Bold else FontWeight.Normal)
-                                here.take(2).forEach { rd ->
+                                // On a photo the number sits on a small white tab so it stays readable.
+                                Text("$dn", color = if (cover != null) c.ink else fg, fontSize = 24.sp, fontWeight = if (here.isNotEmpty()) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = if (cover != null) Modifier.background(c.bg, Corner).padding(horizontal = 6.dp) else Modifier)
+                                if (cover == null) here.take(2).forEach { rd ->
                                     val color = if (rd.eventId.startsWith("log-")) c.soft else trip
                                     if (compact) Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(6.dp).background(color))
                                     else Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -195,72 +200,101 @@ private fun RecordMonth(month: java.time.YearMonth, onMonth: (java.time.YearMont
     }
 }
 
-/** One day as a rail, like the 오늘 timeline: every stop the car made, oldest first, trips under their own title. */
+/**
+ * One day as a photo journal (정원 2026-10-31: 시간표보다 남긴 말과 사진을 감성 있게). The day's best photo on top,
+ * then each place that has something to remember: its photos big, the line written there in large type, the
+ * group's comments with names; time and parking last, small. Places with nothing left fold into one line.
+ */
 @Composable
 private fun DayTimeline(vm: CarHomeViewModel, date: LocalDate, rds: List<RecordDay>) {
     val c = LocalCarColors.current
-    Column(Modifier.fillMaxSize()) {
-        Text(dayText(date), color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        if (rds.isEmpty()) Text("이 날은 기록이 없어요 · 표시된 날을 눌러요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
-        Column(Modifier.weight(1f).padding(top = 8.dp).verticalScroll(rememberScrollState())) {
-            rds.forEach { rd ->
-                val recs by remember(rd) { vm.recordsOf(rd) }.collectAsState(initial = null)
-                Text(rd.title, color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-                when {
-                    recs == null -> Text("불러오는 중", color = c.soft, fontSize = 24.sp)
-                    recs!!.isEmpty() -> Text("기록 칸이 없어요", color = c.soft, fontSize = 24.sp)
-                    else -> recs!!.forEachIndexed { i, r -> RecordNode(r, recs!!.getOrNull(i + 1), first = i == 0) }
-                }
-            }
+    val loaded = rds.map { rd ->
+        val recs by remember(rd) { vm.recordsOf(rd) }.collectAsState(initial = null)
+        val comments by remember(rd) { vm.dayCommentsOf(rd) }.collectAsState(initial = emptyMap())
+        Triple(rd, recs, comments)
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        if (rds.isEmpty()) {
+            Text(dayText(date), color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            Text("이 날은 기록이 없어요 · 표시된 날을 눌러요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
         }
+        loaded.forEachIndexed { ti, (rd, recs, comments) ->
+            if (ti > 0) HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 24.dp))
+            val list = recs.orEmpty()
+            val photoCount = list.sumOf { it.photoUrls.size }
+            // The cover: the day's first photo, wide.
+            list.firstNotNullOfOrNull { it.photoUrls.firstOrNull() }?.let { Photo(it, Modifier.fillMaxWidth().height(260.dp)) }
+            Text(rd.title, color = c.ink, fontSize = 36.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = 14.dp))
+            Text(
+                listOfNotNull(dayText(date), list.size.takeIf { it > 0 }?.let { "${it}곳" }, photoCount.takeIf { it > 0 }?.let { "사진 ${it}장" }).joinToString("  ·  "),
+                color = c.soft, fontSize = 20.sp,
+            )
+            if (recs == null) Text("불러오는 중", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
+            val (memorable, plain) = list.partition { it.photoUrls.isNotEmpty() || it.note.isNotBlank() || comments[it.stopId].orEmpty().isNotEmpty() }
+            memorable.forEachIndexed { i, r ->
+                // The cover photo is not repeated under its own place.
+                val photos = if (i == 0) r.photoUrls.drop(1) else r.photoUrls
+                JournalEntry(r, photos, comments[r.stopId].orEmpty())
+            }
+            if (plain.isNotEmpty()) {
+                val hm = remember { SimpleDateFormat("HH:mm", Locale.KOREA) }
+                Text(
+                    "그 외 들른 곳  " + plain.joinToString("  ·  ") { r -> r.place.name.ifBlank { "이름 없는 곳" } + (r.arrivedAt?.toDate()?.let { " " + hm.format(it) } ?: "") },
+                    color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 20.dp),
+                )
+            }
+            if (recs != null && list.isEmpty()) Text("기록 칸이 없어요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
+        }
+        Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 28.dp, bottom = 12.dp))
     }
 }
 
-/** A record on the rail: grey ✓ node (it happened), time and stay on the left, place, line, parking and photos. */
+/** One place in the journal: photos first, then the words — mine big, the group's as named bubbles — then the facts. */
 @Composable
-private fun RecordNode(r: Record, next: Record?, first: Boolean) {
+private fun JournalEntry(r: Record, photos: List<String>, comments: List<StopComment>) {
     val c = LocalCarColors.current
     val hm = remember { SimpleDateFormat("HH:mm", Locale.KOREA) }
-    val arrived = r.arrivedAt?.toDate()
-    val left = r.leftAt?.toDate()
-    val passed = c.railPassed
-    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
-        Box(
-            Modifier.width(56.dp).fillMaxHeight().drawBehind {
-                val x = size.width / 2
-                val cy = 20.dp.toPx()
-                val w = 4.dp.toPx()
-                if (!first) drawLine(passed, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, cy), w)
-                if (next != null) drawLine(passed, androidx.compose.ui.geometry.Offset(x, cy), androidx.compose.ui.geometry.Offset(x, size.height), w)
-            },
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Box(Modifier.padding(top = 8.dp).size(24.dp).clip(CircleShape).background(passed), contentAlignment = Alignment.Center) {
-                Text("✓", color = androidx.compose.ui.graphics.Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        Column(Modifier.weight(1f).padding(bottom = if (next != null) 28.dp else 8.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(Modifier.width(110.dp)) {
-                    Text(arrived?.let(hm::format) ?: "—", color = c.ink, fontSize = 26.sp)
-                    if (arrived != null && left != null) Text("${((left.time - arrived.time) / 60_000).coerceAtLeast(1)}분 머묾", color = c.soft, fontSize = 20.sp)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(r.place.name.ifBlank { "이름 없는 곳" }, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    listOfNotNull(if (r.unplanned) "계획 밖" else null, r.photoUrls.size.takeIf { it > 0 }?.let { "사진 ${it}장" }, r.parkingNote.ifBlank { null }?.let { "주차 $it" })
-                        .joinToString(" · ").takeIf { it.isNotEmpty() }?.let { Text(it, color = c.soft, fontSize = 20.sp) }
-                    // The line written there, as a bubble (like the group's comments on the 오늘 rail).
-                    if (r.note.isNotBlank()) Text(
-                        r.note, color = c.ink, fontSize = 24.sp, maxLines = 3,
-                        modifier = Modifier.padding(top = 8.dp).border(1.dp, c.line, Corner).padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
+    Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
+        when (photos.size) {
+            0 -> {}
+            1 -> Photo(photos[0], Modifier.fillMaxWidth().height(220.dp))
+            else -> photos.chunked(2).forEach { row ->
+                Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { Photo(it, Modifier.weight(1f).height(170.dp)) }
+                    if (row.size == 1) Box(Modifier.weight(1f))
                 }
             }
-            // The drive to the next stop, from leaving here to arriving there.
-            val nextAt = next?.arrivedAt?.toDate()
-            if (left != null && nextAt != null && nextAt.after(left)) Text("이동 ${((nextAt.time - left.time) / 60_000).coerceAtLeast(1)}분", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(start = 110.dp, top = 10.dp))
         }
+        Text(r.place.name.ifBlank { "이름 없는 곳" }, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = if (photos.isEmpty()) 0.dp else 12.dp))
+        if (r.note.isNotBlank()) Text(r.note, color = c.ink, fontSize = 30.sp, lineHeight = 42.sp, modifier = Modifier.padding(top = 6.dp))
+        comments.forEach { cm ->
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+                Text(cm.who, color = c.soft, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(72.dp).padding(top = 8.dp))
+                Text(cm.text, color = c.ink, fontSize = 24.sp, modifier = Modifier.border(1.dp, c.line, Corner).padding(horizontal = 14.dp, vertical = 8.dp))
+            }
+        }
+        val arrived = r.arrivedAt?.toDate()
+        val left = r.leftAt?.toDate()
+        Text(
+            listOfNotNull(
+                arrived?.let(hm::format),
+                if (arrived != null && left != null) "${((left.time - arrived.time) / 60_000).coerceAtLeast(1)}분" else null,
+                r.parkingNote.ifBlank { null }?.let { "주차 $it" },
+                if (r.unplanned) "계획 밖" else null,
+            ).joinToString("  ·  "),
+            color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 10.dp),
+        )
     }
+}
+
+/** A record photo from Storage, cropped to its frame; the frame is grey while it loads. */
+@Composable
+private fun Photo(url: String, modifier: Modifier) {
+    val c = LocalCarColors.current
+    coil3.compose.AsyncImage(
+        model = url, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        modifier = modifier.clip(Corner).background(c.sheet),
+    )
 }
 
 /**

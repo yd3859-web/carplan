@@ -302,6 +302,24 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .map { list -> list.sortedBy { it.arrivedAt?.toDate()?.time ?: Long.MAX_VALUE } }
         .catch { emit(emptyList()) }
 
+    /** 기록 일기장: the group's comments of that day by place (the stop a record was made at), names resolved. */
+    fun dayCommentsOf(d: RecordDay) = com.htb.carplan.shared.data.TripRepository().observeDayComments(d.groupId, d.eventId, d.date.toString())
+        .map { list ->
+            list.filter { it.stopId != null }.sortedBy { it.createdAt?.toDate()?.time ?: Long.MAX_VALUE }
+                .groupBy({ it.stopId!! }, { StopComment(commenterNames[it.uid] ?: loadName(it.uid), it.text, null) })
+        }
+        .catch { emit(emptyMap()) }
+
+    /** The first photo of a day, for its calendar cell (one read per day, kept). */
+    private val covers = HashMap<String, String?>()
+    suspend fun coverOf(d: RecordDay): String? {
+        val key = "${d.groupId}/${d.eventId}/${d.date}"
+        if (covers.containsKey(key)) return covers[key]
+        val url = runCatching { com.htb.carplan.shared.data.RecordRepository().daySummary(d.groupId, d.eventId, d.date.toString()).firstNotNullOfOrNull { it.photoUrls.firstOrNull() } }.getOrNull()
+        covers[key] = url
+        return url
+    }
+
     private val maintenance = com.htb.carplan.shared.data.MaintenanceRepository()
     /** 차량 관리 events of the owner: records (past) and dues (`due-*`). */
     val careEvents: StateFlow<List<Event>> = owner
