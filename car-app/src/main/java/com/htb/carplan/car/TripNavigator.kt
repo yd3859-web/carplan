@@ -166,7 +166,11 @@ class TripNavigator(
     private val _stations = MutableStateFlow<List<GasStation>>(emptyList())
     /** Cheapest stations near the car after "응" (12장); the screen lists the top 3. */
     val stations: StateFlow<List<GasStation>> = _stations.asStateFlow()
-    private var fakeDrive: Job? = null
+    /** The simulator is playing the day: position, remaining distance and ETA come from it, not the navigation. */
+    @Volatile var simActive = false
+    private var simEtaAt = 0L
+    /** The car has driven since the last record: getting in (door / P at start) is not an arrival. */
+    private var drovenSinceRecord = false
     private val _notice = MutableStateFlow<String?>(null)
     /** Short status for the screen ("기록 칸: 서현역 12:40"). */
     val notice: StateFlow<String?> = _notice.asStateFlow()
@@ -204,6 +208,7 @@ class TripNavigator(
             override fun onDestinationArrived(info: DestinationArrivedInfo) { Log.i(TAG, "destination arrived ${info.name}"); onArrived() }
             override fun onRouteStarted(info: RouteStartInfo) { onRouteStarted(info.duration) }
             override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
+                if (simActive) return // the simulator owns the position (the emulator GPS never moves)
                 lastLocation = info.latitude to info.longitude
                 lastAddress = info.address
                 _live.update { it.copy(lat = info.latitude, lng = info.longitude, heading = info.heading, address = info.address) }
@@ -213,6 +218,7 @@ class TripNavigator(
                 _live.update { it.copy(turn = t?.type, turnMeters = t?.distance, turnText = t?.description) }
             }
             override fun onDrivingInfo(info: DrivingInfo) {
+                if (simActive) return
                 // The nearest point we are driving to: the first waypoint while any remain, else the destination.
                 val next = info.waypoints.firstOrNull() ?: info.destination
                 _live.update { it.copy(remainMeters = next.distance, remainSeconds = next.duration, nextName = next.name) }
@@ -253,9 +259,10 @@ class TripNavigator(
             fuelAtPark = carState.fuelPercent; fueledAsked = false
             router.requestCurrentLocation()
             parkTimer?.cancel()
-            parkTimer = scope.launch { delay(PARK_CONFIRM_MS); confirmArrival(reason = "P 5분") }
+            if (drovenSinceRecord) parkTimer = scope.launch { delay(PARK_CONFIRM_MS); confirmArrival(reason = "P 5분") }
         }
         if (prev == Gear.P && gear != Gear.P) {
+            drovenSinceRecord = true
             parkTimer?.cancel()
             parkedRecord?.let { (g, e, r) -> scope.launch { runCatching { records.markLeft(g, e, parkedDate, r) } } }
             parkedRecord = null
@@ -264,12 +271,12 @@ class TripNavigator(
 
     /** Driver door opened (from [VehicleMonitor]): in P that means "내렸다" → arrival now (Q34). */
     fun onDriverDoorOpened() {
-        if (lastGear == Gear.P) { parkTimer?.cancel(); confirmArrival(reason = "운전석 문") }
+        if (lastGear == Gear.P && drovenSinceRecord) { parkTimer?.cancel(); confirmArrival(reason = "운전석 문") }
     }
 
     /** Driver's belt unbuckled while parked (13장 2): same meaning as the door — about to get out. */
     fun onDriverUnbuckled() {
-        if (lastGear == Gear.P) { parkTimer?.cancel(); confirmArrival(reason = "운전석 벨트") }
+        if (lastGear == Gear.P && drovenSinceRecord) { parkTimer?.cancel(); confirmArrival(reason = "운전석 벨트") }
     }
 
     /**
@@ -279,6 +286,7 @@ class TripNavigator(
      */
     private fun confirmArrival(reason: String, assumeAtNext: Boolean = false) {
         if (parkedRecord != null) return
+        drovenSinceRecord = false
         scope.launch {
             val t = trip.value
             val today = LocalDate.now().toString()
@@ -512,45 +520,61 @@ class TripNavigator(
         return km * 1.3
     }
 
-    // ---------- 20장: fake drive for the demo ----------
+    // ---------- 시뮬레이션 (DriveSimulator) ----------
 
-    /** Plays the day: every few seconds the car "arrives" at the next stop (records included). */
-    fun playFakeDrive(stepMs: Long = 6_000) {
-        fakeDrive?.cancel()
-        fakeDrive = scope.launch {
-            // Pickups first (11장 Q28): glide to each waiting pickup, then the planned stops.
-            while (true) {
-                val t = trip.value ?: break
-                val target = t.waitingPickups.firstOrNull()?.place ?: t.next?.place ?: break
-                val isPickup = t.waitingPickups.isNotEmpty()
-                // 17장 demo: the "곧 도착해요" / "주차장 찾아봐 주세요" pushes fire as the fake car closes in.
-                if (isPickup) runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, t.waitingPickups.first().uid, 120) }
-                else t.next?.let { n -> if (t.day?.parkingHintStopId != n.id) runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }
-                val from = lastLocation ?: (target.lat + 0.02 to target.lng - 0.02)
-                val steps = (stepMs / 1000).toInt().coerceAtLeast(3)
-                for (i in 1..steps) {
-                    delay(1000)
-                    val f = i.toDouble() / steps
-                    lastLocation = (from.first + (target.lat - from.first) * f) to (from.second + (target.lng - from.second) * f)
-                    if (t.day?.pickupSharing == true) carId.value?.let { id -> runCatching { cars.updateLocation(id, lastLocation!!.first, lastLocation!!.second) } }
-                }
-                if (isPickup) {
-                    val uid = t.waitingPickups.first().uid
-                    runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
-                    _notice.value = "픽업 장소 도착 (가짜 주행)"
-                    // demo: the passenger "boards" after a moment
-                    delay(3000)
-                    runCatching { pickupsRepo.setStatus(t.groupId, t.eventId, t.date, uid, PickupStatus.ON_BOARD) }
-                } else {
-                    parkedRecord = null
-                    confirmArrival(reason = "가짜 주행", assumeAtNext = true)
-                }
-            }
-            _notice.value = "가짜 주행 끝"
+    fun simLocation(): Pair<Double, Double>? = lastLocation
+
+    /** The simulated car moved: same effect as a navigation location + driving-info update. */
+    fun simMove(lat: Double, lng: Double, remainMeters: Int, remainSeconds: Int, nextName: String) {
+        lastLocation = lat to lng
+        _live.update { it.copy(lat = lat, lng = lng, remainMeters = remainMeters, remainSeconds = remainSeconds, nextName = nextName) }
+    }
+
+    /** Parked: the leg is over, so no "0 m · 1분" left on screen. */
+    fun simParked() = _live.update { it.copy(remainMeters = null, remainSeconds = null) }
+
+    /** "응" to the start question, if that is what is on screen (not a fuel or change question). */
+    fun simAnswerStart() {
+        val p = _prompt.value
+        if (p == null) { if (!_guiding.value) go(); return }
+        if (p.reason in setOf(PromptReason.APP_START, PromptReason.GEAR_D, PromptReason.MANUAL, PromptReason.PICKUP)) go()
+    }
+
+    /** 11장 phones: "약 n분" for the first pickup (every 5 s, not every tick). */
+    fun simEta(remainSeconds: Int, isPickup: Boolean) {
+        val now = System.currentTimeMillis()
+        if (!isPickup || now - simEtaAt < SHARE_INTERVAL_MS) return
+        simEtaAt = now
+        val t = trip.value ?: return
+        val uid = t.waitingPickups.firstOrNull()?.uid ?: return
+        scope.launch { runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, uid, remainSeconds.toLong()) } }
+    }
+
+    /** 12장: five minutes before the next stop → "주차장 찾아봐 주세요" push. */
+    fun simParkingHint() {
+        val t = trip.value ?: return
+        val n = t.next ?: return
+        if (t.day?.parkingHintStopId != n.id) scope.launch { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }
+    }
+
+    /** The car reached a pickup place (what the navigation's waypoint event does on a real road). */
+    fun simArrivedPickup(uid: String) {
+        val t = trip.value ?: return
+        routedPickups = routedPickups.filterNot { it == uid }
+        scope.launch {
+            runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
+            _notice.value = "픽업 장소 도착 · ${t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"}"
         }
     }
 
-    fun stopFakeDrive() { fakeDrive?.cancel(); fakeDrive = null }
+    /** The passenger got in (phones normally press [탔어요]). */
+    fun simBoarded(uid: String) {
+        val t = trip.value ?: return
+        scope.launch { runCatching { pickupsRepo.setStatus(t.groupId, t.eventId, t.date, uid, PickupStatus.ON_BOARD) } }
+    }
+
+    /** A stop the simulator cannot drive to (no coordinates): tick it off and move on. */
+    fun simSkip() = onArrived()
 
     private fun ask(reason: PromptReason) {
         val t = trip.value ?: return
@@ -745,7 +769,7 @@ class TripNavigator(
                 delay(2_000)
                 val t = trip.value
                 val here = lastLocation
-                if (t != null && here != null && fakeDrive?.isActive != true) {
+                if (t != null && here != null && !simActive) {
                     val from = Place(name = "차", lat = here.first, lng = here.second)
                     val pickup = routedPickups.firstOrNull()?.let { uid -> t.pickups.firstOrNull { it.uid == uid && it.status == PickupStatus.WAITING && it.place.hasCoords() } }
                     if (pickup != null) {
@@ -784,7 +808,8 @@ class TripNavigator(
             // 11장 3: pickups ride in front of the planned stops.
             router.route(pick.map { it.place } + withCoords.map { it.place })
             routed = withCoords.map { it.id }
-            router.openNavigation()
+            // While simulating, keep our screen in front (the route still goes to the navigation).
+            if (!simActive) router.openNavigation()
         }
         lastRouteSentAt = System.currentTimeMillis()
         _guiding.value = true

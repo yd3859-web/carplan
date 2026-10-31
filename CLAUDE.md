@@ -102,7 +102,8 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 14장 짧은 영상 내보내기 완료(`phone/record/DayVideo.kt`, MediaCodec YUV420 입력 → mp4, 에뮬 미확인). 기획서 대비 안 만든 기능 없음(2026-10-30 저녁 기준).
 - Q05 구글 캘린더 읽기 완료(`phone/calendar/GoogleCalendar.kt`, AuthorizationClient calendar.readonly, 설정 탭 스위치, 메모리에만). GCP `carplan-htb`에 Google Calendar API 사용 설정 필요(Chrome으로 켬). Storage 규칙 멤버만 배포됨(2026-10-30).
 - **2026-10-30 밤 상태**: 기획서(작동시나리오) 기능은 전부 코드 있음. 서버(규칙·Functions 6개·Storage·Hosting) 배포 끝. UI/UX 1차 개편 끝(차 첫 화면 두 모양·질문 패널·더보기·일정 추가 전체 화면·차 다트 게임 / 폰 레일 칸 접기·⋮ 메뉴·그룹 [+]·기록 일기장·차량 탭 상세·글자 크기 한 단계). 사용 흐름 평가 60~65%.
-- **다음 작업은 `docs/다음작업_플랜.md`부터**: 0 시뮬레이션 뼈대 → 1 차 UI/UX → 2 폰 UI/UX → 3 시연 시나리오, 그 뒤 새 기능 아이디어(★출발 시각 역산·늦을 때 공유·주차 위치). 불편한 점·평가·아이디어는 `docs/UX_메모.md`, 빌드·설치는 `docs/앱_켜는_법.txt`, 확인 목록은 `docs/테스트체크리스트.md`(F11 착석·문 잠금, G 실기기).
+- **0단계 시뮬레이션 끝(2026-10-31)**: 차 `DriveSimulator.kt` — 시연 메뉴 [오늘 시험 여행 만들기]→[시뮬레이션 재생]. 앱이 에뮬 안 Virtual Console(127.0.0.1:8088)에 기어·속도·문을 직접 보냄, 위치는 카카오 도로 좌표. 좌석 SDK 이벤트는 에뮬에서 거의 안 옴(앱에 직접 넣음).
+- **다음 작업은 `docs/다음작업_플랜.md`부터**: ~~0 시뮬레이션 뼈대~~ → 1 차 UI/UX → 2 폰 UI/UX → 3 시연 시나리오, 그 뒤 새 기능 아이디어(★출발 시각 역산·늦을 때 공유·주차 위치). 불편한 점·평가·아이디어는 `docs/UX_메모.md`, 빌드·설치는 `docs/앱_켜는_법.txt`, 확인 목록은 `docs/테스트체크리스트.md`(F11 착석·문 잠금, G 실기기).
 - 정원 원칙: 대회·제출물·PT 얘기는 꺼내지 않는다. 개발(UI/UX)만. 고칠 때마다 에뮬로 써 보고 불편한 점을 UX_메모에 쌓아 보고.
 - Firestore 18장 규칙 **배포됨**(2026-10-30, 실서버 23개 경우 통과). 개발용으로 되돌리려면 `cp firestore.dev.rules firestore.rules` 후 정원이 다시 배포.
 

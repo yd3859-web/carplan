@@ -133,6 +133,11 @@ class VehicleMonitor(private val context: Context) {
         }
     }
 
+    // 시뮬레이션 without the Virtual Console: the simulator plays the signals straight into the monitor.
+    fun simGear(g: Gear) = _state.update { it.copy(gear = g) }
+    fun simDriverDoorOpened() { _driverDoorOpened.tryEmit(Unit) }
+    fun simPassengerSeated() { _passengerSeated.tryEmit(SeatValue.ROW_1_RIGHT) }
+
     fun stop() {
         handler.removeCallbacksAndMessages(null)
         vehicle?.release()

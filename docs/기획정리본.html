@@ -541,7 +541,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   <div class="tbl"><table>
     <thead><tr><th>항목</th><th>판정</th><th>내용</th></tr></thead>
     <tbody>
-      <tr><td>바꿀 수 있는 것</td><td class="yes">된다</td><td>기어·브레이크·조향각·주행거리(Motion), 크루즈(ADAS), 문·창문·트렁크·좌석·조명·와이퍼(Convenience), 경고등(Safety), 주행가능거리·배터리·충전(Energy), 공조(Climate)</td></tr>
+      <tr><td>바꿀 수 있는 것</td><td class="yes">된다</td><td>기어·브레이크·조향각·주행거리(Motion), 크루즈(ADAS), 문·창문·트렁크·좌석·조명·와이퍼(Convenience) — 단 좌석 착석은 앱의 SDK 이벤트가 거의 안 온다(2026-10-31: 80초에 2번, 값도 늦음). 앱 안에서도 127.0.0.1:8088로 바로 조작 가능(시뮬레이션이 씀), 경고등(Safety), 주행가능거리·배터리·충전(Energy), 공조(Climate)</td></tr>
       <tr><td>속도</td><td class="yes">된다</td><td>공식 문서에는 없지만 콘솔 화면의 속도 값이 차량 속도로 들어가고 주행 제한도 켜짐(직접 확인)</td></tr>
       <tr><td>차 위치 움직이기</td><td class="no">없다</td><td>공식 문서(설치·설정·콘솔 셋업·사용 가이드, 릴리스 노트)와 콘솔 코드 어디에도 GPS·위치·경로·내비 모의 주행이 없다. 속도를 넣어도 내비 위치는 그대로</td></tr>
       <tr><td>3D 고속도로·숲 화면</td><td class="ref-c">보기용</td><td>문서: "테마 변경은 차량 테스트 기능에 영향을 주지 않는다". P단일 때 테마 전환, 1인칭·3인칭 카메라</td></tr>

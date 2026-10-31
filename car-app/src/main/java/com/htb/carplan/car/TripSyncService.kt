@@ -96,6 +96,16 @@ object CarRuntime {
     fun voice(context: Context): VoicePrompt =
         voice ?: VoicePrompt(context.applicationContext).also { it.start(); voice = it }
 
+    private var simulator: DriveSimulator? = null
+
+    /** 시뮬레이션: plays today's trip through the Virtual Console (one per process). */
+    @Synchronized
+    fun simulator(context: Context): DriveSimulator =
+        simulator ?: DriveSimulator(navigator(context), monitor(context), scope) {
+            val app = context.applicationContext
+            app.startActivity(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        }.also { simulator = it }
+
     /** 9장 "다음 목적지로 갈까요?" — one per process, shared by the service and the screen. */
     @Synchronized
     fun navigator(context: Context): TripNavigator =

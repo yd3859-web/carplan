@@ -57,6 +57,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -141,11 +142,15 @@ private fun CarHome(vm: CarHomeViewModel) {
     LaunchedEffect(Unit) {
         vm.passengerSeated.collect { if (!vm.vehicle.value.drivingRestricted) { seatedPrompt = true; qr = true } }
     }
+    // Moving off closes the boarding QR: nobody scans while the car drives.
+    LaunchedEffect(vehicle.gear) { if (vehicle.gear == com.htb.carplan.shared.model.Gear.D && seatedPrompt) { qr = false; seatedPrompt = false } }
 
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
         StatusBand(car, vehicle, qrGroup?.name, passengers, careDue)
+        val sim by vm.sim.collectAsStateWithLifecycle()
+        if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim)
         error?.let { Text("오류: $it", color = Warn, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         notice?.let { Text(it, color = Accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
@@ -620,6 +625,22 @@ private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Un
     }
 }
 
+/** 시뮬레이션이 도는 동안 맨 위 한 줄: 지금 무슨 장면인지 + 일시정지·배속·끝. */
+@Composable
+private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onStop: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("시뮬레이션", color = Soft, fontSize = 18.sp)
+        Text(sim.phase, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        sim.remainMeters?.let { Text(if (it >= 1000) "%.1f km".format(it / 1000.0) else "$it m", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) }
+        if (!sim.viaConsole) Text("콘솔 없이", color = Soft, fontSize = 16.sp)
+        Spacer(Modifier.weight(1f))
+        OutlinedButton(onClick = onPause, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.paused) "계속" else "일시정지", color = Ink, fontSize = 18.sp) }
+        OutlinedButton(onClick = onSpeed, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.speedX == 1) "2배속" else "1배속", color = Ink, fontSize = 18.sp) }
+        TextButton(onClick = onStop) { Text("끝", color = Soft, fontSize = 18.sp) }
+    }
+    HorizontalDivider(color = Line)
+}
+
 /** 20장: demo controls — fuel %, car type, fake drive, arrival. */
 @Composable
 private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit) {
@@ -636,10 +657,12 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                     FilterChip(selected = false, onClick = { vm.setEvOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
                 }
                 HorizontalDivider(color = Line)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { vm.playFakeDrive(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("가짜 주행 재생 (6초마다 다음 칸 도착)", fontSize = 18.sp) }
-                    TextButton(onClick = { vm.stopFakeDrive() }) { Text("멈춤", fontSize = 18.sp, color = Soft) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("시뮬레이션 재생", fontSize = 18.sp) }
+                    TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 18.sp, color = Soft) }
+                    TextButton(onClick = { vm.makeTestTrip() }) { Text(if (vm.trip.value?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 18.sp, color = Ink) }
                 }
+                Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 16.sp, color = Soft)
                 Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 16.sp, color = Soft)
                 HorizontalDivider(color = Line)
                 val split by vm.previewSplit.collectAsStateWithLifecycle()

@@ -135,8 +135,12 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     // 20장 디버그 메뉴
     fun setFuelOverride(percent: Double?) { monitor.fuelOverride = percent }
     fun setEvOverride(ev: Boolean?) { monitor.evOverride = ev }
-    fun playFakeDrive() = navigator.playFakeDrive()
-    fun stopFakeDrive() = navigator.stopFakeDrive()
+    private val simulator = CarRuntime.simulator(app)
+    val sim: StateFlow<SimState> = simulator.state
+    fun playSim() = simulator.play()
+    fun stopSim() = simulator.stop()
+    fun pauseSim() = simulator.togglePause()
+    fun speedSim() = simulator.toggleSpeed()
 
     private val carId = MutableStateFlow<String?>(null)
     private val _error = MutableStateFlow<String?>(null)
@@ -246,6 +250,35 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun debugArrive() = navigator.debugArrive()
 
     /** 차에서 일정 만들기 (Q19), parked only. Goes to the owner's solo group. */
+    /** 시연 메뉴: a fresh trip today (or the same one rewound) (3 stops around Pangyo, this car) so the simulation always has something to play. */
+    fun makeTestTrip() {
+        val u = owner.value ?: return
+        val id = carId.value ?: return
+        val today = LocalDate.now().toString()
+        // Played already today: rewind it instead of piling up another trip (the car would keep showing the finished one).
+        trip.value?.takeIf { it.title == "시험 여행" }?.let { t ->
+            viewModelScope.launch {
+                runCatching {
+                    val trips = TripRepository()
+                    t.stops.filter { it.visited }.forEach { trips.setVisited(t.groupId, t.eventId, t.date, it.id, false, 0) }
+                    trips.setDayStatus(t.groupId, t.eventId, t.date, com.htb.carplan.shared.model.DayStatus.READY)
+                }.onFailure { _error.value = it.message }
+            }
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                val eventId = calendar.addEvent(u.soloGroupId, Event(categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id, title = "시험 여행", startDate = today, endDate = today, carId = id, createdBy = u.uid))
+                val trips = TripRepository()
+                listOf(
+                    Triple(Place(name = "판교역", lat = 37.3948, lng = 127.1112), "10:00", "여기서 출발"),
+                    Triple(Place(name = "율동공원", lat = 37.3802, lng = 127.1497), "11:00", "산책"),
+                    Triple(Place(name = "정자역", lat = 37.3670, lng = 127.1085), "12:30", "점심"),
+                ).forEach { (place, time, memo) -> trips.addStop(u.soloGroupId, eventId, today, place, time, memo, u.uid) }
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     fun addEvent(event: Event) {
         val u = owner.value ?: return
         viewModelScope.launch {
