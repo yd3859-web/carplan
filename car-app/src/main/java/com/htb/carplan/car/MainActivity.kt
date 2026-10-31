@@ -150,6 +150,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     var dartOpen by remember { mutableStateOf(false) }
     val dart by vm.dart.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
+    var addDate by remember { mutableStateOf(LocalDate.now()) }
     var qr by remember { mutableStateOf(false) }
     var seatedPrompt by remember { mutableStateOf(false) }
     /** Someone sat down while a question was on screen: the QR waits until it is answered. */
@@ -201,7 +202,13 @@ private fun CarHome(vm: CarHomeViewModel) {
         val restricted = vehicle.drivingRestricted
         val forceSplit by vm.previewSplit.collectAsStateWithLifecycle()
         val nextComment by vm.nextComment.collectAsStateWithLifecycle()
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        // 주차 중엔 폰 앱처럼 (정원 2026-10-31): a tab rail on the driver's side. Driving: only 오늘, no rail.
+        var tab by remember { mutableStateOf(CarTab.TODAY) }
+        LaunchedEffect(restricted) { if (restricted) tab = CarTab.TODAY }
+        Row(Modifier.fillMaxSize()) {
+        if (!restricted) TabRail(tab, onTab = { tab = it })
+        if (tab == CarTab.CALENDAR) CarCalendar(vm, onAdd = { d -> addDate = d; adding = true }, onGoTo = { e -> vm.goTo(e); tab = CarTab.TODAY })
+        else BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
             // Two shapes (정원 2026-10-30): alone → wide; next to the navigation (half the app area) → the day's timeline, big.
             val wide = maxWidth >= 1100.dp
             // Our window is half the app area → the driver put us next to the navigation (Pleos 1:1 split).
@@ -224,6 +231,7 @@ private fun CarHome(vm: CarHomeViewModel) {
             }
         // Pleos 주행 제한: buttons are disabled while moving (view only); the voice question's two buttons stay usable.
         }
+        }
     }
 
     if (more && !vehicle.drivingRestricted) MoreDialog(
@@ -240,7 +248,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         onDismiss = { more = false },
     )
     if (adding && !vehicle.drivingRestricted) {
-        CarAddDialog(onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false })
+        CarAddDialog(date = addDate, onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false; addDate = LocalDate.now() })
     }
     if (pickTrip && trip != null && !vehicle.drivingRestricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { CarCloseButton(onClick = { pickTrip = false }) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -970,9 +978,10 @@ private fun qrBitmap(text: String, size: Int): Bitmap {
 
 /** 차에서 일정 만들기 (Q19): full screen, big fields, hours as buttons, never closed by a stray tap. */
 @Composable
-private fun CarAddDialog(onSave: (Event) -> Unit, onDismiss: () -> Unit) {
+private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> Unit, onDismiss: () -> Unit) {
     var title by remember { mutableStateOf("") }
-    var dayOffset by remember { mutableStateOf(0L) }
+    // Opened from the calendar on a later day: that day is already chosen.
+    var dayOffset by remember { mutableStateOf(java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)) }
     var hour by remember { mutableStateOf<Int?>(null) }
     var half by remember { mutableStateOf(false) }
     var place by remember { mutableStateOf("") }
@@ -991,7 +1000,7 @@ private fun CarAddDialog(onSave: (Event) -> Unit, onDismiss: () -> Unit) {
             Spacer(Modifier.height(18.dp))
             Text("언제", color = Soft, fontSize = 20.sp)
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("오늘" to 0L, "내일" to 1L, "모레" to 2L).forEach { (label, off) ->
+                (listOf("오늘" to 0L, "내일" to 1L, "모레" to 2L) + (if (dayOffset > 2 || dayOffset < 0) listOf(dayLabel(LocalDate.now().plusDays(dayOffset)) to dayOffset) else emptyList())).forEach { (label, off) ->
                     FilterChip(selected = dayOffset == off, onClick = { dayOffset = off }, shape = Corner, colors = chipColors(), label = { Text(label, fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
                 }
             }
@@ -1014,10 +1023,15 @@ private fun CarAddDialog(onSave: (Event) -> Unit, onDismiss: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth().height(96.dp), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk, disabledContainerColor = Disabled, disabledContentColor = Soft),
-            ) { Text(listOfNotNull(listOf("오늘", "내일", "모레")[dayOffset.toInt()], time ?: "종일", title.ifBlank { null }).joinToString("  ") + "  추가", fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+            ) { Text(listOfNotNull(dayLabel(LocalDate.now().plusDays(dayOffset)), time ?: "종일", title.ifBlank { null }).joinToString("  ") + "  추가", fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
         }
     }
 }
 
 private fun dayTitle(date: LocalDate) =
     "${date.monthValue}월 ${date.dayOfMonth}일 (${date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})"
+
+/** "오늘" / "내일" / "모레" / "11월 3일" */
+private fun dayLabel(d: LocalDate): String = when (java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), d)) {
+    0L -> "오늘"; 1L -> "내일"; 2L -> "모레"; else -> "${d.monthValue}월 ${d.dayOfMonth}일"
+}

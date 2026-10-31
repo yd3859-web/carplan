@@ -209,6 +209,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 캘린더 탭 (주차 중): the month on screen and its events (repeating ones included, Repeat expands them per day). */
+    val calMonth = MutableStateFlow(java.time.YearMonth.now())
+    val monthEvents: StateFlow<List<CalendarEvent>> = combine(owner, calMonth) { u, m -> u to m }
+        .flatMapLatest { (u, m) ->
+            if (u == null) flowOf(emptyList())
+            else calendar.observeGroups(u.uid).map { gs -> gs.map { it.id } }
+                .flatMapLatest { ids -> calendar.observeEvents(ids, m.atDay(1).toString(), m.atEndOfMonth().toString()) }
+        }
+        .catch { _error.value = it.message; emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun eventsOn(date: LocalDate, all: List<CalendarEvent>): List<CalendarEvent> = all.filter { Repeat.occursOn(it.event, date) }
         .sortedWith(compareBy({ !it.event.allDay }, { it.event.startTime ?: "" }))
 
