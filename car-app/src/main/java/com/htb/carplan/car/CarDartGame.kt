@@ -112,7 +112,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
         Box(Modifier.fillMaxSize().background(Palette.Background)) {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text("닫기", fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold) }
+                    CarBackButton(onBack = onDismiss)
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
                         Text("다트 — 동네 뽑기", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                         Text("다트를 아래로 당겼다 놓으세요 · 폰에도 같이 떠요", fontSize = 20.sp, color = Palette.TextSoft)

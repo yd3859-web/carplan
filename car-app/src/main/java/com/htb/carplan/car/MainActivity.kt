@@ -942,8 +942,8 @@ private fun CarAddDialog(onSave: (Event) -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Column(Modifier.fillMaxSize().background(Bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("일정 추가", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("취소", fontSize = 24.sp, color = Soft) }
+                CarBackButton(onBack = onDismiss)
+                Text("일정 추가", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.padding(start = 16.dp))
             }
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
