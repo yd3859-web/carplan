@@ -128,7 +128,8 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
                         Box(Modifier.weight(1f).fillMaxHeight().padding(2.dp)) {
                             if (n in 1..days) {
                                 val d = month.atDay(n)
-                                val dayEvents = vm.eventsOn(d, events)
+                                // What the user registered shows, repeating ones too; the 시연 메뉴 test commute doesn't (정원 2026-10-31).
+                                val dayEvents = vm.eventsOn(d, events).filterNot { vm.isTestEvent(it.event) }
                                 val isPicked = d == picked
                                 Column(
                                     Modifier.fillMaxSize()
@@ -158,7 +159,7 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
     // The chosen day: what is on it, and the two things the car can do with it.
     Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp)) {
         Text("${picked.monthValue}월 ${picked.dayOfMonth}일 (${picked.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        val dayEvents = vm.eventsOn(picked, events)
+        val dayEvents = vm.eventsOn(picked, events).filterNot { vm.isTestEvent(it.event) }
         Column(Modifier.weight(1f).padding(top = 12.dp).verticalScroll(rememberScrollState())) {
             if (dayEvents.isEmpty()) Text("일정이 없어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
             dayEvents.forEach { item ->

@@ -373,6 +373,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
      * 시연 메뉴: a commute that is due right now (16장 "회사로 갈까요?" needs a repeating event with a place within
      * ±60 min). Every day, starting now, to "회사" in Pangyo. Pressing again replaces the previous test commute.
      */
+    /** The 시연 메뉴 test commute: it drives the 16장 question but is not the user's plan, so the calendar leaves it out. */
+    fun isTestEvent(e: Event) = e.memo == TEST_COMMUTE_MEMO
+
+    /** 시연 메뉴 [시험 출근 지우기]. */
+    fun removeTestCommute() {
+        viewModelScope.launch {
+            runCatching { monthEvents.value.plus(week.value).filter { isTestEvent(it.event) }.distinctBy { it.event.id }.forEach { calendar.setEventDeleted(it.groupId, it.event.id, true) } }
+                .onSuccess { navigator.notify("시험 출근을 지웠어요") }.onFailure { _error.value = it.message }
+        }
+    }
+
     fun makeTestCommute() {
         val u = owner.value ?: return
         viewModelScope.launch {

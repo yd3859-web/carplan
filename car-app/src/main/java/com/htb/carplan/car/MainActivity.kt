@@ -957,6 +957,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 HorizontalDivider(color = Line)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.removeTestCommute(); onDismiss() }) { Text("시험 출근 지우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeSecondTestTrip(); onDismiss() }) { Text("두 번째 여행", fontSize = 20.sp, color = Ink) }
                 }
