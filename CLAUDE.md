@@ -101,7 +101,9 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 18장 보안 규칙 = `firestore.rules`(= `firestore.prod.rules`, 에뮬레이터로 23개 경우 통과). 배포 완료(2026-10-30). 바꾸면 **정원이 직접** `firebase deploy --only firestore:rules`(Claude는 배포 권한 없음). 문제 생기면 `firestore.dev.rules`를 `firestore.rules`로 복사해 다시 배포. 규칙 테스트는 `firebase emulators:exec --only firestore "python3 -I <스크립트>"`로 가짜 JWT(alg none) + REST. 주의: v2 규칙에서 `{doc=**}`는 0단계도 잡아 부모 문서 규칙을 덮는다.
 - 14장 짧은 영상 내보내기 완료(`phone/record/DayVideo.kt`, MediaCodec YUV420 입력 → mp4, 에뮬 미확인). 기획서 대비 안 만든 기능 없음(2026-10-30 저녁 기준).
 - Q05 구글 캘린더 읽기 완료(`phone/calendar/GoogleCalendar.kt`, AuthorizationClient calendar.readonly, 설정 탭 스위치, 메모리에만). GCP `carplan-htb`에 Google Calendar API 사용 설정 필요(Chrome으로 켬). Storage 규칙 멤버만 배포됨(2026-10-30).
-- 다음(순서): 정원이 규칙 배포(`firebase deploy --only firestore:rules`)·Blaze → Functions·Storage 배포 → 에뮬 테스트 F2~F10 → release APK(`apk/팀명_carplan_release.apk`)·심사용 README → 기획서 DOCX(접수양식 받으면) → 시연 영상 → 시간 남으면 구글 캘린더 불러오기(Q05).
+- **2026-10-30 밤 상태**: 기획서(작동시나리오) 기능은 전부 코드 있음. 서버(규칙·Functions 6개·Storage·Hosting) 배포 끝. UI/UX 1차 개편 끝(차 첫 화면 두 모양·질문 패널·더보기·일정 추가 전체 화면·차 다트 게임 / 폰 레일 칸 접기·⋮ 메뉴·그룹 [+]·기록 일기장·차량 탭 상세·글자 크기 한 단계). 사용 흐름 평가 60~65%.
+- **다음 작업은 `docs/다음작업_플랜.md`부터**: 0 시뮬레이션 뼈대 → 1 차 UI/UX → 2 폰 UI/UX → 3 시연 시나리오, 그 뒤 새 기능 아이디어(★출발 시각 역산·늦을 때 공유·주차 위치). 불편한 점·평가·아이디어는 `docs/UX_메모.md`, 빌드·설치는 `docs/앱_켜는_법.txt`, 확인 목록은 `docs/테스트체크리스트.md`(F11 착석·문 잠금, G 실기기).
+- 정원 원칙: 대회·제출물·PT 얘기는 꺼내지 않는다. 개발(UI/UX)만. 고칠 때마다 에뮬로 써 보고 불편한 점을 UX_메모에 쌓아 보고.
 - Firestore 18장 규칙 **배포됨**(2026-10-30, 실서버 23개 경우 통과). 개발용으로 되돌리려면 `cp firestore.dev.rules firestore.rules` 후 정원이 다시 배포.
 
 ## 에뮬레이터 테스트 요령
