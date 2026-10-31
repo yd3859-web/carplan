@@ -90,8 +90,11 @@ class DriveSimulator(
         hold(5_000)
         while (true) {
             val t = navigator.trip.value ?: run { phase("오늘 여행이 없어요"); hold(3_000); return }
-            val pickup = t.waitingPickups.firstOrNull()
-            val target = pickup?.place ?: t.next?.place ?: break
+            // Drive to whatever the navigation holds first (a station picked on the way included), else the plan.
+            val entry = navigator.simTarget()
+            val station = entry?.kind == NaviEntry.Kind.STATION
+            val pickup = entry?.takeIf { it.kind == NaviEntry.Kind.PICKUP }?.let { e -> t.waitingPickups.firstOrNull { it.uid == e.id } } ?: t.waitingPickups.firstOrNull().takeIf { entry == null }
+            val target = entry?.place ?: pickup?.place ?: t.next?.place ?: break
             if (!target.hasCoords()) { phase("${target.name}: 좌표가 없어 건너뛰어요"); hold(3_000); navigator.simSkip(); continue }
             val name = pickup?.let { "${it.name.ifBlank { "일행" }} 픽업" } ?: target.name
 
@@ -104,13 +107,19 @@ class DriveSimulator(
             navigator.simAnswerStart()
             showUs()
 
-            drive(target, name, isPickup = pickup != null)
+            if (!drive(target, name, isPickup = pickup != null)) continue
 
             phase("$name 도착")
             speed(0)
             gear(Gear.P)
             navigator.simParked()
             hold(2_000)
+            if (station) {
+                navigator.simArrivedStation()
+                phase("$name · 넣는 중")
+                hold(4_000)
+                continue
+            }
             if (pickup != null) {
                 navigator.simArrivedPickup(pickup.uid)
                 hold(3_000)
@@ -144,8 +153,10 @@ class DriveSimulator(
     }
 
     /** Glides along the road from the car to [target]; the screen and the phones see the position move. */
-    private suspend fun drive(target: Place, name: String, isPickup: Boolean) {
+    /** Returns false when the navigation got a new first place mid-leg (a station picked on the way): start over. */
+    private suspend fun drive(target: Place, name: String, isPickup: Boolean): Boolean {
         phase("$name 가는 중", target = name)
+        val startEntry = navigator.simTarget()
         val here = navigator.simLocation()?.takeIf { RouteMath.metersBetween(it.first, it.second, target.lat, target.lng) < FAR_METERS }
             ?: (target.lat - 0.025 to target.lng - 0.03) // no sensible start (emulator GPS): begin ~4 km away
         val from = Place(name = "차", lat = here.first, lng = here.second)
@@ -166,6 +177,9 @@ class DriveSimulator(
         while (done < 1.0) {
             delay(TICK_MS)
             if (_state.value.paused) { speed(0); continue }
+            // The driver picked a petrol station: the navigation now leads there first — this leg is over.
+            val nowEntry = navigator.simTarget()
+            if (nowEntry != null && nowEntry.kind == NaviEntry.Kind.STATION && startEntry?.kind != NaviEntry.Kind.STATION) return false
             done = (done + TICK_MS * _state.value.speedX / screenMs).coerceAtMost(1.0)
             val at = pointAt(path, cum, total * done)
             val remainM = (total * (1 - done)).toInt()
@@ -182,6 +196,7 @@ class DriveSimulator(
             }
             if (!hinted && !isPickup && remainS <= 300) { hinted = true; navigator.simParkingHint() }
         }
+        return true
     }
 
     private fun showUs() = scope.launch { repeat(2) { delay(1_500); bringToFront() } }

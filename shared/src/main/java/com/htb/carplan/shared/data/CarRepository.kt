@@ -44,8 +44,8 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
                 "state.rangeKm" to state.rangeKm,
                 "state.isEv" to state.isEv,
                 "state.odometerKm" to state.odometerKm,
-                "state.lat" to state.lat,
-                "state.lng" to state.lng,
+                // Position is written only by updateLocation (11장 P1): the monitor never has one, and writing null
+                // here wiped the shared position every time fuel or gear changed.
                 "state.updatedAt" to FieldValue.serverTimestamp(),
             ),
         ).await()

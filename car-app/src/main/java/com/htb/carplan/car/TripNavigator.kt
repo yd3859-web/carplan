@@ -64,6 +64,9 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     val version: Long get() = day?.version ?: 0
 }
 
+/** One place the navigation is driving to right now, in order (묶음 2: 칸·픽업·주유소가 한 목록). */
+data class NaviEntry(val kind: Kind, val id: String, val place: Place) { enum class Kind { STOP, PICKUP, STATION } }
+
 enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE, PARKING }
 
 /** What the navigation tells us while guiding — the 주행 화면 draws this (the SDK has no map view to embed). */
@@ -120,8 +123,6 @@ class TripNavigator(
     private var commuteEvent: Event? = null
     private var commuteDeclinedDate: String? = null
     private var commuteAskedDate: String? = null
-    /** Pickup uids currently in the navigation route (in front of [routed] stops). */
-    private var routedPickups: List<String> = emptyList()
     private var fuelAtPark: Double? = null
     /** The station the driver picked (12장), so the fill-up record says where and at what price. */
     private var pickedStation: GasStation? = null
@@ -142,8 +143,12 @@ class TripNavigator(
     val live: StateFlow<NaviLive> = _live.asStateFlow()
     private var liveJob: Job? = null
 
-    /** Stop ids that are currently inside the navigation route, in order. */
-    private var routed: List<String> = emptyList()
+    /**
+     * What the navigation holds right now, in driving order — pickups, stops and a petrol station all in one list.
+     * Arrival, refill, the 10장 comparison and [원래대로] all read this one (2026-10-31, 묶음 2; fixes N1 where a
+     * station arrival ticked off the next stop).
+     */
+    private var inNavi: List<NaviEntry> = emptyList()
     /** Every remaining stop at the moment the route was last sent (what the navigation "knows"). */
     private var routedPlan: List<Stop> = emptyList()
     private var routedVersion = -1L
@@ -236,7 +241,7 @@ class TripNavigator(
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
                 if (System.currentTimeMillis() - lastRouteSentAt < OWN_CANCEL_WINDOW_MS) return
                 Log.i(TAG, "route cancelled by navigation")
-                routed = emptyList()
+                inNavi = emptyList()
                 _guiding.value = false
             }
         })
@@ -249,7 +254,9 @@ class TripNavigator(
         scope.launch {
             trip.filterNotNull().collect { t ->
                 // 9장 1: ask once when the app starts and today has stops left.
-                if (!askedOnStart && t.next != null) { askedOnStart = true; ask(PromptReason.APP_START) }
+                if (!askedOnStart && (t.next != null || t.waitingPickups.isNotEmpty())) { askedOnStart = true; ask(PromptReason.APP_START) }
+                // 11장 P2: the app restarted while sharing was on → keep sharing (the question is skipped then).
+                if (t.day?.pickupSharing == true && t.waitingPickups.isNotEmpty() && shareJob?.isActive != true) startSharing(t)
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != revertedVersion) scheduleChangeCheck()
                 // "다음 목적지 ○○로 갈까요?" follows the plan: when the next stop changed (edited on a phone), ask about the new one.
@@ -522,8 +529,13 @@ class TripNavigator(
     fun goViaStation(st: GasStation) {
         _stations.value = emptyList()
         pickedStation = st
-        val rest = trip.value?.remaining?.map { it.place }.orEmpty().take(MAX_PLACES - 1)
-        router.route(listOf(st.place) + rest)
+        // The station goes in front; behind it the places still to go (pickups waiting, then stops not yet visited —
+        // never one ticked off while the list was open). Arriving at the station ticks nothing (N1).
+        val t = trip.value
+        val tail = (t?.waitingPickups.orEmpty().map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } +
+            t?.remaining.orEmpty().filter { it.place.hasCoords() }.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }).take(MAX_PLACES - 1)
+        inNavi = listOf(NaviEntry(NaviEntry.Kind.STATION, st.id, st.place)) + tail
+        router.route(inNavi.map { it.place })
         router.openNavigation()
         lastRouteSentAt = System.currentTimeMillis()
         _notice.value = "${st.name} (${st.price}원) 들렀다 가요"
@@ -581,7 +593,7 @@ class TripNavigator(
     /** The car reached a pickup place (what the navigation's waypoint event does on a real road). */
     fun simArrivedPickup(uid: String) {
         val t = trip.value ?: return
-        routedPickups = routedPickups.filterNot { it == uid }
+        inNavi = inNavi.filterNot { it.kind == NaviEntry.Kind.PICKUP && it.id == uid }
         scope.launch {
             runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
             val who = t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"
@@ -589,6 +601,12 @@ class TripNavigator(
             voice.say("$who 픽업 장소예요.")
         }
     }
+
+    /** What the navigation is driving to first (the simulator follows the same list the car does). */
+    fun simTarget(): NaviEntry? = inNavi.firstOrNull()
+
+    /** The simulated car reached the petrol station in front of the route: take it off the list, nothing is ticked. */
+    fun simArrivedStation() { if (inNavi.firstOrNull()?.kind == NaviEntry.Kind.STATION) onArrived() }
 
     /** The passenger got in (phones normally press [탔어요]). */
     fun simBoarded(uid: String) {
@@ -696,8 +714,9 @@ class TripNavigator(
             if (!_guiding.value) return@launch
             val diff = describeChange(routedPlan, t.remaining)
             // What the navigation actually holds (the next few places): a change further back needs no new route.
-            val inNavi = describeChange(routedPlan.take(MAX_PLACES), t.remaining.take(MAX_PLACES))
-            if (diff == null || inNavi == null) {
+            val stopsInNavi = inNavi.count { it.kind == NaviEntry.Kind.STOP }.coerceAtLeast(1)
+            val ahead = describeChange(routedPlan.take(stopsInNavi), t.remaining.take(stopsInNavi))
+            if (diff == null || ahead == null) {
                 // A memo, a time, or a stop beyond the routed ones: the plan is reflected, the car says nothing.
                 routedPlan = t.remaining
                 routedVersion = t.version
@@ -717,12 +736,12 @@ class TripNavigator(
         val next = t.next
         if (next == null) {
             // Everything left was removed: stop guiding.
-            router.route(emptyList()); routed = emptyList(); routedPlan = emptyList(); _guiding.value = false
+            router.route(emptyList()); inNavi = emptyList(); routedPlan = emptyList(); _guiding.value = false
             scope.launch { voice.say("${who}님이 남은 일정을 모두 뺐어요. 안내를 끝낼게요.") }
             return
         }
         val nextChanged = routedPlan.firstOrNull()?.id != next.id
-        previousRoute = routedPlan.take(MAX_PLACES).map { it.place }
+        previousRoute = inNavi.map { it.place }
         previousVersion = routedVersion
         askJob?.cancel()
         revertedVersion = -1
@@ -823,7 +842,7 @@ class TripNavigator(
                     val from = Place(name = "차", lat = here.first, lng = here.second)
                     suspend fun etaTo(place: Place): Int? = _live.value.remainSeconds
                         ?: if (System.currentTimeMillis() - kakaoAt >= KAKAO_ETA_MIN_MS) { kakaoAt = System.currentTimeMillis(); runCatching { kakao.directions(from, place).seconds }.getOrNull() } else null
-                    val pickup = routedPickups.firstOrNull()?.let { uid -> t.pickups.firstOrNull { it.uid == uid && it.status == PickupStatus.WAITING && it.place.hasCoords() } }
+                    val pickup = inNavi.firstOrNull()?.takeIf { it.kind == NaviEntry.Kind.PICKUP }?.let { e -> t.pickups.firstOrNull { it.uid == e.id && it.status == PickupStatus.WAITING && it.place.hasCoords() } }
                     if (pickup != null) {
                         val eta = etaTo(pickup.place)
                         if (eta != null) runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, pickup.uid, eta.toLong()) }
@@ -845,9 +864,8 @@ class TripNavigator(
         val batch = t.remaining.take((MAX_PLACES - pick.size).coerceAtLeast(0))
         routedPlan = t.remaining
         routedVersion = t.version
-        routedPickups = pick.map { it.uid }
         if (batch.isEmpty() && pick.isEmpty()) {
-            routed = emptyList()
+            inNavi = emptyList()
             _guiding.value = false
             return
         }
@@ -857,19 +875,19 @@ class TripNavigator(
         if (withCoords.isEmpty() && pick.isEmpty()) {
             val first = batch.first()
             router.search(first.place.name)
-            routed = listOf(first.id)
+            inNavi = listOf(NaviEntry(NaviEntry.Kind.STOP, first.id, first.place))
             _notice.value = "${first.place.name}: 주소가 없어 내비 검색으로 찾아요"
             scope.launch { voice.say("${first.place.name}은 주소가 없어서 내비에서 찾아 주세요.") }
         } else {
             // 11장 3: pickups ride in front of the planned stops.
-            router.route(pick.map { it.place } + withCoords.map { it.place })
-            routed = withCoords.map { it.id }
+            inNavi = pick.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + withCoords.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }
+            router.route(inNavi.map { it.place })
             // While simulating, keep our screen in front (the route still goes to the navigation).
             if (!simActive) router.openNavigation()
         }
         lastRouteSentAt = System.currentTimeMillis()
         _guiding.value = true
-        Log.i(TAG, "routed ${routed.size} of ${t.remaining.size} remaining (version ${t.version})")
+        Log.i(TAG, "routed ${inNavi.count { it.kind == NaviEntry.Kind.STOP }} of ${t.remaining.size} remaining (version ${t.version})")
     }
 
     /** The navigation computed a route: publish when it expects to reach the next stop (10장 7·8). */
@@ -885,30 +903,41 @@ class TripNavigator(
     /** One place reached: mark it visited, then top the route up while more stops remain (Q22). */
     private fun onArrived() {
         val t = trip.value ?: return
-        // A pickup place comes before the stops: mark the car there and keep the rest of the route.
-        routedPickups.firstOrNull()?.let { uid ->
-            routedPickups = routedPickups.drop(1)
-            scope.launch {
-                runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
-                val who = t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"
-                _notice.value = "픽업 장소 도착 · $who"
-                voice.say("$who 픽업 장소예요.")
+        // The first thing in the navigation is what we reached: a pickup, a station, or a planned stop.
+        val first = inNavi.firstOrNull()
+        when (first?.kind) {
+            NaviEntry.Kind.PICKUP -> {
+                inNavi = inNavi.drop(1)
+                scope.launch {
+                    runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, first.id) }
+                    val who = t.pickups.firstOrNull { it.uid == first.id }?.name?.ifBlank { null } ?: "일행"
+                    _notice.value = "픽업 장소 도착 · $who"
+                    voice.say("$who 픽업 장소예요.")
+                }
+                return
             }
-            return
+            NaviEntry.Kind.STATION -> {
+                // N1: a petrol stop is not a planned stop — nothing is ticked; the fill-up record follows from the fuel level (Q44).
+                inNavi = inNavi.drop(1)
+                _notice.value = "${first.place.name} 도착 · 넣고 나면 기록을 남길게요"
+                scope.launch { voice.say("${first.place.name}이에요. 넣고 나면 기록을 남길게요.") }
+                return
+            }
+            else -> {}
         }
-        val reached = routed.firstOrNull()?.let { id -> t.stops.firstOrNull { it.id == id } } ?: t.next ?: return
-        routed = routed.drop(1)
+        val reached = first?.let { e -> t.stops.firstOrNull { it.id == e.id } } ?: t.next ?: return
+        inNavi = inNavi.drop(1)
         scope.launch {
             val after = t.remaining.filterNot { it.id == reached.id }
             runCatching {
                 trips.setVisited(t.groupId, t.eventId, t.date, reached.id, true, t.stops.indexOfFirst { it.id == after.firstOrNull()?.id }.coerceAtLeast(0))
                 if (after.isEmpty()) {
                     trips.setDayStatus(t.groupId, t.eventId, t.date, DayStatus.DONE)
-                    routed = emptyList()
+                    inNavi = emptyList()
                     routedPlan = emptyList()
                     _guiding.value = false
                     voice.say("오늘 일정을 모두 다녀왔어요.")
-                } else if (after.size > routed.size) {
+                } else if (after.size > inNavi.count { it.kind == NaviEntry.Kind.STOP }) {
                     // More stops than the navigation holds: refill from the car's position.
                     sendRoute(t.copy(stops = t.stops.map { if (it.id == reached.id) it.copy(visited = true) else it }))
                 } else {
