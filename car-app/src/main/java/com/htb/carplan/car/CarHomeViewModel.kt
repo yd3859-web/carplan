@@ -139,14 +139,14 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 6장 game: the dart stuck at (lat, lng) → nearest 동네 in the scope (same as the phone). */
-    fun throwDartAt(scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double) {
+    fun throwDartAt(scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double, radiusKm: Double = 100.0) {
         val t = trip.value ?: return
         val u = owner.value ?: return
         loadRegions()
         viewModelScope.launch {
             val cur = dart.value
             val same = cur != null && cur.scope == scope && cur.region == region && cur.eventId == t.eventId
-            val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region)) ?: run { _error.value = "그 범위엔 동네가 없어요"; return@launch }
+            val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region, radiusKm)) ?: run { _error.value = "그 범위엔 동네가 없어요"; return@launch }
             runCatching { dartRepo.throwDart(t.groupId, if (same) cur!!.id else null, scope, centerLat, centerLng, region, pick, if (same) cur!!.throwCount + 1 else 1, u.uid, t.eventId, t.date) }
                 .onFailure { _error.value = it.message }
         }
@@ -162,6 +162,25 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         val u = owner.value ?: return
         viewModelScope.launch {
             runCatching { val parts = d.resultName.split(" "); TripRepository().addStop(t.groupId, t.eventId, t.date, Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName), null, "다트 · " + parts.dropLast(1).drop(1).joinToString(" "), u.uid) }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
+    /**
+     * Q57 (차): places of one kind around the dart's 동네 — one Kakao call per press, within 2 km, closest first.
+     * Empty without a key (the 동네 itself can still go in as a stop).
+     */
+    suspend fun dartSpots(lat: Double, lng: Double, category: com.htb.carplan.shared.net.KakaoCategory): List<Place> =
+        if (!kakao.available) emptyList()
+        else runCatching { kakao.searchCategory(category, lat, lng, radiusMeters = 2000, size = 4) }.getOrDefault(emptyList())
+
+    /** A recommended place from the dart window → a stop at the end of today's trip. */
+    fun addPlaceAsStop(place: Place, memo: String) {
+        val t = trip.value ?: return
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            runCatching { TripRepository().addStop(t.groupId, t.eventId, t.date, place, null, memo, u.uid) }
+                .onSuccess { navigator.notify("${place.name} 오늘 일정에 넣었어요") }
                 .onFailure { _error.value = it.message }
         }
     }

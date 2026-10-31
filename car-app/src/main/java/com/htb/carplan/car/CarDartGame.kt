@@ -73,6 +73,10 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
+import com.htb.carplan.shared.net.KakaoCategory
+import com.htb.carplan.shared.model.Place
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.clickable
 
 // Same board as the phone (vote/DartGame.kt), drawn with the car's colours. Keep the two in step.
 private object Palette {
@@ -99,12 +103,14 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { vm.ensureRegions(); regionsReady = true }
     var scope by remember { mutableStateOf(DartScope.NATIONAL) }
     var region by remember { mutableStateOf("서울특별시") }
+    // Q56: "내 위치 N km" — the driver picks N (정원 2026-10-31).
+    var radiusKm by remember { mutableStateOf(100.0) }
     // Q56 3: the car's position comes from the navigation (asked once when the game opens), not the car document.
     val live by vm.live.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.requestLocation() }
     val here = if (scope == DartScope.NEAR) (live.lat?.let { la -> live.lng?.let { lo -> la to lo } } ?: vm.lastLocation()) else null
-    val pool = remember(scope, region, here, regionsReady) {
-        Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null).ifEmpty { Regions.all }
+    val pool = remember(scope, region, here, regionsReady, radiusKm) {
+        Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, radiusKm).ifEmpty { Regions.all }
     }
     val shown = dart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
     var flying by remember { mutableStateOf(false) }
@@ -115,7 +121,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                 val compact = LocalCompact.current
                 val scopes: @Composable () -> Unit = {
                     CarScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
-                    CarScopeChip("내 위치 100km", scope == DartScope.NEAR) { scope = DartScope.NEAR }
+                    CarScopeChip("내 위치", scope == DartScope.NEAR) { scope = DartScope.NEAR }
                     CarScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -131,6 +137,9 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                 if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Regions.sidoNames.forEach { s -> CarScopeChip(shortSido(s), region == s) { region = s } }
                 }
+                if (scope == DartScope.NEAR) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(10.0, 30.0, 50.0, 100.0, 200.0).forEach { km -> CarScopeChip("${km.toInt()}km", radiusKm == km) { radiusKm = km } }
+                }
                 if (scope == DartScope.NEAR && here == null) Text("차 위치를 아직 몰라서 전국으로 보여 줘요", fontSize = 20.sp, color = Palette.TextSoft, modifier = Modifier.padding(horizontal = 28.dp))
                 HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 8.dp))
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -138,7 +147,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                         pool = pool,
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
-                        onLanded = { lat, lng -> vm.throwDartAt(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng) },
+                        onLanded = { lat, lng -> vm.throwDartAt(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm) },
                     )
                     androidx.compose.animation.AnimatedVisibility(
                         visible = shown != null && !flying,
@@ -153,10 +162,39 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                             Text(d.resultName.split(" ").first(), fontSize = 20.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 38.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
                             Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 20.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
+                            // Q57: what is there in that 동네 — one kind at a time (one Kakao call per press), then a stop.
+                            val uiScope = rememberCoroutineScope()
+                            var cat by remember(d.id, d.throwCount) { mutableStateOf<KakaoCategory?>(null) }
+                            var spots by remember(d.id, d.throwCount) { mutableStateOf<List<Place>?>(null) }
+                            Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(KakaoCategory.FOOD, KakaoCategory.CAFE, KakaoCategory.SIGHT).forEach { k ->
+                                    val on = cat == k
+                                    OutlinedButton(
+                                        onClick = { cat = k; spots = null; uiScope.launch { spots = vm.dartSpots(d.resultLat, d.resultLng, k) } },
+                                        shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, if (on) Palette.TextStrong else Palette.SheetEdge),
+                                        modifier = Modifier.weight(1f).height(76.dp),
+                                    ) { Text(k.label, fontSize = 24.sp, color = Palette.TextStrong, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal) }
+                                }
+                            }
+                            if (cat != null) Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                                when {
+                                    spots == null -> Text("찾는 중", fontSize = 20.sp, color = Palette.TextSoft)
+                                    spots!!.isEmpty() -> Text("근처에서 못 찾았어요", fontSize = 20.sp, color = Palette.TextSoft)
+                                    else -> spots!!.forEach { p ->
+                                        Row(
+                                            Modifier.fillMaxWidth().heightIn(min = 76.dp).clickable { vm.addPlaceAsStop(p, "다트 추천 · ${cat!!.label}"); onDismiss() },
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Text(p.name, fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+                                            Text("넣기", fontSize = 20.sp, color = Palette.Teal, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
                             Button(
                                 onClick = { vm.addDartAsStop(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
-                                modifier = Modifier.padding(top = 14.dp).fillMaxWidth().height(76.dp),
-                            ) { Text("오늘 일정에 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+                                modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(76.dp),
+                            ) { Text("이 동네 그대로 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
                         }
                     }
                     error?.let { Text(it, color = Palette.Teal, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
