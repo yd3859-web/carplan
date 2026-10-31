@@ -408,6 +408,38 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── ③ 여행 칸 편집 (주차 중, 정원 2026-10-31): the same writes as the phone's trip editor; each bumps the day's version.
+    private val kakao = com.htb.carplan.shared.net.KakaoApi(BuildConfig.KAKAO_REST_KEY)
+
+    /** One Kakao keyword search per press, near the car (API 한도: no search-as-you-type). Empty = name only. */
+    suspend fun searchPlaces(query: String): List<Place> {
+        if (!kakao.available || query.isBlank()) return emptyList()
+        val near = navigator.simLocation()
+        return runCatching { kakao.searchKeyword(query.trim(), near = near, size = 6).filter { p -> with(com.htb.carplan.shared.calendar.RouteMath) { p.hasCoords() } } }.getOrDefault(emptyList())
+    }
+
+    private fun editTrip(block: suspend TripRepository.(TodayTrip, String) -> Unit) {
+        val t = trip.value ?: return
+        val u = owner.value ?: return
+        viewModelScope.launch { runCatching { TripRepository().block(t, u.uid) }.onFailure { _error.value = it.message } }
+    }
+
+    fun addStop(place: Place, time: String?) = editTrip { t, uid -> addStop(t.groupId, t.eventId, t.date, place, time, "", uid) }
+    fun setStopTime(stop: com.htb.carplan.shared.model.Stop, time: String?) =
+        editTrip { t, uid -> updateStop(t.groupId, t.eventId, t.date, stop.id, stop.place, time, stop.memo, uid) }
+    fun removeStop(stopId: String) = editTrip { t, uid -> setDeleted(t.groupId, t.eventId, t.date, stopId, true, uid) }
+    fun restoreStop(stopId: String) = editTrip { t, uid -> setDeleted(t.groupId, t.eventId, t.date, stopId, false, uid) }
+
+    /** Moves a stop still ahead one place up or down; places already passed keep their spot at the front. */
+    fun moveStop(stopId: String, by: Int) = editTrip { t, uid ->
+        val ahead = t.remaining.map { it.id }.toMutableList()
+        val i = ahead.indexOf(stopId)
+        val j = i + by
+        if (i < 0 || j !in ahead.indices) return@editTrip
+        ahead.add(j, ahead.removeAt(i))
+        reorder(t.groupId, t.eventId, t.date, t.stops.filter { it.visited }.map { it.id } + ahead, uid)
+    }
+
     fun addEvent(event: Event) {
         val u = owner.value ?: return
         viewModelScope.launch {

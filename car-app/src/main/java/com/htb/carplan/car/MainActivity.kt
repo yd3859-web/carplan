@@ -150,6 +150,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     var dartOpen by remember { mutableStateOf(false) }
     val dart by vm.dart.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
     var addDate by remember { mutableStateOf(LocalDate.now()) }
     var qr by remember { mutableStateOf(false) }
     var seatedPrompt by remember { mutableStateOf(false) }
@@ -222,7 +223,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
                     if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
-                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true },
+                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true }, onEdit = { editing = true },
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
                         onNavi = { vm.openNavigation() },
                         onMore = { more = true },
@@ -250,6 +251,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (adding && !vehicle.drivingRestricted) {
         CarAddDialog(date = addDate, onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false; addDate = LocalDate.now() })
     }
+    if (editing && !vehicle.drivingRestricted) CarTripEdit(vm, onDismiss = { editing = false })
     if (pickTrip && trip != null && !vehicle.drivingRestricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { CarCloseButton(onClick = { pickTrip = false }) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         allTrips.forEach { e ->
@@ -340,7 +342,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
  * thing to do next — where, when, one huge button. Everything else lives behind [더보기] (parked only).
  */
 @Composable
-private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onOtherTrip: () -> Unit, onAdd: () -> Unit, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
+private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onOtherTrip: () -> Unit, onAdd: () -> Unit, onEdit: () -> Unit, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
     // Parked at a stop with the route still on: the next place is "다음", not "가는 중".
     val goingLabel = if (guiding && moving) "가는 중" else "다음"
     val todayEvents = vm.eventsOn(today, week)
@@ -365,6 +367,8 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                         Text("  오늘 여행 ${allTrips.size}개 중", color = Soft, fontSize = 20.sp)
                         if (!restricted) Box(Modifier.padding(start = 12.dp)) { CarCloseButton(onClick = onOtherTrip, label = "다른 여행") }
                     }
+                    // ③ 주차 중엔 차에서도 칸을 고친다 (정원 2026-10-31).
+                    if (!restricted) Box(Modifier.padding(start = 12.dp)) { CarCloseButton(onClick = onEdit, label = "칸 편집") }
                 }
                 Spacer(Modifier.height(18.dp))
                 TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving)
@@ -459,11 +463,11 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             }
             // Nothing to go to: say how to get something, and offer the one action the car can do (parked).
             if (nextName == null && !guiding && !dayDone) {
-                Text(if (trip != null) "폰에서 칸을 넣으면 여기 나와요" else "폰에서 일정을 넣거나, 여기서 바로 만들어요", color = Soft, fontSize = 24.sp, modifier = Modifier.padding(bottom = 16.dp))
+                Text(if (trip != null) "여기서 장소 칸을 넣거나, 폰에서 넣어요" else "폰에서 일정을 넣거나, 여기서 바로 만들어요", color = Soft, fontSize = 24.sp, modifier = Modifier.padding(bottom = 16.dp))
                 if (!restricted) Button(
-                    onClick = onAdd, modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
+                    onClick = if (trip != null) onEdit else onAdd, modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
                     colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk),
-                ) { Text("일정 추가", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+                ) { Text(if (trip != null) "장소 넣기" else "일정 추가", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
             }
             // Driving: both buttons would only be greyed out; the status band keeps [내비 열기].
             else if (!dayDone && !restricted) Button(
@@ -700,7 +704,7 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
     val fs = if (big) 28.sp else 24.sp; val fsNext = if (big) 36.sp else 24.sp; val gap = if (big) 22.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
     val nextId = trip.next?.id
     val railPassed = RailPassed; val line = Line // drawBehind is not composable
-    if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 · 폰에서 추가", color = Soft, fontSize = 24.sp)
+    if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 · [칸 편집]에서 넣어요", color = Soft, fontSize = 24.sp)
     val visitedCount = trip.stops.count { it.visited }
     val hidden = if (foldVisited && visitedCount > 1) visitedCount - 1 else 0
     if (hidden > 0) Text("✓  앞의 ${hidden}곳 다녀옴", color = Soft, fontSize = if (big) 20.sp else 20.sp, modifier = Modifier.padding(start = rail, bottom = 10.dp))
