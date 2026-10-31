@@ -159,7 +159,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         val careDue by vm.careDue.collectAsStateWithLifecycle()
         StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation)
         val sim by vm.sim.collectAsStateWithLifecycle()
-        if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim)
+        if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim, onRemoveStop = vm::testRemoveStop)
         error?.let { Text("오류: $it", color = Warn, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         notice?.let { Text(it, color = Accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
@@ -712,13 +712,15 @@ private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Un
 
 /** 시뮬레이션이 도는 동안 맨 위 한 줄: 지금 무슨 장면인지 + 일시정지·배속·끝. */
 @Composable
-private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onStop: () -> Unit) {
+private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onStop: () -> Unit, onRemoveStop: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("시뮬레이션", color = Soft, fontSize = 18.sp)
         Text(sim.phase, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         sim.remainMeters?.let { Text(if (it >= 1000) "%.1f km".format(it / 1000.0) else "$it m", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) }
         if (!sim.viaConsole) Text("콘솔 없이", color = Soft, fontSize = 16.sp)
         Spacer(Modifier.weight(1f))
+        // 10장 check while driving (the menu is closed in D): a passenger takes a stop out on their phone.
+        OutlinedButton(onClick = onRemoveStop, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text("칸 하나 빼기", color = Ink, fontSize = 18.sp) }
         OutlinedButton(onClick = onPause, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.paused) "계속" else "일시정지", color = Ink, fontSize = 18.sp) }
         OutlinedButton(onClick = onSpeed, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.speedX == 1) "2배속" else "1배속", color = Ink, fontSize = 18.sp) }
         TextButton(onClick = onStop) { Text("끝", color = Soft, fontSize = 18.sp) }

@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
@@ -262,6 +263,9 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching {
                     val trips = TripRepository()
                     t.stops.filter { it.visited }.forEach { trips.setVisited(t.groupId, t.eventId, t.date, it.id, false, 0) }
+                    // Stops taken out with [칸 하나 빼기] come back too (the trip's own list hides deleted ones).
+                    trips.observeStops(t.groupId, t.eventId, t.date).first().filter { it.deleted }
+                        .forEach { trips.setDeleted(t.groupId, t.eventId, t.date, it.id, false, owner.value?.uid.orEmpty()) }
                     trips.setDayStatus(t.groupId, t.eventId, t.date, com.htb.carplan.shared.model.DayStatus.READY)
                 }.onFailure { _error.value = it.message }
             }
@@ -277,6 +281,16 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                     Triple(Place(name = "정자역", lat = 37.3670, lng = 127.1085), "12:30", "점심"),
                 ).forEach { (place, time, memo) -> trips.addStop(u.soloGroupId, eventId, today, place, time, memo, u.uid) }
             }.onFailure { _error.value = it.message }
+        }
+    }
+
+    /** 시뮬 줄 [칸 하나 빼기]: what a passenger's phone would do (10장) — takes out the last stop still ahead. */
+    fun testRemoveStop() {
+        val t = trip.value ?: return
+        val u = owner.value ?: return
+        val target = t.remaining.drop(1).lastOrNull() ?: return
+        viewModelScope.launch {
+            runCatching { TripRepository().setDeleted(t.groupId, t.eventId, t.date, target.id, true, u.uid) }.onFailure { _error.value = it.message }
         }
     }
 
