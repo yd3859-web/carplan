@@ -309,7 +309,23 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
         }
         VerticalDivider(color = Line)
         Column(Modifier.weight(1f).fillMaxHeight().padding(32.dp)) {
-            if (prompt != null) { prompt(); return@Column }
+            if (prompt != null) {
+                prompt()
+                // A question while driving (주차장, 경로 바꾸기) must not hide where we are going and how far.
+                if (guiding && nextName != null) {
+                    Text("가는 중", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 24.dp))
+                    Text(nextName, color = Accent, fontSize = 30.sp, fontWeight = FontWeight.Black, maxLines = 1)
+                    remainText(live, trip, guiding)?.let { Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 4.dp)) }
+                    LegProgress(live, nextName)
+                }
+                // The question takes the panel, but the menu must stay reachable while parked.
+                Spacer(Modifier.weight(1f))
+                if (!restricted) Button(
+                    onClick = onMore, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner,
+                    colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
+                ) { Text("더보기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+                return@Column
+            }
             // The trip is over: say so, instead of "갈 곳이 없어요" (which reads like nothing was planned).
             val dayDone = trip != null && trip.stops.isNotEmpty() && trip.next == null && nextName == null
             if (dayDone) {
@@ -323,6 +339,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             listOfNotNull(nextTime?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
             }
+            if (guiding) LegProgress(live, nextName)
             trip?.next?.memo?.let { com.htb.carplan.shared.calendar.StopMemo.split(it).second }?.takeIf { it.isNotBlank() }?.let {
                 Text(it, color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp), maxLines = 2)
             }
@@ -333,24 +350,49 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     Text(who, color = Soft, fontSize = 17.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
+            // While driving, the one after: what comes once this stop is done.
+            trip?.remaining?.getOrNull(1)?.takeIf { guiding }?.let { after ->
+                HorizontalDivider(color = Line, modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))
+                Text("그다음", color = Soft, fontSize = 18.sp)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(after.place.name, color = Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                    after.time?.let { Text("  $it", color = Soft, fontSize = 22.sp) }
+                }
+                val more = trip.remaining.size - 2
+                if (more > 0) Text("그 뒤 ${more}곳 더", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp))
+            }
             }
             Spacer(Modifier.weight(1f))
             later?.let { (d, item) ->
                 val label = if (d == today.plusDays(1)) "내일" else "${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}"
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
             }
-            if (!dayDone) Button(
+            // Driving: both buttons would only be greyed out; the status band keeps [내비 열기].
+            if (!dayDone && !restricted) Button(
                 onClick = { if (guiding) onNavi() else onGo() },
                 enabled = !restricted && (guiding || nextName != null),
                 modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White, disabledContainerColor = Color(0xFFD5D8DC), disabledContentColor = Soft),
             ) { Text(if (guiding) "내비 보기" else "안내 시작", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
-            if (!dayDone) Spacer(Modifier.height(12.dp))
-            Button(
+            if (!dayDone && !restricted) Spacer(Modifier.height(12.dp))
+            if (!restricted) Button(
                 onClick = onMore, enabled = !restricted, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
             ) { Text("더보기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
         }
+    }
+}
+
+/** How much of this leg is behind us: a thin blue line (blue = where the car goes). The leg's length is the
+ * largest distance seen since the target changed, so it needs no extra data from the navigation. */
+@Composable
+private fun LegProgress(live: NaviLive, target: String?) {
+    val remain = live.remainMeters ?: return
+    var total by remember(target) { mutableStateOf(remain) }
+    if (remain > total) total = remain
+    val done = if (total <= 0) 0f else (1f - remain.toFloat() / total).coerceIn(0f, 1f)
+    Box(Modifier.padding(top = 14.dp).fillMaxWidth().height(6.dp).clip(Corner).background(Line)) {
+        Box(Modifier.fillMaxWidth(done).fillMaxHeight().background(Accent))
     }
 }
 

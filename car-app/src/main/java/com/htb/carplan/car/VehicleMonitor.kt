@@ -44,6 +44,7 @@ class VehicleMonitor(private val context: Context) {
     private val _passengerCount = MutableStateFlow(0)
     val passengerCount: StateFlow<Int> = _passengerCount.asStateFlow()
     private val occupied = HashMap<SeatValue, Boolean>()
+    private val changed = HashSet<SeatValue>()
 
     /** Fires when the driver's door goes from closed to open (13장: "사람이 내렸다"). */
     private val _driverDoorOpened = MutableSharedFlow<Unit>(extraBufferCapacity = 2)
@@ -100,8 +101,11 @@ class VehicleMonitor(private val context: Context) {
                         override fun onSeatOccupancyUpdated(value: Boolean?) {
                             val now = value == true
                             val was = occupied[seat]
+                            if (was != null && was != now) changed += seat
                             occupied[seat] = now
-                            _passengerCount.value = occupied.values.count { it }
+                            // The first report is the state at app start: the emulator boots with every seat "occupied",
+                            // so only seats that changed since then are counted (a car app starts before people get in).
+                            if (was != null) _passengerCount.value = occupied.filterKeys { it in changed }.values.count { it }
                             // Only a real change (someone sat down) counts; the first report is just the initial state.
                             if (now && was == false) _passengerSeated.tryEmit(seat)
                         }
@@ -136,7 +140,11 @@ class VehicleMonitor(private val context: Context) {
     // 시뮬레이션 without the Virtual Console: the simulator plays the signals straight into the monitor.
     fun simGear(g: Gear) = _state.update { it.copy(gear = g) }
     fun simDriverDoorOpened() { _driverDoorOpened.tryEmit(Unit) }
-    fun simPassengerSeated() { _passengerSeated.tryEmit(SeatValue.ROW_1_RIGHT) }
+    fun simPassengerSeated() {
+        changed += SeatValue.ROW_1_RIGHT; occupied[SeatValue.ROW_1_RIGHT] = true
+        _passengerCount.value = occupied.filterKeys { it in changed }.values.count { it }
+        _passengerSeated.tryEmit(SeatValue.ROW_1_RIGHT)
+    }
 
     fun stop() {
         handler.removeCallbacksAndMessages(null)
