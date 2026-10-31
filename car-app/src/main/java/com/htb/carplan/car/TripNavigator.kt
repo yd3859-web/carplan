@@ -70,6 +70,11 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
 /** [말하기] on screen: the mic is open, or the known commands are shown as buttons (nothing understood). */
 data class VoiceState(val listening: Boolean = false, val choices: Boolean = false, val heard: String? = null)
 
+/** The day in fuel for [eventId]: km still to drive, % it uses, % left on arrival. */
+data class FuelUsage(val eventId: String, val km: Int, val usedPercent: Int, val leftPercent: Int, val ev: Boolean, val short: Boolean = false)
+/** Where to fill up on the way (Q55): the station, which stop it comes after, fuel % by then, 원 saved vs. now. */
+data class FuelSuggestion(val eventId: String, val station: GasStation, val afterStopId: String?, val afterName: String?, val percentThen: Int?, val saving: Int?)
+
 /** One place in a "가까운 ○○" list on the car screen (주유소·충전소·주차장·맛집). [priceWon] only for 주유소. */
 data class NearPlace(val id: String, val name: String, val meters: Int, val place: Place, val priceWon: Int? = null)
 /** The list shown in our own window — the driver picks without leaving carplan (no hop into the navigation). */
@@ -197,6 +202,13 @@ class TripNavigator(
     private var fuelAskedToday: String? = null      // date of the last "not guiding" ask
     /** Q55: the fill-up planned at departure ("율동공원 지나서 ○○ 주유소"); while it stands, the plain low-fuel notice keeps quiet. */
     private var fuelPlan: GasStation? = null
+    /** Q55 on screen: what the day takes in fuel, and (when short) the station to stop at. */
+    private val _fuelUsage = MutableStateFlow<FuelUsage?>(null)
+    val fuelUsage: StateFlow<FuelUsage?> = _fuelUsage.asStateFlow()
+    private val _fuelSuggestion = MutableStateFlow<FuelSuggestion?>(null)
+    val fuelSuggestion: StateFlow<FuelSuggestion?> = _fuelSuggestion.asStateFlow()
+    /** [경유지로] on the rail's suggested station. */
+    fun goViaSuggested() { _fuelSuggestion.value?.let { goViaStation(it.station) } }
     private var fuelPlanVersion = -1L
     private val _nearby = MutableStateFlow<NearbyList?>(null)
     /** 주유소·충전소·주차장·맛집 near the car, shown in our window; picking one makes it the next waypoint. */
@@ -664,26 +676,50 @@ class TripNavigator(
                 legs += FuelPlan.Leg(from, s, m)
                 from = s.place
             }
-            val short = FuelPlan.shortfall(legs, reach, ROUTE_MARGIN_KM * 1000) ?: run { fuelPlan = null; return@launch }
-            val after = FuelPlan.afterName(legs, short)
-            val where = after?.let { "${it} 지나서" } ?: "출발하고 바로"
             val ev = carState.isEv == true
-            if (ev || !opinet.available) {
+            // Always: what the day takes (정원 2026-10-31) — a line on the screen, no voice when it is enough.
+            val short = FuelPlan.shortfall(legs, reach, ROUTE_MARGIN_KM * 1000)
+            FuelPlan.usage(legs.sumOf { it.meters }, fuel, reach)?.let { u ->
+                _fuelUsage.value = FuelUsage(t.eventId, (u.meters / 1000).toInt(), u.usedPercent.toInt().coerceAtLeast(1), u.leftPercent.toInt(), ev, short = short != null)
+            }
+            // 정원 2026-10-31: only when it runs short, or the tank is at/below half somewhere today — and then
+            // only from where it is at half (nobody fills up at 85 %).
+            val total = legs.sumOf { it.meters }
+            val perPercent = FuelPlan.metersPerPercent(fuel, reach)
+            val window = perPercent?.let { FuelPlan.window(fuel, it, short?.byMeters, total) }
+            if (short == null && window == null) { fuelPlan = null; _fuelSuggestion.value = null; return@launch }
+            val after = short?.let { FuelPlan.afterName(legs, it) }
+            val where = after?.let { "${it} 지나서" } ?: "출발하고 바로"
+            if (short != null && (ev || !opinet.available)) {
                 val what = if (ev) "충전소" else "주유소"
                 val message = "오늘 남은 길이 ${(short.total / 1000).toInt()}km인데 ${(reach / 1000).toInt()}km밖에 못 가요. $where ${what}에 들러야 해요."
                 show(NextPrompt(t.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")) { askJob = scope.launch { voice.say(message) } }
                 return@launch
             }
-            val at = FuelPlan.pointAt(legs, short.byMeters) ?: return@launch
-            val list = runCatching { opinet.around(at.lat, at.lng) }.getOrElse { emptyList() }
-            val best = list.minByOrNull { it.price } ?: run {
+            // Prices at up to three points on the way (soon · halfway · just before it runs short), stations within
+            // 3 km of the way only — then the cheapest, and on a tie the later one.
+            // An EV or no Opinet key and not short: the line on screen is enough.
+            if (ev || !opinet.available || window == null) return@launch
+            val found = FuelPlan.searchPoints(window.start, window.endInclusive).flatMap { m ->
+                val at = FuelPlan.pointAt(legs, m) ?: return@flatMap emptyList()
+                runCatching { opinet.around(at.lat, at.lng) }.getOrElse { emptyList() }
+                    .filter { it.meters <= 3_000 }.map { FuelPlan.Candidate(m, it.price, it) }
+            }
+            val pick = FuelPlan.pick(found) ?: run {
+                if (short == null) return@launch // not short: no station on the way is not worth a question
                 val message = "오늘 남은 길이 ${(short.total / 1000).toInt()}km인데 ${(reach / 1000).toInt()}km밖에 못 가요. $where 주유소에 들러야 해요."
                 show(NextPrompt(t.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "주유소 찾기")) { askJob = scope.launch { voice.say(message) } }
                 return@launch
             }
+            val best = pick.best.item
+            val afterStop = FuelPlan.afterStopAt(legs, pick.best.atMeters)
+            val pctThen = perPercent?.let { (fuel - pick.best.atMeters / it).toInt().coerceAtLeast(1) }
             fuelPlan = best
             _stations.value = emptyList()
-            val message = "연료가 ${fuel.toInt()}%라 $where ${best.name}에서 넣으면 좋아요. 리터당 ${"%,d".format(best.price)}원이에요."
+            _fuelSuggestion.value = FuelSuggestion(t.eventId, best, afterStop?.id, afterStop?.place?.name, pctThen, pick.saving)
+            val whenText = (afterStop?.place?.name?.let { "$it 지나서" } ?: "출발하고 곧") + (pctThen?.let { " 연료 ${it}%쯤일 때" } ?: "")
+            val message = "$whenText ${best.name}에서 넣으면 가장 싸요. 리터당 ${"%,d".format(best.price)}원" +
+                (pick.saving?.let { "으로, 지금 근처보다 ${it}원 싸요." } ?: "이에요.")
             show(NextPrompt(t.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "경유지로 넣기")) { askJob = scope.launch { voice.say(message) } }
         }
     }
@@ -712,6 +748,7 @@ class TripNavigator(
     /** Driver picked a station from the list: it becomes the next waypoint, the plan follows. */
     fun goViaStation(st: GasStation) {
         _stations.value = emptyList()
+        _fuelSuggestion.value = null // it is in the route now (다음 = 그 주유소)
         pickedStation = st
         // The station goes in front; behind it the places still to go (pickups waiting, then stops not yet visited —
         // never one ticked off while the list was open). Arriving at the station ticks nothing (N1).

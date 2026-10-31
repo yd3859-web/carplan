@@ -236,7 +236,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
-                    if (compact) SplitDayView(trip, vm.dayComments.collectAsStateWithLifecycle().value, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
+                    if (compact) SplitDayView(trip, vm.dayComments.collectAsStateWithLifecycle().value, vm.fuelSuggestion.collectAsStateWithLifecycle().value?.takeIf { it.eventId == trip?.eventId }, vm::goViaSuggested, trip?.let { fuelLine(it, vehicle, vm.fuelUsage.collectAsStateWithLifecycle().value) }, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
                         today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true }, onEdit = { editing = true },
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
@@ -325,9 +325,12 @@ private fun chipColors(): SelectableChipColors = FilterChipDefaults.filterChipCo
 
 @Composable
 private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit, onGroup: () -> Unit, onDemo: () -> Unit) {
+    // Half screen: only fuel (+ 주유 필요), the group and [말하기] — range, 정비 and the navigation button stay off
+    // (the navigation is right next to us).
+    val compact = LocalCompact.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
+        Modifier.fillMaxWidth().padding(horizontal = if (compact) 20.dp else 32.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 16.dp else 32.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 시연 메뉴 is not for drivers: hold the logo to open it (C5).
@@ -337,12 +340,12 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         // At or under the alert level (설정 cars.fuelAlertPercent): say it in words, no extra colour (one accent only).
         val alertAt = car?.fuelAlertPercent?.toDouble() ?: 20.0
         if ((v.fuelPercent ?: 101.0) <= alertAt) Text(if (v.isEv == true) "충전 필요" else "주유 필요", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.border(1.dp, Ink, Corner).padding(horizontal = 8.dp, vertical = 2.dp))
-        v.rangeKm?.takeIf { it > 0 }?.let { Stat("주행가능", "${it.toInt()} km") }
-        careDue?.let { Stat("정비", it) }
+        if (!compact) v.rangeKm?.takeIf { it > 0 }?.let { Stat("주행가능", "${it.toInt()} km") }
+        if (!compact) careDue?.let { Stat("정비", it) }
         Spacer(Modifier.weight(1f))
         // Tap the group to show its QR (7장) — the band is where the driver already looks.
-        groupName?.let { Box(Modifier.clickable(enabled = !v.drivingRestricted, onClick = onGroup)) { Stat("그룹", it) } }
-        if (passengers > 0) Stat("동승자", "${passengers}명")
+        groupName?.let { Box(Modifier.weight(1f, fill = false).clickable(enabled = !v.drivingRestricted, onClick = onGroup)) { if (compact) Text(it, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) else Stat("그룹", it) } }
+        if (passengers > 0 && !compact) Stat("동승자", "${passengers}명")
         // ⑧ 음성 명령: always there, driving included — speaking is how the driver changes things on the move.
         // Voice is the main way to act while driving: a full-size button, filled so it reads first in the band.
         Button(onClick = onListen, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 160.dp)) {
@@ -350,8 +353,8 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         }
         // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
         if (v.drivingRestricted) {
-            Text("주행 중 · 보기만", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            TextButton(onClick = onNavi) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+            if (!compact) Text("주행 중 · 보기만", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            if (!compact) TextButton(onClick = onNavi) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         }
     }
     HorizontalDivider(color = Line)
@@ -390,8 +393,12 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     // ③ 주차 중엔 차에서도 칸을 고친다 (정원 2026-10-31).
                     if (!restricted) Box(Modifier.padding(start = 12.dp)) { CarCloseButton(onClick = onEdit, label = "칸 편집") }
                 }
+                if (!moving) fuelLine(trip, vm.vehicle.collectAsStateWithLifecycle().value, vm.fuelUsage.collectAsStateWithLifecycle().value)?.let {
+                    Text(it, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 6.dp))
+                }
                 Spacer(Modifier.height(18.dp))
-                TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving, detail = !moving, comments = vm.dayComments.collectAsStateWithLifecycle().value)
+                TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving, detail = !moving, comments = vm.dayComments.collectAsStateWithLifecycle().value,
+                    fuelStop = vm.fuelSuggestion.collectAsStateWithLifecycle().value?.takeIf { it.eventId == trip.eventId }, onFuelVia = vm::goViaSuggested)
             } else if (todayEvents.isEmpty()) {
                 Text("오늘은 일정이 없어요", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text("폰 캘린더에 일정을 넣으면 여기로 와요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 8.dp))
@@ -519,6 +526,37 @@ private fun drivenTimes(trip: TodayTrip, live: NaviLive, guiding: Boolean): Map<
     return com.htb.carplan.shared.calendar.Schedule.asDriven(trip.stops, trip.next?.id, eta)
 }
 
+/**
+ * Q55 on screen (정원 2026-10-31): what the rest of the day takes in fuel. After [가기] the road figures from the
+ * plan; before, a straight-line guess (×1.3, no API call) marked "약".
+ */
+private fun fuelLine(trip: TodayTrip, v: com.htb.carplan.shared.model.CarState, usage: FuelUsage?): String? {
+    val what = if (v.isEv == true) "배터리" else "연료"
+    usage?.takeIf { it.eventId == trip.eventId }?.let { u ->
+        // Short = less than the 30 km reserve at some point (FuelPlan.shortfall), not just an empty tank on arrival.
+        return "남은 길 ${u.km}km · $what ${u.usedPercent}% 써요 · " + if (u.short) "중간에 넣어야 해요" else "도착 때 ${u.leftPercent.coerceAtLeast(0)}%"
+    }
+    val pts = trip.remaining.map { it.place }.filter { with(com.htb.carplan.shared.calendar.RouteMath) { it.hasCoords() } }
+    if (pts.size < 2) return null
+    val meters = pts.zipWithNext().sumOf { (a, b) -> com.htb.carplan.shared.calendar.RouteMath.metersBetween(a.lat, a.lng, b.lat, b.lng) } * 1.3
+    val u = com.htb.carplan.shared.calendar.FuelPlan.usage(meters, v.fuelPercent, v.rangeKm?.times(1000)) ?: return null
+    return "남은 길 약 ${(meters / 1000).toInt()}km · $what 약 ${u.usedPercent.toInt().coerceAtLeast(1)}% 써요"
+}
+
+/** The suggested station on the rail: grey, dashed like a plan, with [경유지로] parked. */
+@Composable
+private fun FuelStopRow(f: FuelSuggestion, indent: Dp, showButton: Boolean, onVia: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(start = indent, top = 12.dp, bottom = 4.dp).border(1.dp, Line, Corner).padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("추천 주유 · ${f.station.name}", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(listOfNotNull("${"%,d".format(f.station.price)}원", f.percentThen?.let { "연료 ${it}%쯤" }, f.saving?.let { "지금 근처보다 ${it}원 쌈" }).joinToString(" · "), color = Soft, fontSize = 20.sp, maxLines = 1)
+        }
+        if (showButton) OutlinedButton(onClick = onVia, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Line)) {
+            Text("경유지로", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
 /** "3곳 다녀왔어요" / "2곳 다녀왔어요 · 1곳 건너뜀" */
 private fun doneLine(t: TodayTrip): String {
     val skipped = t.stops.count { it.skipped }
@@ -554,7 +592,7 @@ private fun remainText(live: NaviLive, trip: TodayTrip?, guiding: Boolean): Stri
  * passengers' phones; the car only shows the day and answers the voice questions. One small [더보기] while parked.
  */
 @Composable
-private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopComment>>, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
+private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopComment>>, fuelStop: FuelSuggestion?, onFuelVia: () -> Unit, fuelLine: String?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -569,6 +607,7 @@ private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopCommen
                     done -> Text("오늘 일정 끝 · ${doneLine(trip!!)}", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                     trip != null -> Text("${trip.stops.count { s -> s.visited && !s.skipped }}/${trip.stops.size}곳 다녀옴", color = Soft, fontSize = 26.sp)
                 }
+                if (!restricted) fuelLine?.let { Text(it, color = Soft, fontSize = 20.sp, maxLines = 1) }
             }
             // ⑩ in the half view too: more than one trip today → one tap to pick another (parked only).
             if (!restricted && otherTrips > 0) CarCloseButton(onClick = onOtherTrip, label = "다른 여행")
@@ -580,7 +619,7 @@ private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopCommen
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (trip != null) {
                 // The half screen is tall and narrow: room between places, and (parked) the memo·comments·drive like the wide view (정원 2026-10-31).
-                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding), driving = restricted, detail = !restricted, comments = comments, roomy = true)
+                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding), driving = restricted, detail = !restricted, comments = comments, roomy = true, fuelStop = fuelStop, onFuelVia = onFuelVia)
                 if (trip.stops.isNotEmpty() && trip.next == null) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 18.dp))
             } else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
         }
@@ -722,7 +761,7 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
  * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
  */
 @Composable
-private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false, detail: Boolean = false, comments: Map<String, List<StopComment>> = emptyMap(), roomy: Boolean = false) {
+private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false, detail: Boolean = false, comments: Map<String, List<StopComment>> = emptyMap(), roomy: Boolean = false, fuelStop: FuelSuggestion? = null, onFuelVia: () -> Unit = {}) {
     // detail (주차 중, 정원 2026-10-31: 폰 타임라인처럼): expected times for blank slots, the planned time under a moved
     // one, every memo, the group's comments (read-only) and the drive between places — straight-line, no API call.
     val legs = remember(trip.stops) {
@@ -755,6 +794,8 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
     val more = if (lastShown < Int.MAX_VALUE) (trip.stops.size - 1 - lastShown).coerceAtLeast(0) else 0
     trip.stops.forEachIndexed { i, s ->
         if (i < hidden || i > lastShown) return@forEachIndexed
+        // A station before the next place (filling up right away) sits just above it, under the places already passed.
+        if (fuelStop != null && fuelStop.afterStopId == null && s.id == nextId) FuelStopRow(fuelStop, rail, showButton = detail, onFuelVia)
         val isNext = s.id == nextId
         val color = when { s.visited -> Soft; isNext -> Accent; else -> Ink }
         val below = trip.stops.getOrNull(i + 1)
@@ -814,6 +855,8 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
                 if (detail && below != null) legs[s.id]?.let { (m, sec) ->
                     Text("이동 약 ${(sec / 60).coerceAtLeast(1)}분 · ${"%.1f".format(m / 1000)}km", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(start = timeW, top = 10.dp))
                 }
+                // Q55: the station to fill up at, right after the place it comes after (정원 2026-10-31).
+                if (fuelStop != null && fuelStop.afterStopId == s.id) FuelStopRow(fuelStop, timeW, showButton = detail, onFuelVia)
             }
         }
     }

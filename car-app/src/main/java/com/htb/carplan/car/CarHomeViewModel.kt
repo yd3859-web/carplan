@@ -98,6 +98,9 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     private val monitor = CarRuntime.monitor(app)
 
     fun goViaStation(st: com.htb.carplan.shared.net.GasStation) = navigator.goViaStation(st)
+    val fuelUsage = navigator.fuelUsage
+    val fuelSuggestion = navigator.fuelSuggestion
+    fun goViaSuggested() = navigator.goViaSuggested()
     fun dismissStations() = navigator.dismissStations()
 
     // 6장 다트 (주차 중): same room as the phones
