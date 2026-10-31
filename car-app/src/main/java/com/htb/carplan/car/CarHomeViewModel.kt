@@ -72,6 +72,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 시연 메뉴: draw the half-width (next to the navigation) layout even on the full app area. */
     val previewSplit = MutableStateFlow(false)
+    /** 시연 메뉴: night colours (CarTheme) without waiting for the car to dim. */
+    val previewDark = MutableStateFlow(false)
     val stations = navigator.stations
     private val monitor = CarRuntime.monitor(app)
 

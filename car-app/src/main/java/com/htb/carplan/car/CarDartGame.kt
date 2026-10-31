@@ -75,9 +75,16 @@ import kotlin.random.Random
 
 // Same board as the phone (vote/DartGame.kt), drawn with the car's colours. Keep the two in step.
 private object Palette {
-    val Background = Color(0xFFFFFFFF); val TextStrong = Color(0xFF111111); val TextSoft = Color(0xFF8A9096)
-    val Line = Color(0xFFE4E6E9); val SheetEdge = Color(0xFFC9CED4); val Navy = Color(0xFF111111)
-    val NavySoft = Color(0xFF2B2F33); val Teal = Color(0xFF0066B3); val ChipText = Color(0xFF4A5056)
+    val Background: Color @Composable get() = LocalCarColors.current.bg
+    val TextStrong: Color @Composable get() = LocalCarColors.current.ink
+    val TextSoft: Color @Composable get() = LocalCarColors.current.soft
+    val Line: Color @Composable get() = LocalCarColors.current.line
+    val SheetEdge: Color @Composable get() = LocalCarColors.current.sheetEdge
+    val Navy: Color @Composable get() = LocalCarColors.current.ink
+    val NavySoft: Color @Composable get() = if (LocalCarColors.current.dark) Color(0xFFD0D4D8) else Color(0xFF2B2F33)
+    val Teal: Color @Composable get() = LocalCarColors.current.accent
+    val ChipText: Color @Composable get() = LocalCarColors.current.soft
+    val OnNavy: Color @Composable get() = LocalCarColors.current.onInk
 }
 private val Corner = RoundedCornerShape(4.dp)
 
@@ -139,7 +146,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 38.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
                             Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 18.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
                             Button(
-                                onClick = { vm.addDartAsStop(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
+                                onClick = { vm.addDartAsStop(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
                                 modifier = Modifier.padding(top = 14.dp).fillMaxWidth().height(72.dp),
                             ) { Text("오늘 일정에 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
                         }
@@ -154,7 +161,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
 @Composable
 private fun CarScopeChip(label: String, selected: Boolean, onClick: () -> Unit) = FilterChip(
     selected = selected, onClick = onClick, shape = Corner, label = { Text(label, fontSize = 20.sp, modifier = Modifier.padding(6.dp)) },
-    colors = FilterChipDefaults.filterChipColors(containerColor = Palette.Background, labelColor = Palette.TextStrong, selectedContainerColor = Palette.Navy, selectedLabelColor = Color.White),
+    colors = FilterChipDefaults.filterChipColors(containerColor = Palette.Background, labelColor = Palette.TextStrong, selectedContainerColor = Palette.Navy, selectedLabelColor = Palette.OnNavy),
 )
 
 private data class HitSpot(val lat: Double, val lng: Double, val key: String)
@@ -202,6 +209,11 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
     var assetsReady by remember { mutableStateOf(MapAssets.sgg != null) }
     LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { MapAssets.load(context) }; assetsReady = true }
     val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    // Draw lambdas are not composable: read the theme colours here.
+    val colors = LocalCarColors.current
+    val cTeal = colors.accent; val cNavy = colors.ink; val cSoft = colors.soft; val cLine = colors.line
+    val cOff = colors.railPassed; val cDot = colors.soft
+    val dartColors = DartColors(barrel = colors.ink, shaft = if (colors.dark) Color(0xFFD0D4D8) else Color(0xFF2B2F33), flight = colors.accent)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val w = with(density) { maxWidth.toPx() }; val h = with(density) { maxHeight.toPx() }
@@ -304,12 +316,12 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             }
             // NEAR scope: the 100 km circle
             // names
-            val big = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Palette.TextSoft)
+            val big = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = cSoft)
             if (detail < 1f) sidoLabels.forEach { l ->
                 val p = toScreen(l.lat, l.lng)
                 if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
                 val on = l.name in poolSidos
-                val st = big.copy(color = (if (on) ink else Color(0xFFB9BEC4)).copy(alpha = (1f - detail) * appear.value), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                val st = big.copy(color = (if (on) ink else cOff).copy(alpha = (1f - detail) * appear.value), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
                 val m = measurer.measure(l.name, st)
                 drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
             }
@@ -317,7 +329,7 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                 sggLabels.forEach { l ->
                     val p = toScreen(l.lat, l.lng)
                     if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
-                    val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.ChipText.copy(alpha = detail)))
+                    val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, color = cSoft.copy(alpha = detail)))
                     drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
                 }
                 val st = stuck
@@ -327,8 +339,8 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                         val p = toScreen(rg.lat, rg.lng)
                         if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
                         val isHit = hit != null && kotlin.math.abs(rg.lat - hit.lat) < 1e-6 && kotlin.math.abs(rg.lng - hit.lng) < 1e-6
-                        drawCircle((if (isHit) Palette.Teal else Color(0xFF8A9096)).copy(alpha = detail), (if (isHit) 6 else 3).dp.toPx(), p)
-                        val m = measurer.measure(rg.dong ?: rg.sigungu, androidx.compose.ui.text.TextStyle(fontSize = if (isHit) 20.sp else 13.sp, fontWeight = if (isHit) FontWeight.Black else FontWeight.Normal, color = (if (isHit) ink else Palette.TextSoft).copy(alpha = detail)))
+                        drawCircle((if (isHit) cTeal else cDot).copy(alpha = detail), (if (isHit) 6 else 3).dp.toPx(), p)
+                        val m = measurer.measure(rg.dong ?: rg.sigungu, androidx.compose.ui.text.TextStyle(fontSize = if (isHit) 20.sp else 13.sp, fontWeight = if (isHit) FontWeight.Black else FontWeight.Normal, color = (if (isHit) ink else cSoft).copy(alpha = detail)))
                         drawText(m, topLeft = p + Offset(8.dp.toPx(), -m.size.height / 2f))
                     }
             }
@@ -336,10 +348,10 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             val sp = stuck?.let { toScreen(it.first, it.second) }
             if (sp != null && impact.value < 1f) {
                 val r = impact.value * 140.dp.toPx()
-                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.8f), r, sp, style = Stroke(3.dp.toPx()))
-                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.35f), r * 0.55f, sp, style = Stroke(2.dp.toPx()))
+                drawCircle(cTeal.copy(alpha = (1f - impact.value) * 0.8f), r, sp, style = Stroke(3.dp.toPx()))
+                drawCircle(cTeal.copy(alpha = (1f - impact.value) * 0.35f), r * 0.55f, sp, style = Stroke(2.dp.toPx()))
             }
-            drawLine(Palette.Line, Offset(0f, boardH), Offset(w, boardH), 1.dp.toPx())
+            drawLine(cLine, Offset(0f, boardH), Offset(w, boardH), 1.dp.toPx())
         }
 
         // gesture
@@ -379,24 +391,24 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                 val power = min(1f, p.getDistance() / (size.height * 0.40f))
                 val dir = Offset(-p.x, -p.y) / p.getDistance()
                 val end = launchAt + dir * (launchAt.y - boardH * 0.04f) * power
-                drawLine(Palette.Teal, launchAt, end, 3.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
-                drawCircle(Palette.Teal, 14.dp.toPx(), end, style = Stroke(2.dp.toPx()))
-                drawArc(Palette.Navy, -90f, 360f * power, false, launchAt - Offset(30.dp.toPx(), 30.dp.toPx()), androidx.compose.ui.geometry.Size(60.dp.toPx(), 60.dp.toPx()), style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
+                drawLine(cTeal, launchAt, end, 3.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
+                drawCircle(cTeal, 14.dp.toPx(), end, style = Stroke(2.dp.toPx()))
+                drawArc(cNavy, -90f, 360f * power, false, launchAt - Offset(30.dp.toPx(), 30.dp.toPx()), androidx.compose.ui.geometry.Size(60.dp.toPx(), 60.dp.toPx()), style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
             }
             val t = fly.value; val target = flightTo
             when {
-                p != null -> drawDart(launchAt + p * 0.35f, atan2(-p.y, -p.x), 1.5f)
+                p != null -> drawDart(dartColors, launchAt + p * 0.35f, atan2(-p.y, -p.x), 1.5f)
                 flying && target != null -> {
                     val ground = flightFrom + (target - flightFrom) * t
                     drawOval(Color(0x33000000), ground - Offset(10.dp.toPx(), 3.dp.toPx()), androidx.compose.ui.geometry.Size(20.dp.toPx() * (0.6f + t * 0.4f), 6.dp.toPx()))
                     val pos = ground + Offset(0f, -sin(PI * t).toFloat() * size.height * 0.22f)
-                    drawDart(pos, atan2(target.y - flightFrom.y, target.x - flightFrom.x) + (1 - t) * -0.4f, 1.5f - 0.75f * t, wobble.value)
+                    drawDart(dartColors, pos, atan2(target.y - flightFrom.y, target.x - flightFrom.x) + (1 - t) * -0.4f, 1.5f - 0.75f * t, wobble.value)
                 }
                 stuck != null -> {
                     val sp = toScreen(stuck!!.first, stuck!!.second)
-                    drawDart(sp, atan2(sp.y - launchAt.y, sp.x - launchAt.x), 0.75f + 0.25f * detail, wobble.value)
+                    drawDart(dartColors, sp, atan2(sp.y - launchAt.y, sp.x - launchAt.x), 0.75f + 0.25f * detail, wobble.value)
                 }
-                else -> drawDart(launchAt, (-PI / 2).toFloat(), 1.5f)
+                else -> drawDart(dartColors, launchAt, (-PI / 2).toFloat(), 1.5f)
             }
         }
     }
@@ -414,16 +426,18 @@ private fun RouteMathDeg(la1: Double, lo1: Double, la2: Double, lo2: Double): Do
     return dx * dx + dy * dy
 }
 
-/** Steel tip, black barrel, blue flights — pointing along [heading] (radians, 0 = right). */
-private fun DrawScope.drawDart(at: Offset, heading: Float, s: Float, wobbleDeg: Float = 0f) {
+private data class DartColors(val barrel: Color, val shaft: Color, val flight: Color)
+
+/** Steel tip, ink barrel, blue flights — pointing along [heading] (radians, 0 = right). */
+private fun DrawScope.drawDart(c: DartColors, at: Offset, heading: Float, s: Float, wobbleDeg: Float = 0f) {
     rotate(Math.toDegrees(heading.toDouble()).toFloat() + wobbleDeg, at) {
         scale(s, s, at) {
             val u = 1.dp.toPx()
             drawLine(Color(0xFF9AA1A8), at, at + Offset(-10 * u, 0f), 2.5f * u, StrokeCap.Round)
-            drawLine(Palette.Navy, at + Offset(-10 * u, 0f), at + Offset(-34 * u, 0f), 6 * u, StrokeCap.Round)
-            drawLine(Palette.NavySoft, at + Offset(-34 * u, 0f), at + Offset(-48 * u, 0f), 2.5f * u, StrokeCap.Round)
+            drawLine(c.barrel, at + Offset(-10 * u, 0f), at + Offset(-34 * u, 0f), 6 * u, StrokeCap.Round)
+            drawLine(c.shaft, at + Offset(-34 * u, 0f), at + Offset(-48 * u, 0f), 2.5f * u, StrokeCap.Round)
             val b = at + Offset(-48 * u, 0f)
-            drawPath(Path().apply { moveTo(b.x + 10 * u, b.y); lineTo(b.x - 6 * u, b.y - 9 * u); lineTo(b.x - 2 * u, b.y); lineTo(b.x - 6 * u, b.y + 9 * u); close() }, Palette.Teal)
+            drawPath(Path().apply { moveTo(b.x + 10 * u, b.y); lineTo(b.x - 6 * u, b.y - 9 * u); lineTo(b.x - 2 * u, b.y); lineTo(b.x - 6 * u, b.y + 9 * u); close() }, c.flight)
         }
     }
 }

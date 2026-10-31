@@ -56,6 +56,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 
 ## 디자인 규칙 — 현대(Pleos) 기본 UI에 녹아들게
 - **흰 바탕, 검정에 가까운 글자**(`Palette.TextStrong` #111), 보조 글자 회색(`TextSoft`). 어두운 카드·그라데이션 없음.
+- **차 앱은 다크 모드가 있다**(2026-10-31 정원): 차가 밤 모드면 검정 바탕·밝은 글자(`car/CarTheme.kt`의 `DarkCarColors`, 파랑은 #4DA3FF로 밝게). 차 색은 `LocalCarColors`를 통해서만 쓴다(`Ink`·`Soft` 같은 getter). 그리기 람다(`drawBehind`·`Canvas`) 안에선 색을 미리 변수에 담는다. 시연 메뉴 [다크 모드 미리보기]로 확인.
 - **섹션은 둥근 카드로 나누지 않는다.** 얇은 구분선(`HorizontalDivider(color = Palette.Line)`)과 여백으로 나눈다. 색 바탕 칸 금지(입력 필드만 `InputBg`).
 - 모서리는 전부 **4dp**(`Corner`). 원형 점·배지 대신 숫자·짧은 글자.
 - 버튼: 주요 = 검정 채움 흰 글자(`Palette.Navy`), 보조 = 흰 바탕 + 1dp 회색 테두리. 칩도 테두리형.
