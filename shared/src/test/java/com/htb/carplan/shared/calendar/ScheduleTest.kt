@@ -32,4 +32,21 @@ class ScheduleTest {
         assertNull(est["a"])
         assertEquals("13:00", est["c"])
     }
+
+    @Test
+    fun `running late pushes the later typed times`() {
+        val stops = listOf(stop("a", "10:00").copy(visited = true), stop("b", "11:00"), stop("c", "12:30"), stop("d"))
+        val out = Schedule.asDriven(stops, "b", java.time.LocalTime.of(13, 29))
+        assertEquals("13:29", out["b"])
+        assertEquals("14:59", out["c"]) // 12:30 + 149 min late
+        assertNull(out["d"]) // no typed time, nothing to move
+        assertNull(out["a"]) // already visited
+    }
+
+    @Test
+    fun `early or barely late moves only the next stop`() {
+        val stops = listOf(stop("b", "11:00"), stop("c", "12:30"))
+        assertEquals(mapOf("b" to "10:40"), Schedule.asDriven(stops, "b", java.time.LocalTime.of(10, 40)))
+        assertEquals(mapOf("b" to "11:03"), Schedule.asDriven(stops, "b", java.time.LocalTime.of(11, 3)))
+    }
 }

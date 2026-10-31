@@ -31,4 +31,29 @@ object Schedule {
         }
         return out
     }
+
+    /**
+     * The day as it is actually going (정원 2026-10-31: times are expectations, not promises — running late just
+     * pushes the rest of the day). [nextId] is the stop the car is driving to and [nextEta] when the navigation
+     * expects to get there; it shows that time. When it is [minLateMinutes] or more after the typed time, every
+     * later stop with a typed time moves by the same amount. Arriving early moves nothing (more time there).
+     * @return stopId → "HH:mm" to show instead of the typed time.
+     */
+    fun asDriven(stops: List<Stop>, nextId: String?, nextEta: LocalTime?, minLateMinutes: Long = 5): Map<String, String> {
+        if (nextId == null || nextEta == null) return emptyMap()
+        val idx = stops.indexOfFirst { it.id == nextId }.takeIf { it >= 0 } ?: return emptyMap()
+        val out = LinkedHashMap<String, String>()
+        out[nextId] = fmt(nextEta)
+        val planned = stops[idx].time?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: return out
+        val late = java.time.Duration.between(planned, nextEta).toMinutes()
+        if (late < minLateMinutes) return out
+        for (s in stops.drop(idx + 1)) {
+            if (s.visited) continue
+            val t = s.time?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: continue
+            out[s.id] = fmt(t.plusMinutes(late))
+        }
+        return out
+    }
+
+    private fun fmt(t: LocalTime) = "%02d:%02d".format(t.hour, t.minute)
 }

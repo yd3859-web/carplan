@@ -180,7 +180,7 @@ private fun CarHome(vm: CarHomeViewModel) {
             val compact = !wide || forceSplit
             Row(Modifier.fillMaxSize()) {
                 if (forceSplit && wide) Box(Modifier.weight(1f).fillMaxHeight().background(Color(0xFFE9ECEF)), contentAlignment = Alignment.Center) {
-                    Text("내비 자리\n(반반 미리보기)", color = Soft, fontSize = 22.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Text("다른 앱 자리\n(내비·음악 등, 반반 미리보기)", color = Soft, fontSize = 22.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
@@ -289,7 +289,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             if (trip != null) {
                 Text(trip.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(18.dp))
-                TripStops(trip, big = true)
+                TripStops(trip, big = true, times = drivenTimes(trip, live, guiding))
             } else if (todayEvents.isEmpty()) {
                 Text("오늘은 일정이 없어요", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text("폰 캘린더에 일정을 넣으면 여기로 와요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 8.dp))
@@ -336,7 +336,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             } else {
             Text(if (guiding) "가는 중" else "다음", color = Soft, fontSize = 20.sp)
             Text(nextName ?: "갈 곳이 없어요", color = if (nextName != null) Accent else Soft, fontSize = 44.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
-            listOfNotNull(nextTime?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
+            listOfNotNull(nextTime?.takeIf { !guiding || (live.remainSeconds == null && trip?.day?.etaNext == null) }?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
             }
             if (guiding) LegProgress(live, nextName)
@@ -356,7 +356,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text("그다음", color = Soft, fontSize = 18.sp)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(after.place.name, color = Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    after.time?.let { Text("  $it", color = Soft, fontSize = 22.sp) }
+                    (drivenTimes(trip, live, guiding)[after.id] ?: after.time)?.let { Text("  $it", color = Soft, fontSize = 22.sp) }
                 }
                 val more = trip.remaining.size - 2
                 if (more > 0) Text("그 뒤 ${more}곳 더", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp))
@@ -381,6 +381,18 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             ) { Text("더보기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
+}
+
+/**
+ * Rail times as the day is actually going (정원 2026-10-31): the next stop shows when the navigation expects to
+ * arrive, and running late pushes the later stops' times along. Not a warning — the plan just moves.
+ */
+private fun drivenTimes(trip: TodayTrip, live: NaviLive, guiding: Boolean): Map<String, String> {
+    if (!guiding) return emptyMap()
+    // The navigation's live time first; between updates, the arrival it last announced (days/{date}.etaNext).
+    val eta = live.remainSeconds?.let { java.time.LocalTime.now().plusSeconds(it.toLong()) }
+        ?: trip.day?.etaNext?.let { runCatching { java.time.LocalTime.parse(it) }.getOrNull() } ?: return emptyMap()
+    return com.htb.carplan.shared.calendar.Schedule.asDriven(trip.stops, trip.next?.id, eta)
 }
 
 /** How much of this leg is behind us: a thin blue line (blue = where the car goes). The leg's length is the
@@ -418,15 +430,25 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
             Column(Modifier.weight(1f)) {
                 // The rail already names the next place (big, blue); the header only says what the day is and how far.
                 Text(trip?.title ?: "오늘", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text(remainText(live, trip, guiding) ?: trip?.let { "${it.stops.count { s -> s.visited }}/${it.stops.size}곳 다녀옴" } ?: "", color = Soft, fontSize = 22.sp)
+                val done = trip != null && trip.stops.isNotEmpty() && trip.next == null
+                val remain = remainText(live, trip, guiding)
+                when {
+                    // Driving: how far and when — the one line the driver glances at, so not grey.
+                    remain != null -> Text(remain, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    done -> Text("오늘 일정 끝 · ${trip!!.stops.size}곳 다녀왔어요", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    trip != null -> Text("${trip.stops.count { s -> s.visited }}/${trip.stops.size}곳 다녀옴", color = Soft, fontSize = 22.sp)
+                }
             }
             if (!restricted) TextButton(onClick = onMore) { Text("더보기", color = Soft, fontSize = 22.sp) }
         }
+        if (guiding) LegProgress(live, trip?.next?.place?.name)
         HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 18.dp))
         prompt?.let { it(); Spacer(Modifier.height(18.dp)) }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            if (trip != null) TripStops(trip, big = true, foldVisited = true)
-            else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
+            if (trip != null) {
+                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding))
+                if (trip.stops.isNotEmpty() && trip.next == null) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 18.dp))
+            } else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
         }
         if (!guiding && !restricted && (trip?.next != null || next != null)) Button(
             onClick = onGo, modifier = Modifier.fillMaxWidth().height(100.dp), shape = Corner,
@@ -546,7 +568,7 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
  * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
  */
 @Composable
-private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false) {
+private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap()) {
     val node = if (big) 30.dp else 22.dp; val small = if (big) 24.dp else 18.dp; val rail = if (big) 64.dp else 44.dp
     val fs = if (big) 28.sp else 21.sp; val fsNext = if (big) 34.sp else 21.sp; val gap = if (big) 22.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
     val nextId = trip.next?.id
@@ -585,7 +607,7 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
             }
             Column(Modifier.weight(1f).padding(bottom = if (below != null) gap else 0.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    s.time?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = if (big) 22.sp else 21.sp, modifier = Modifier.width(if (big) 84.dp else 64.dp)) }
+                    (times[s.id] ?: s.time)?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = if (big) 22.sp else 21.sp, modifier = Modifier.width(if (big) 84.dp else 64.dp)) }
                     Text(s.place.name, color = color, fontSize = if (isNext) fsNext else fs, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
                     if (isNext && !big) Text("  다음", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
