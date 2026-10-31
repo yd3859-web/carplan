@@ -232,7 +232,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
-                    if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
+                    if (compact) SplitDayView(trip, vm.dayComments.collectAsStateWithLifecycle().value, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
                         today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true }, onEdit = { editing = true },
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
@@ -550,7 +550,7 @@ private fun remainText(live: NaviLive, trip: TodayTrip?, guiding: Boolean): Stri
  * passengers' phones; the car only shows the day and answers the voice questions. One small [더보기] while parked.
  */
 @Composable
-private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
+private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopComment>>, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -575,7 +575,8 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
         prompt?.let { it(); Spacer(Modifier.height(18.dp)) }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (trip != null) {
-                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding), driving = restricted)
+                // The half screen is tall and narrow: room between places, and (parked) the memo·comments·drive like the wide view (정원 2026-10-31).
+                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding), driving = restricted, detail = !restricted, comments = comments, roomy = true)
                 if (trip.stops.isNotEmpty() && trip.next == null) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 18.dp))
             } else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
         }
@@ -715,7 +716,7 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
  * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
  */
 @Composable
-private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false, detail: Boolean = false, comments: Map<String, List<StopComment>> = emptyMap()) {
+private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false, detail: Boolean = false, comments: Map<String, List<StopComment>> = emptyMap(), roomy: Boolean = false) {
     // detail (주차 중, 정원 2026-10-31: 폰 타임라인처럼): expected times for blank slots, the planned time under a moved
     // one, every memo, the group's comments (read-only) and the drive between places — straight-line, no API call.
     val legs = remember(trip.stops) {
@@ -735,7 +736,7 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
     }
     val timeW = if (detail) 116.dp else if (big) 100.dp else 64.dp
     val node = if (big) 30.dp else 22.dp; val small = if (big) 24.dp else 18.dp; val rail = if (big) 64.dp else 44.dp
-    val fs = if (big) 28.sp else 24.sp; val fsNext = if (big) 36.sp else 24.sp; val gap = if (big) 22.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
+    val fs = if (big) 28.sp else 24.sp; val fsNext = if (big) 36.sp else 24.sp; val gap = if (roomy) 44.dp else if (big) 30.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
     val nextId = trip.next?.id
     val railPassed = RailPassed; val line = Line // drawBehind is not composable
     if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 · [칸 편집]에서 넣어요", color = Soft, fontSize = 24.sp)
