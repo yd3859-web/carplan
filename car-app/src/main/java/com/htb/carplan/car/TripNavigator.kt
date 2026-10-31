@@ -761,7 +761,24 @@ class TripNavigator(
         if (t.waitingPickups.isNotEmpty() && t.day?.pickupSharing != true) { askPickup(t); return }
         val next = t.next ?: return
         fuelPlanVersion = t.version // Q55: the plan speaks after "가기"; the plain notice stays quiet meanwhile
-        show(NextPrompt(next, reason)) { askJob = scope.launch { answer(voice.ask("다음 목적지 ${withRo(next.place.name)} 갈까요?", ::listening)) } }
+        show(NextPrompt(next, reason)) {
+            askJob = scope.launch {
+                // ★1 (차 쪽): "지금 출발하면 10시 12분 도착이에요" — one Kakao leg, cached (legSeconds), straight line when offline.
+                val eta = departEta(next)
+                eta?.let { e -> _prompt.update { p -> p?.takeIf { it.stop.id == next.id }?.copy(message = "지금 출발하면 $e 도착") } }
+                val q = "다음 목적지 ${withRo(next.place.name)} 갈까요?" + (eta?.let { " 지금 출발하면 ${it.replace(":", "시 ")}분 도착이에요." } ?: "")
+                answer(voice.ask(q, ::listening))
+            }
+        }
+    }
+
+    /** "10:12" when leaving now for [next] (needs the car's position); null when it cannot tell. */
+    private suspend fun departEta(next: Stop): String? {
+        if (!next.place.hasCoords()) return null
+        val here = lastLocation ?: return null
+        val secs = legSeconds(Place(name = "차", lat = here.first, lng = here.second), next.place)
+        val at = LocalTime.now().plusSeconds(secs.toLong())
+        return "%d:%02d".format(at.hour, at.minute)
     }
 
     /** 12장: five minutes out — passengers get a push; the car offers the navigation's own parking search. */

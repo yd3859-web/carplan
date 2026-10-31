@@ -562,6 +562,8 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
         return
     }
     val question = when { fuel || commute || parking -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" }
+    // ★1: the start question carries "지금 출발하면 10:12 도착" in [NextPrompt.message].
+    val startLine = p.message?.takeIf { !(fuel || commute || parking || change) }
     val hint = when {
         p.listening -> "듣는 중 · \"응\" 또는 \"아니\""
         p.heard != null -> "들은 말 \"${p.heard}\" · 버튼으로 골라 주세요"
@@ -571,6 +573,7 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
     val no = when { pickup -> "공유 없이"; fuel || parking -> "아니요"; change -> "그대로"; else -> "나중에" }
     Column(Modifier.fillMaxWidth().background(Band, Corner).border(1.dp, BandEdge, Corner).padding(if (compact) 22.dp else 28.dp)) {
         Text(question, color = OnBand, fontSize = if (compact) 30.sp else 36.sp, lineHeight = if (compact) 38.sp else 44.sp, fontWeight = FontWeight.Bold)
+        startLine?.let { Text(it, color = OnBand, fontSize = if (compact) 24.sp else 28.sp, modifier = Modifier.padding(top = 6.dp)) }
         Text(hint, color = BandSoft, fontSize = 20.sp, modifier = Modifier.padding(top = 6.dp, bottom = 18.dp))
         val btn: @Composable (String, Boolean, () -> Unit, Modifier) -> Unit = { label, primary, onClick, m ->
             Button(
