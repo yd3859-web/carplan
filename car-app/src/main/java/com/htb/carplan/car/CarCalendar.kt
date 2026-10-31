@@ -247,8 +247,9 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
     val today = LocalDate.now()
     Column(modifier) {
         Text("${picked.monthValue}월 ${picked.dayOfMonth}일 (${picked.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})", color = c.ink, fontSize = if (compact) 28.sp else 32.sp, fontWeight = FontWeight.Bold)
-        val dayEvents = vm.eventsOn(picked, events).filterNot { vm.isTestEvent(it.event) }
-        androidx.compose.animation.Crossfade(picked, Modifier.weight(1f), animationSpec = carSpec(), label = "day") { _ ->
+        // Each half of the fade draws its own day (the old day fades out while the new one fades in).
+        androidx.compose.animation.Crossfade(picked, Modifier.weight(1f), animationSpec = carSpec(), label = "day") { day ->
+        val dayEvents = vm.eventsOn(day, events).filterNot { vm.isTestEvent(it.event) }
         Column(Modifier.fillMaxSize().padding(top = if (compact) 4.dp else 12.dp).verticalScroll(rememberScrollState())) {
             if (dayEvents.isEmpty()) Text("일정이 없어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
             dayEvents.forEach { item ->
@@ -262,7 +263,7 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
                         listOfNotNull(kind, e.place?.name?.ifBlank { null }).joinToString(" · ").takeIf { it.isNotEmpty() }?.let { Text(it, color = c.soft, fontSize = 20.sp, maxLines = 1) }
                     }
                     // Only today's places can be driven to from here; a trip runs through the 오늘 tab.
-                    if (picked == today && e.place != null && e.categoryId != BuiltInCategory.TRIP.id) {
+                    if (day == today && e.place != null && e.categoryId != BuiltInCategory.TRIP.id) {
                         OutlinedButton(onClick = { onGoTo(item) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
                             Text("안내", color = c.ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         }

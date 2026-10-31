@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- 7장: scanning the car's invite QR -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- The camera is optional (photos can come from the gallery): phones and tablets without one can still install. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- 17장: push (Q02: asked at first start) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 2장 일정 "n분 전" 알림: 캘린더 앱의 정확한 알람 (33+ 자동 허용, 31–32는 사용자 허용 없으면 대략 시각) -->

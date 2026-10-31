@@ -218,7 +218,9 @@ private fun DayTimeline(vm: CarHomeViewModel, date: LocalDate, rds: List<RecordD
             Text(dayText(date), color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             Text("이 날은 기록이 없어요 · 표시된 날을 눌러요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
         }
-        loaded.forEachIndexed { ti, (rd, recs, comments) ->
+        // A trip of that day with no records yet (today's other trip) stays out when another one has some.
+        val anyRecords = loaded.any { !it.second.isNullOrEmpty() }
+        loaded.filter { !anyRecords || !it.second.isNullOrEmpty() }.forEachIndexed { ti, (rd, recs, comments) ->
             if (ti > 0) HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
             val list = recs.orEmpty()
             Text(rd.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)

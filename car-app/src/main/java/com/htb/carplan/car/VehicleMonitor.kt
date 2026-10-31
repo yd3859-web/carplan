@@ -73,8 +73,8 @@ class VehicleMonitor(private val context: Context) {
         pm.listen(VehiclePropertyIds.GEAR_SELECTION) { v -> _state.update { it.copy(gear = (v as? Int).toGear()) } }
         realEv = when { (evCapacity ?: 0f) > 0f -> true; (fuelCapacity ?: 0f) > 0f -> false; else -> null }
         _state.update { it.copy(isEv = evOverride ?: realEv) }
-        pm.listen(VehiclePropertyIds.FUEL_LEVEL) { v -> percentOf(v, fuelCapacity)?.let { p -> realFuel = p; _state.update { it.copy(fuelPercent = fuelOverride ?: p) } } }
-        pm.listen(VehiclePropertyIds.EV_BATTERY_LEVEL) { v -> percentOf(v, evCapacity)?.let { p -> realFuel = p; _state.update { it.copy(fuelPercent = fuelOverride ?: p) } } }
+        pm.listen(VehiclePropertyIds.FUEL_LEVEL) { v -> percentOf(v, fuelCapacity)?.let { p -> realFuel = p; _state.update { it.copy(fuelPercent = fuelOverride ?: p) }; vehicle?.let(::pollOdometer) } }
+        pm.listen(VehiclePropertyIds.EV_BATTERY_LEVEL) { v -> percentOf(v, evCapacity)?.let { p -> realFuel = p; _state.update { it.copy(fuelPercent = fuelOverride ?: p) }; vehicle?.let(::pollOdometer) } }
 
         runCatching {
             val ux = c.getCarManager(Car.CAR_UX_RESTRICTION_SERVICE) as CarUxRestrictionsManager
@@ -113,11 +113,6 @@ class VehicleMonitor(private val context: Context) {
                     })
                 }.onFailure { Log.w(TAG, "seat occupancy unavailable", it) }
             }
-            v.getOdometer().getRangeRemainingDistance(
-                // Pleos reports metres (500000 while the cluster shows 500 km).
-                { m -> m?.let { r -> _state.update { it.copy(rangeKm = r.toDouble() / 1000) } } },
-                { Log.w(TAG, "range read failed", it) },
-            )
             // 13장: no belt listener in the SDK → while in P, read the driver's buckle every 2 s.
             handler.postDelayed(object : Runnable {
                 override fun run() {
@@ -154,7 +149,15 @@ class VehicleMonitor(private val context: Context) {
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
+    /** Odometer and range have no listener: both are read now and then once a minute (range used to be read only at start). */
     private fun pollOdometer(v: Vehicle) {
+        runCatching {
+            v.getOdometer().getRangeRemainingDistance(
+                // Pleos reports metres (500000 while the cluster shows 500 km).
+                { m -> m?.let { r -> _state.update { it.copy(rangeKm = r.toDouble() / 1000) } } },
+                { Log.w(TAG, "range read failed: ${it.message}") },
+            )
+        }.onFailure { Log.w(TAG, "range unavailable", it) }
         runCatching {
             v.getOdometer().getCurrentDistanceDriven(
                 { km -> km?.let { d -> _state.update { it.copy(odometerKm = d.toDouble()) } } },

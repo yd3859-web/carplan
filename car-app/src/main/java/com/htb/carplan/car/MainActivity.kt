@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -948,26 +949,6 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
 }
 
 @Composable
-private fun WeekList(vm: CarHomeViewModel, week: List<CalendarEvent>, modifier: Modifier) {
-    Column(modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-        SectionTitle("이번 주")
-        (0..6L).forEach { i ->
-            val d = vm.weekStart.plusDays(i)
-            val items = vm.eventsOn(d, week)
-            val isToday = d == LocalDate.now()
-            Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-                Text(
-                    "${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}",
-                    Modifier.width(76.dp),
-                    color = if (isToday) Accent else Soft, fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
-                )
-                Text(items.joinToString(", ") { it.event.title }.ifEmpty { "—" }, color = if (items.isEmpty()) Soft else Ink, fontSize = 24.sp, maxLines = 2)
-            }
-        }
-    }
-}
-
-@Composable
 private fun BigButton(label: String, enabled: Boolean = true, primary: Boolean = false, onClick: () -> Unit) {
     Button(
         onClick = onClick,
@@ -1120,6 +1101,9 @@ private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onSt
 /** 20장: demo controls — fuel %, car type, fake drive, arrival. */
 @Composable
 private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit) {
+    // Watched, not read once: the buttons follow the trip and guiding while the menu is open (lint, QA 2026-11-01).
+    val guiding by vm.guiding.collectAsStateWithLifecycle()
+    val trip by vm.trip.collectAsStateWithLifecycle()
     CarDialog(onDismiss = onDismiss, title = "시연 메뉴", buttons = { CarCloseButton(onClick = onDismiss) }) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("연료/배터리  지금 ${v.fuelPercent?.toInt() ?: "—"}%  ·  ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"}", fontSize = 20.sp, color = Soft)
@@ -1133,23 +1117,23 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                     FilterChip(selected = false, onClick = { vm.setEvOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
                 }
                 HorizontalDivider(color = Line)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk)) { Text("시뮬레이션 재생", fontSize = 20.sp) }
                     TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 20.sp, color = Soft) }
-                    if (vm.guiding.value) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.makeTestTrip() }) { Text(if (vm.trip.value?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 20.sp, color = Ink) }
+                    if (guiding) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.makeTestTrip() }) { Text(if (trip?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 20.sp, color = Ink) }
                 }
                 Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 20.sp, color = Soft)
                 Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 20.sp, color = Soft)
                 HorizontalDivider(color = Line)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.removeTestCommute(); onDismiss() }) { Text("시험 출근 지우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeSecondTestTrip(); onDismiss() }) { Text("두 번째 여행", fontSize = 20.sp, color = Ink) }
                 }
                 // Two months of made-up use (friends, groups, past trips with records and photos); pressed again it adds missing photos.
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.seedDemo(); onDismiss() }) { Text("오래 쓴 것처럼 채우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.clearDemo(); onDismiss() }) { Text("데모 지우기", fontSize = 20.sp, color = Ink) }
                 }

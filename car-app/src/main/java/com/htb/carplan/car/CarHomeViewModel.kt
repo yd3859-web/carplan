@@ -219,17 +219,21 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val owner: StateFlow<User?> = car
-        .flatMapLatest { c -> c?.ownerUid?.let(calendar::observeUser) ?: flowOf(null) }
+        .map { it?.ownerUid }.distinctUntilChanged() // not a new listener for every fuel/gear update of the car
+        .flatMapLatest { uid -> uid?.let(calendar::observeUser) ?: flowOf(null) }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val weekStart: LocalDate = LocalDate.now().let { it.minusDays((it.dayOfWeek.value % 7).toLong()) }
+    /** Today, re-checked every minute: the screen moves to the new day at midnight without a restart (QA 2026-11-01). */
+    private val today = kotlinx.coroutines.flow.flow { while (true) { emit(LocalDate.now()); kotlinx.coroutines.delay(60_000) } }.distinctUntilChanged()
 
-    /** Owner's events from this Sunday through next Saturday. */
+    /** Owner's events from today through a week ahead (today's list, the next one, "내일 · …", 정비 예정). */
     val week: StateFlow<List<CalendarEvent>> = owner
         .flatMapLatest { u -> if (u == null) flowOf(emptyList()) else calendar.observeGroups(u.uid) }
         .map { groups -> groups.map { it.id } }
-        .flatMapLatest { ids -> calendar.observeEvents(ids, weekStart.toString(), weekStart.plusDays(6).toString()) }
+        .distinctUntilChanged()
+        .combine(today) { ids, d -> ids to d }
+        .flatMapLatest { (ids, d) -> calendar.observeEvents(ids, d.toString(), d.plusDays(7).toString()) }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

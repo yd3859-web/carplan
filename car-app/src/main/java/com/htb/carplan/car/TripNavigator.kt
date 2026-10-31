@@ -46,6 +46,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -188,12 +190,20 @@ class TripNavigator(
     private var changeJob: Job? = null
     private var askedOnStart = false
     private var lastGear = Gear.UNKNOWN
+    /** Left P and not yet in D (R or N on the way out). */
+    private var leftParkForDrive = false
     private var lastRouteSentAt = 0L
 
     // ---- 13장 arrival → record
     private var parkTimer: Job? = null
     /** Set once a record was made for this parking; cleared when the car drives off. */
     private var parkedRecord: Triple<String, String, String>? = null // groupId, eventId, recordId
+    /**
+     * The planned stop the navigation just reported reaching, and when. The navigation says "arrived" before the car
+     * is parked, so by the time P + door make the record, [TodayTrip.next] is already the stop after it — the record
+     * must still go to this one (QA 2026-11-01: planned arrivals were saved as "계획 밖").
+     */
+    private var lastReached: Pair<Stop, Long>? = null
     private var parkedDate: String = ""
     private var lastLocation: Pair<Double, Double>? = null
     private var lastAddress: String = ""
@@ -312,11 +322,20 @@ class TripNavigator(
     }
 
     /** Today's trip of the car owner: prefers the one the car already marked active, else the first trip of the day. */
+    // QA 2026-11-01: only what picks the trip restarts the listeners — the car document changes every second while
+    // driving (fuel, gear, odometer) and each change used to re-open every group/event/stop listener. The date is
+    // part of the key so the car moves to the new day at midnight without a restart.
+    private data class TripKey(val carId: String, val owner: String?, val activeEventId: String?, val today: String)
+    private val todayTicker = flow { while (true) { emit(LocalDate.now().toString()); delay(60_000) } }.distinctUntilChanged()
+
     val trip: StateFlow<TodayTrip?> = carId.filterNotNull()
         .flatMapLatest { id -> calendar.observeCar(id) }
-        .flatMapLatest { car ->
-            val owner = car?.ownerUid ?: return@flatMapLatest flowOf(null)
-            val today = LocalDate.now().toString()
+        .combine(todayTicker) { car, today -> car?.let { TripKey(it.id, it.ownerUid, it.activeEventId, today) } }
+        .distinctUntilChanged()
+        .flatMapLatest { key ->
+            val owner = key?.owner ?: return@flatMapLatest flowOf(null)
+            val today = key.today
+            val car = key
             calendar.observeGroups(owner)
                 .flatMapLatest { groups -> calendar.observeEvents(groups.map { it.id }, today, today) }
                 .map { events ->
@@ -325,7 +344,7 @@ class TripNavigator(
                     // ⑩: the latest explicit choice wins — the one chosen in the car (activeEventId), then a phone's
                     // "오늘 이 차로 가요" (7장 2), then the first trip of the day.
                     tripsToday.firstOrNull { it.event.id == car.activeEventId }
-                        ?: tripsToday.firstOrNull { it.event.carId == car.id }
+                        ?: tripsToday.firstOrNull { it.event.carId == car.carId }
                         ?: tripsToday.firstOrNull()
                 }
                 .flatMapLatest { ev ->
@@ -441,7 +460,13 @@ class TripNavigator(
     fun onGear(gear: Gear) {
         val prev = lastGear
         lastGear = gear
-        if (prev == Gear.P && gear == Gear.D && !_guiding.value && trip.value?.next != null) ask(PromptReason.GEAR_D)
+        // Out of a parking spot is often P → R (back out) → D: the question comes at the first D after P, not only P → D.
+        if (gear == Gear.P) leftParkForDrive = false
+        if (prev == Gear.P && gear != Gear.P) leftParkForDrive = true
+        if (gear == Gear.D && leftParkForDrive) {
+            leftParkForDrive = false
+            if (!_guiding.value && trip.value?.next != null) ask(PromptReason.GEAR_D)
+        }
         // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
         if (gear == Gear.P && prev != Gear.P) {
             // Parked = arrived: "근처 주차장 찾아볼까요?" is no longer a question.
@@ -482,11 +507,20 @@ class TripNavigator(
             val t = trip.value
             val today = LocalDate.now().toString()
             val loc = lastLocation
+            fun near(s: Stop) = loc != null && s.place.hasCoords() && RouteMath.metersBetween(loc.first, loc.second, s.place.lat, s.place.lng) <= NEAR_METERS
+            // Just ticked off by the navigation (within the last half hour, and here or position unknown): that stop.
+            val reached = lastReached?.takeIf { (s, at) -> System.currentTimeMillis() - at < REACHED_VALID_MS && (loc == null || !s.place.hasCoords() || near(s)) && t?.stops?.any { it.id == s.id } == true }?.first
             val next = t?.next
-            val nearNext = next != null && (assumeAtNext || (loc != null && next.place.hasCoords() && RouteMath.metersBetween(loc.first, loc.second, next.place.lat, next.place.lng) <= NEAR_METERS) || (loc == null && _guiding.value))
+            val nearNext = next != null && (assumeAtNext || near(next) || (loc == null && _guiding.value))
             runCatching {
                 val carUid = carId.value.orEmpty()
-                if (t != null && nearNext && next != null) {
+                if (t != null && reached != null) {
+                    lastReached = null
+                    val id = records.addRecord(t.groupId, t.eventId, today, Record(place = reached.place, stopId = reached.id, createdBy = carUid, parkedLat = loc?.first, parkedLng = loc?.second))
+                    parkedRecord = Triple(t.groupId, t.eventId, id); parkedDate = today
+                    _notice.value = "기록 칸: ${reached.place.name} ($reason)"
+                    scope.launch { voice.say("${reached.place.name} 기록 남겼어요.") }
+                } else if (t != null && nearNext && next != null) {
                     // ★3 주차 위치: where the car actually stopped (may differ from the stop's own point).
                     val id = records.addRecord(t.groupId, t.eventId, today, Record(place = next.place, stopId = next.id, createdBy = carUid, parkedLat = loc?.first, parkedLng = loc?.second))
                     parkedRecord = Triple(t.groupId, t.eventId, id); parkedDate = today
@@ -1306,6 +1340,8 @@ class TripNavigator(
             else -> {}
         }
         val reached = first?.let { e -> t.stops.firstOrNull { it.id == e.id } } ?: t.next ?: return
+        // The record comes a little later (P + door): it belongs to this stop even though "next" moves on now.
+        if (parkedRecord == null) lastReached = reached to System.currentTimeMillis()
         inNavi = inNavi.drop(1)
         scope.launch {
             val after = t.remaining.filterNot { it.id == reached.id }
@@ -1350,6 +1386,8 @@ class TripNavigator(
         private const val PICKUP_DONE_MS = 10 * 60_000L
         /** A second stop within this long and [NEAR_METERS] of an unplanned record reuses it. */
         private const val SAME_PARKING_MS = 30 * 60_000L
+        /** How long a stop the navigation reported reaching waits for its record (P + door). */
+        private const val REACHED_VALID_MS = 30 * 60_000L
         /** Kakao Mobility fallback for the ETA when the navigation gives no driving info: at most this often. */
         private const val KAKAO_ETA_MIN_MS = 5 * 60_000L
         private val START_REASONS = setOf(PromptReason.APP_START, PromptReason.GEAR_D, PromptReason.MANUAL, PromptReason.PICKUP)
