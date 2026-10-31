@@ -235,6 +235,9 @@ class TripNavigator(
         })
         scope.launch { guiding.collect { on -> if (on) startEtaLoop() else etaJob?.cancel() } }
         scope.launch { guiding.collect { updateLiveLoop() } }
+        // The fuel check only ran when the fuel value changed: a low tank seen while the start question was up was
+        // never asked about. Look again whenever the screen is free of questions and when guiding starts or stops.
+        scope.launch { combine(_prompt, guiding) { p, _ -> p == null }.collect { free -> if (free) onCarState(carState) } }
         scope.launch { carId.filterNotNull().flatMapLatest { calendar.observeCar(it) }.catch { }.collect { fuelAlertPercent = it?.fuelAlertPercent?.toDouble() ?: LOW_FUEL_PERCENT } }
         scope.launch {
             trip.filterNotNull().collect { t ->
@@ -242,6 +245,12 @@ class TripNavigator(
                 if (!askedOnStart && t.next != null) { askedOnStart = true; ask(PromptReason.APP_START) }
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
+                // "다음 목적지 ○○로 갈까요?" follows the plan: when the next stop changed (edited on a phone), ask about the new one.
+                _prompt.value?.let { p ->
+                    val start = p.reason == PromptReason.APP_START || p.reason == PromptReason.GEAR_D || p.reason == PromptReason.MANUAL
+                    val n = t.next
+                    if (start && n != null && n.id != p.stop.id) { ask(p.reason); return@collect }
+                }
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
                 _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }

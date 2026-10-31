@@ -186,7 +186,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
                     if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
-                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment,
+                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D,
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
                         onNavi = { vm.openNavigation() },
                         onMore = { more = true },
@@ -257,6 +257,9 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
     ) {
         Text("carplan", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Black)
         Stat(if (v.isEv == true) "배터리" else "연료", v.fuelPercent?.let { "${it.toInt()}%" } ?: "—")
+        // At or under the alert level (설정 cars.fuelAlertPercent): say it in words, no extra colour (one accent only).
+        val alertAt = car?.fuelAlertPercent?.toDouble() ?: 20.0
+        if ((v.fuelPercent ?: 101.0) <= alertAt) Text(if (v.isEv == true) "충전 필요" else "주유 필요", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.border(1.dp, Ink, Corner).padding(horizontal = 8.dp, vertical = 2.dp))
         v.rangeKm?.takeIf { it > 0 }?.let { Stat("주행가능", "${it.toInt()} km") }
         careDue?.let { Stat("정비", it) }
         Spacer(Modifier.weight(1f))
@@ -276,7 +279,9 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
  * thing to do next — where, when, one huge button. Everything else lives behind [더보기] (parked only).
  */
 @Composable
-private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
+private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
+    // Parked at a stop with the route still on: the next place is "다음", not "가는 중".
+    val goingLabel = if (guiding && moving) "가는 중" else "다음"
     val todayEvents = vm.eventsOn(today, week)
     val others = todayEvents.filter { it.event.id != trip?.eventId }
     val nextName = trip?.next?.place?.name ?: next?.event?.place?.name
@@ -313,7 +318,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 prompt()
                 // A question while driving (주차장, 경로 바꾸기) must not hide where we are going and how far.
                 if (guiding && nextName != null) {
-                    Text("가는 중", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 24.dp))
+                    Text(goingLabel, color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 24.dp))
                     Text(nextName, color = Accent, fontSize = 30.sp, fontWeight = FontWeight.Black, maxLines = 1)
                     remainText(live, trip, guiding)?.let { Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 4.dp)) }
                     LegProgress(live, nextName)
@@ -334,7 +339,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text("${trip.stops.size}곳 다녀왔어요", color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
                 Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp))
             } else {
-            Text(if (guiding) "가는 중" else "다음", color = Soft, fontSize = 20.sp)
+            Text(goingLabel, color = Soft, fontSize = 20.sp)
             Text(nextName ?: "갈 곳이 없어요", color = if (nextName != null) Accent else Soft, fontSize = 44.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
             listOfNotNull(nextTime?.takeIf { !guiding || (live.remainSeconds == null && trip?.day?.etaNext == null) }?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
