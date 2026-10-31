@@ -485,7 +485,6 @@ private fun MoreDialog(guidingNext: String?, hasTrip: Boolean, onPick: (String) 
             add("add" to "일정 추가")
             add("navi" to "내비 열기")
             if (hasTrip) add("ask" to "다음 목적지 다시 묻기")
-            guidingNext?.let { add("arrive" to "$it 도착 처리 (시연)") }
             add("debug" to "시연 메뉴")
         }
         tiles.chunked(2).forEach { row ->
@@ -688,13 +687,21 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, hasTrip: Boolean, onN
         onDismiss = onDismiss,
         title = if (seated) "같이 타셨나요? QR 찍고 들어오세요" else if (group == null) "같이 탄 사람 추가" else "${group.name}에 들어오기",
         buttons = {
-            if (group == null) { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Soft) }; TextButton(onClick = onNewGroup) { Text("새 그룹", fontSize = 22.sp, color = Ink, fontWeight = FontWeight.Bold) } }
-            else TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) }
+            // Car-sized buttons: the main one filled black, the other outlined (디자인 규칙).
+            val closeBtn: @Composable () -> Unit = {
+                OutlinedButton(onClick = onDismiss, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, SheetEdge), modifier = Modifier.height(72.dp)) { Text("닫기", fontSize = 24.sp, color = Ink) }
+            }
+            if (group == null) {
+                closeBtn()
+                Spacer(Modifier.width(12.dp))
+                Button(onClick = onNewGroup, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink), modifier = Modifier.height(72.dp)) { Text("새 그룹 만들고 QR 보기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+            } else closeBtn()
         },
     ) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (group == null) {
-                    Text(if (hasTrip) "오늘 여행은 혼자 쓰는 일정이라 들어올 그룹이 없어요. 새 그룹을 만들면 QR이 떠요." else "오늘 걸린 여행이 없어요. 새 그룹을 만들면 QR이 떠요.", fontSize = 20.sp, color = Soft)
+                    Text(if (hasTrip) "오늘 여행은 혼자 쓰는 일정이라 들어올 그룹이 없어요." else "오늘 걸린 여행이 없어요.", fontSize = 22.sp, color = Ink, modifier = Modifier.fillMaxWidth())
+                    Text("새 그룹을 만들면 QR이 떠요. 같이 탄 사람이 폰으로 찍으면 들어와요.", fontSize = 20.sp, color = Soft, modifier = Modifier.fillMaxWidth())
                 } else {
                     val link = InviteLinks.url(group.inviteCode)
                     val bitmap = remember(link) { qrBitmap(link, 560) }
@@ -760,6 +767,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("시뮬레이션 재생", fontSize = 18.sp) }
                     TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 18.sp, color = Soft) }
+                    if (vm.guiding.value) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 18.sp, color = Ink) }
                     TextButton(onClick = { vm.makeTestTrip() }) { Text(if (vm.trip.value?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 18.sp, color = Ink) }
                 }
                 Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 16.sp, color = Soft)
