@@ -51,6 +51,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Create
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -59,6 +61,8 @@ enum class CarTab(val label: String, val icon: androidx.compose.ui.graphics.vect
     TODAY("오늘", Icons.Filled.Home),
     CALENDAR("캘린더", Icons.Filled.DateRange),
     PEOPLE("같이 탈 사람", Icons.Filled.Person),
+    RECORDS("기록", Icons.Filled.Create),
+    VEHICLE("차량", Icons.Filled.Build),
 }
 
 private val Corner = RoundedCornerShape(4.dp)
@@ -75,7 +79,8 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
     val bar = if (c.dark) c.sheet else c.bg
     val chosen = if (c.dark) c.sheetEdge else c.sheet
     // The grey patch slides to the chosen tab (정원 2026-10-31: 순간이동 말고 옆으로 흐르게). Tabs are one width so it can.
-    val tabW = if (LocalCompact.current) 180.dp else 220.dp
+    // Five tabs: they must fit the half screen too (≈ 830 dp).
+    val tabW = if (LocalCompact.current) 148.dp else 200.dp
     val gap = 4.dp
     val x by androidx.compose.animation.core.animateDpAsState((tabW + gap) * tab.ordinal, androidx.compose.animation.core.tween(TAB_SLIDE_MS), label = "tab")
     Box(
@@ -96,7 +101,7 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
                     androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) c.ink else c.soft, modifier = Modifier.size(42.dp))
-                    Text(t.label, color = if (on) c.ink else c.soft, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                    Text(t.label, color = if (on) c.ink else c.soft, fontSize = if (LocalCompact.current) 20.sp else 24.sp, maxLines = 1, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
                 }
             }
         }

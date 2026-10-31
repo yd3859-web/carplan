@@ -41,6 +41,9 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 
+/** One day of a trip (or 일상 기록) in the 기록 tab. */
+data class RecordDay(val groupId: String, val eventId: String, val date: LocalDate, val title: String)
+
 /** One comment under a stop on the car's timeline: who, what, when (HH:mm). */
 data class StopComment(val who: String, val text: String, val at: String?)
 
@@ -100,6 +103,10 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun goViaStation(st: com.htb.carplan.shared.net.GasStation) = navigator.goViaStation(st)
     val fuelUsage = navigator.fuelUsage
     val fuelSuggestion = navigator.fuelSuggestion
+    /** 주유하기 slot (정원 2026-10-31): recomputed when the trip or the car's fuel changes; straight line, no API. */
+    val fuelNeed: StateFlow<FuelNeed?> by lazy { combine(trip, CarRuntime.monitor(app).state, car) { t, v, c -> navigator.fuelNeed(t, v, c?.fuelAlertPercent?.toDouble() ?: 20.0) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null) }
+    fun findFuelOnRoute() = navigator.findFuelOnRoute()
     fun goViaSuggested() = navigator.goViaSuggested()
     fun dismissStations() = navigator.dismissStations()
 
@@ -238,6 +245,52 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         .catch { _error.value = it.message; emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── ⑤ 기록·차량 탭 (주차 중, 정원 2026-10-31): the same data as the phone's 기록·차량 tabs, read on the car.
+    /** Days that can hold records: trips (each day of them up to today) and 일상 기록, last 60 days, newest first. */
+    val recordDays: StateFlow<List<RecordDay>> = owner
+        .flatMapLatest { u ->
+            if (u == null) flowOf(emptyList())
+            else calendar.observeGroups(u.uid).map { gs -> gs.map { it.id } }.flatMapLatest { ids ->
+                val today = LocalDate.now()
+                calendar.observeEvents(ids, today.minusDays(60).toString(), today.toString())
+            }
+        }
+        .map { list ->
+            val today = LocalDate.now()
+            list.filter { !it.event.deleted && (it.event.categoryId == com.htb.carplan.shared.model.BuiltInCategory.TRIP.id || it.event.id.startsWith("log-")) }
+                .flatMap { e ->
+                    val start = LocalDate.parse(e.event.startDate)
+                    val end = minOf(LocalDate.parse(e.event.endDate.ifBlank { e.event.startDate }), today)
+                    generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }
+                        .map { d -> RecordDay(e.groupId, e.event.id, d, if (e.event.id.startsWith("log-")) "일상 기록" else e.event.title) }.toList()
+                }
+                .sortedWith(compareByDescending<RecordDay> { it.date }.thenBy { it.title })
+        }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun recordsOf(d: RecordDay) = com.htb.carplan.shared.data.RecordRepository().observeRecords(d.groupId, d.eventId, d.date.toString())
+        .map { list -> list.sortedBy { it.arrivedAt?.toDate()?.time ?: Long.MAX_VALUE } }
+        .catch { emit(emptyList()) }
+
+    private val maintenance = com.htb.carplan.shared.data.MaintenanceRepository()
+    /** 차량 관리 events of the owner: records (past) and dues (`due-*`). */
+    val careEvents: StateFlow<List<Event>> = owner
+        .flatMapLatest { u -> if (u == null) flowOf(emptyList()) else maintenance.observe(u.soloGroupId) }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** [했어요] on the car: today, at the car's own odometer reading (amounts are filled in on the phone if wanted). */
+    fun logCare(item: com.htb.carplan.shared.model.MaintenanceItem) {
+        val u = owner.value ?: return
+        val c = car.value ?: return
+        viewModelScope.launch {
+            runCatching { maintenance.log(u.soloGroupId, c.id, item, LocalDate.now(), vehicle.value.odometerKm, byUid = u.uid, intervals = c.intervals) }
+                .onSuccess { navigator.notify("${item.label} 기록했어요") }
+                .onFailure { _error.value = it.message }
+        }
+    }
 
     /** The owner's own categories (출퇴근…), for their colours in the calendar tab (same colours as the phone). */
     val categories: StateFlow<List<com.htb.carplan.shared.model.CustomCategory>> = owner

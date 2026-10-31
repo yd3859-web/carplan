@@ -72,11 +72,13 @@ data class VoiceState(val listening: Boolean = false, val choices: Boolean = fal
 
 /** The day in fuel for [eventId]: km still to drive, % it uses, % left on arrival. */
 data class FuelUsage(val eventId: String, val km: Int, val usedPercent: Int, val leftPercent: Int, val ev: Boolean, val short: Boolean = false)
+/** A temporary 주유하기 slot on the rail (정원 2026-10-31): after [afterStopId] (null = before the next place) the tank runs short. */
+data class FuelNeed(val eventId: String, val afterStopId: String?, val percentThen: Int?, val ev: Boolean)
 /** Where to fill up on the way (Q55): the station, which stop it comes after, fuel % by then, 원 saved vs. now. */
-data class FuelSuggestion(val eventId: String, val station: GasStation, val afterStopId: String?, val afterName: String?, val percentThen: Int?, val saving: Int?)
+data class FuelSuggestion(val eventId: String, val station: GasStation, val afterStopId: String?, val afterName: String?, val percentThen: Int?, val saving: Int?, val chosen: Boolean = false)
 
 /** One place in a "가까운 ○○" list on the car screen (주유소·충전소·주차장·맛집). [priceWon] only for 주유소. */
-data class NearPlace(val id: String, val name: String, val meters: Int, val place: Place, val priceWon: Int? = null)
+data class NearPlace(val id: String, val name: String, val meters: Int, val place: Place, val priceWon: Int? = null, val where: String? = null)
 /** The list shown in our own window — the driver picks without leaving carplan (no hop into the navigation). */
 data class NearbyList(val title: String, val kind: NaviEntry.Kind, val items: List<NearPlace>, val note: String)
 
@@ -209,6 +211,68 @@ class TripNavigator(
     val fuelSuggestion: StateFlow<FuelSuggestion?> = _fuelSuggestion.asStateFlow()
     /** [경유지로] on the rail's suggested station. */
     fun goViaSuggested() { _fuelSuggestion.value?.let { goViaStation(it.station) } }
+
+    /** The day's legs from the car (or the next place) by straight line × 1.3 — no API call, for the 주유하기 slot. */
+    private fun straightLegs(t: TodayTrip): List<FuelPlan.Leg> {
+        val stops = t.remaining.filter { it.place.hasCoords() }
+        var from = lastLocation?.let { Place(name = "차", lat = it.first, lng = it.second) } ?: stops.firstOrNull()?.place ?: return emptyList()
+        return stops.mapNotNull { s ->
+            if (from.lat == s.place.lat && from.lng == s.place.lng) { from = s.place; return@mapNotNull null }
+            FuelPlan.Leg(from, s, RouteMath.metersBetween(from.lat, from.lng, s.place.lat, s.place.lng) * 1.3).also { from = s.place }
+        }
+    }
+
+    /**
+     * Where today runs short of fuel (keeping the 30 km reserve), as a slot for the rail — or, at the alert level
+     * (설정, 20 %) with nothing short, right before the next place. Null = no 주유하기 today.
+     */
+    fun fuelNeed(t: TodayTrip?, state: CarState, alertPercent: Double): FuelNeed? {
+        t ?: return null
+        val fuel = state.fuelPercent ?: return null
+        val reach = state.rangeKm?.takeIf { it > 0 }?.times(1000.0) ?: return null
+        val legs = straightLegs(t)
+        val short = FuelPlan.shortfall(legs, reach, ROUTE_MARGIN_KM * 1000)
+        if (short == null && fuel > alertPercent) return null
+        val at = short?.byMeters ?: 0.0
+        val after = FuelPlan.afterStopAt(legs, at)
+        val pct = FuelPlan.metersPerPercent(fuel, reach)?.let { (fuel - at / it).toInt().coerceAtLeast(1) }
+        return FuelNeed(t.eventId, after?.id, pct, state.isEv == true)
+    }
+
+    /**
+     * [최저가 주유소 찾기] under the 주유하기 slot: prices at up to three points of the stretch where filling up makes
+     * sense (from half a tank to where it runs short), cheapest first, in our own list. EV / no Opinet key: the
+     * nearby search instead.
+     */
+    fun findFuelOnRoute() {
+        val t = trip.value ?: return
+        val ev = carState.isEv == true
+        if (ev || !opinet.available) { if (ev) findNearby("충전소", null, "전기차 충전소") else findNearby("주유소", KakaoCategory.GAS, null); return }
+        router.requestCurrentLocation()
+        scope.launch {
+            delay(600)
+            val fuel = carState.fuelPercent
+            val reach = carState.rangeKm?.takeIf { it > 0 }?.times(1000.0)
+            val legs = straightLegs(t)
+            val total = legs.sumOf { it.meters }
+            val short = reach?.let { FuelPlan.shortfall(legs, it, ROUTE_MARGIN_KM * 1000) }
+            val per = FuelPlan.metersPerPercent(fuel, reach)
+            val window = (if (fuel != null && per != null) FuelPlan.window(fuel, per, short?.byMeters, total) else null) ?: (0.0..(short?.byMeters ?: total))
+            val found = FuelPlan.searchPoints(window.start, window.endInclusive).flatMap { m ->
+                val at = FuelPlan.pointAt(legs, m) ?: return@flatMap emptyList()
+                runCatching { opinet.around(at.lat, at.lng) }.getOrElse { emptyList() }.filter { it.meters <= 3_000 }.map { m to it }
+            }.distinctBy { it.second.id }.sortedBy { it.second.price }.take(5)
+            if (found.isEmpty()) { findNearby("주유소", KakaoCategory.GAS, null); return@launch }
+            _nearby.value = NearbyList(
+                "가는 길 최저가 주유소", NaviEntry.Kind.STATION,
+                found.map { (m, st) ->
+                    val after = FuelPlan.afterStopAt(legs, m)?.place?.name
+                    NearPlace(st.id, st.name, st.meters, st.place, st.price, where = after?.let { "$it 지나서" } ?: "곧")
+                },
+                "고르면 경유지로 들어가고, 그다음 원래 일정으로 이어져요",
+            )
+        }
+    }
     private var fuelPlanVersion = -1L
     private val _nearby = MutableStateFlow<NearbyList?>(null)
     /** 주유소·충전소·주차장·맛집 near the car, shown in our window; picking one makes it the next waypoint. */
@@ -748,8 +812,12 @@ class TripNavigator(
     /** Driver picked a station from the list: it becomes the next waypoint, the plan follows. */
     fun goViaStation(st: GasStation) {
         _stations.value = emptyList()
-        _fuelSuggestion.value = null // it is in the route now (다음 = 그 주유소)
         pickedStation = st
+        // The 주유하기 slot becomes this station, marked as on the route (it is the next waypoint, before the next place).
+        _fuelSuggestion.value = trip.value?.let { FuelSuggestion(it.eventId, st, afterStopId = null, afterName = null, percentThen = null, saving = null, chosen = true) }
+        // A station picked is a departure: the "다음 목적지로 갈까요?" still on screen is answered.
+        _prompt.value?.takeIf { it.reason in START_REASONS }?.let { askJob?.cancel(); closePrompt() }
+        waiting.removeAll { it.first.reason in START_REASONS }
         // The station goes in front; behind it the places still to go (pickups waiting, then stops not yet visited —
         // never one ticked off while the list was open). Arriving at the station ticks nothing (N1).
         val t = trip.value
@@ -1230,6 +1298,7 @@ class TripNavigator(
             NaviEntry.Kind.STATION -> {
                 // N1: a petrol stop is not a planned stop — nothing is ticked; the fill-up record follows from the fuel level (Q44).
                 inNavi = inNavi.drop(1)
+                _fuelSuggestion.value = null // reached: the slot is done (the 주유하기 slot comes back only if still short)
                 _notice.value = "${first.place.name} 도착 · 넣고 나면 기록을 남길게요"
                 scope.launch { voice.say("${first.place.name}이에요. 넣고 나면 기록을 남길게요.") }
                 return
