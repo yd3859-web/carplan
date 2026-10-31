@@ -1148,6 +1148,11 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                     TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeSecondTestTrip(); onDismiss() }) { Text("두 번째 여행", fontSize = 20.sp, color = Ink) }
                 }
+                // Two months of made-up use (friends, groups, past trips with records and photos); pressed again it adds missing photos.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { vm.seedDemo(); onDismiss() }) { Text("오래 쓴 것처럼 채우기", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.clearDemo(); onDismiss() }) { Text("데모 지우기", fontSize = 20.sp, color = Ink) }
+                }
                 Text("출근: 매일 반복·장소 회사, 오늘 남은 여행이 없을 때 \"회사로 갈까요?\" / 픽업: 백현동에서 기다리는 일행, 시뮬이 먼저 태우러 감", fontSize = 20.sp, color = Soft)
                 HorizontalDivider(color = Line)
                 val split by vm.previewSplit.collectAsStateWithLifecycle()

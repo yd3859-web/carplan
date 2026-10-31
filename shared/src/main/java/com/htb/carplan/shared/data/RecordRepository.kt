@@ -70,7 +70,8 @@ class RecordRepository(
     suspend fun addPhoto(groupId: String, eventId: String, date: String, recordId: String, jpeg: ByteArray): String {
         val name = "${System.currentTimeMillis()}.jpg"
         val ref = storage.reference.child(FirestorePaths.recordPhoto(groupId, eventId, date, recordId, name))
-        ref.putBytes(jpeg).await()
+        // The storage rule (18장) takes images only: without the type the upload arrives as octet-stream and is refused.
+        ref.putBytes(jpeg, com.google.firebase.storage.StorageMetadata.Builder().setContentType("image/jpeg").build()).await()
         val url = ref.downloadUrl.await().toString()
         db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("photoUrls", FieldValue.arrayUnion(url)).await()
         return url

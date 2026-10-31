@@ -21,7 +21,8 @@ service cloud.firestore {
       match /categories/{id} { allow read, write: if signedIn() && me() == uid; }
       // 친구는 양쪽에 같이 쓴다(Q10): 내 목록은 나만, 상대 목록의 "나" 문서는 내가 쓸 수 있음
       match /friends/{fid} {
-        allow read: if signedIn() && me() == uid;
+        // 차는 차주의 친구 이름을 보여 준다(차 '같이 탈 사람' 탭, 2026-10-31)
+        allow read: if signedIn() && (me() == uid || (isCar() && carOwner() == uid));
         allow write: if signedIn() && (me() == uid || me() == fid);
       }
     }
