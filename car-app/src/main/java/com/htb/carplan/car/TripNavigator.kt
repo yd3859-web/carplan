@@ -698,7 +698,6 @@ class TripNavigator(
             t?.remaining.orEmpty().filter { it.place.hasCoords() }.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }).take(MAX_PLACES - 1)
         inNavi = listOf(NaviEntry(NaviEntry.Kind.STATION, st.id, st.place)) + tail
         router.route(inNavi.map { it.place })
-        router.openNavigation()
         lastRouteSentAt = System.currentTimeMillis()
         _notice.value = "${st.name} (${st.price}원) 들렀다 가요"
         fuelDeclinedForRoute = false
@@ -837,7 +836,7 @@ class TripNavigator(
         askJob?.cancel()
         closePrompt()
         revertedVersion = -1
-        routeWithPickups(t)
+        routeWithPickups(t, open = true)
         planFuel(t)
         scope.launch {
             runCatching {
@@ -857,7 +856,7 @@ class TripNavigator(
         if (_prompt.value?.reason == PromptReason.PICKUP) {
             // "아니": still drive to the pickups, just without sharing the position.
             closePrompt()
-            trip.value?.let { routeWithPickups(it); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
+            trip.value?.let { routeWithPickups(it, open = true); scope.launch { runCatching { trips.setDayStatus(it.groupId, it.eventId, it.date, DayStatus.DRIVING) } } }
             return
         }
         closePrompt()
@@ -953,16 +952,17 @@ class TripNavigator(
      * 11장 2: with two or more people to collect, order them so the whole run (car → pickups → first stop)
      * takes the least time, using Kakao Mobility legs (straight line when offline), then route.
      */
-    private fun routeWithPickups(t: TodayTrip) {
+    /** [open] = the driver just said "가기": bring the navigation forward. Refills and plan changes keep our screen in front. */
+    private fun routeWithPickups(t: TodayTrip, open: Boolean = false) {
         val waiting = t.waitingPickups
-        if (waiting.size < 2 || waiting.size > 4) { sendRoute(t); return }
+        if (waiting.size < 2 || waiting.size > 4) { sendRoute(t, open = open); return }
         scope.launch {
             val ordered = bestPickupOrder(t, waiting)
             if (ordered.map { it.uid } != waiting.map { it.uid }) {
                 runCatching { pickupsRepo.setOrder(t.groupId, t.eventId, t.date, ordered.map { it.uid } + t.pickups.map { it.uid }.filterNot { u -> ordered.any { it.uid == u } }) }
                 _notice.value = "픽업 순서를 총 시간 기준으로 바꿨어요"
             }
-            sendRoute(t, ordered)
+            sendRoute(t, ordered, open)
         }
     }
 
@@ -1030,7 +1030,7 @@ class TripNavigator(
         }
     }
 
-    private fun sendRoute(t: TodayTrip, pickups: List<Pickup> = t.waitingPickups) {
+    private fun sendRoute(t: TodayTrip, pickups: List<Pickup> = t.waitingPickups, open: Boolean = false) {
         val pick = pickups.take(MAX_PLACES)
         val batch = t.remaining.take((MAX_PLACES - pick.size).coerceAtLeast(0))
         routedPlan = t.remaining
@@ -1054,7 +1054,7 @@ class TripNavigator(
             inNavi = pick.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + withCoords.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }
             router.route(inNavi.map { it.place })
             // While simulating, keep our screen in front (the route still goes to the navigation).
-            if (!simActive) router.openNavigation()
+            if (open && !simActive) router.openNavigation()
         }
         lastRouteSentAt = System.currentTimeMillis()
         _guiding.value = true

@@ -235,7 +235,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (adding && !vehicle.drivingRestricted) {
         CarAddDialog(onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false })
     }
-    if (pickTrip && trip != null && !vehicle.drivingRestricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { TextButton(onClick = { pickTrip = false }) { Text("닫기", fontSize = 26.sp, color = Ink) } }) {
+    if (pickTrip && trip != null && !vehicle.drivingRestricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { CarCloseButton(onClick = { pickTrip = false }) }) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         allTrips.forEach { e ->
                             val on = e.event.id == trip?.eventId
@@ -258,9 +258,10 @@ private fun CarHome(vm: CarHomeViewModel) {
 /** All car dialogs: dark scrim, grey sheet with an edge and shadow, white cards inside — readable over the white screen. */
 @Composable
 private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, buttons: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // A bump on the road must not close a window: only its [닫기] does (no tap-outside dismiss).
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Box(
-            Modifier.fillMaxSize().background(Color(0x8C131417)).clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
+            Modifier.fillMaxSize().background(Color(0x8C131417)),
             contentAlignment = Alignment.Center,
         ) {
             Column(
@@ -272,7 +273,8 @@ private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, 
                 Spacer(Modifier.height(16.dp))
                 content()
                 Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) { buttons() }
+                // Driver side first: the window's buttons sit bottom-left, [닫기] as a full-size button.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { buttons() }
             }
         }
     }
@@ -536,7 +538,7 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
 /** Everything that is not "go to the next place": big tiles, parked only. */
 @Composable
 private fun MoreDialog(guidingNext: String?, hasTrip: Boolean, onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    CarDialog(onDismiss = onDismiss, title = "더보기", width = 900.dp, buttons = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 26.sp, color = Ink) } }) {
+    CarDialog(onDismiss = onDismiss, title = "더보기", width = 900.dp, buttons = { CarCloseButton(onClick = onDismiss) }) {
         val tiles = buildList {
             // C1 (차 화면 원칙: 혼자여도 버튼 하나로 찾기) — each opens the navigation's own search once.
             add("find:fuel" to "주유소·충전소 찾기")
@@ -783,11 +785,10 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, f
         buttons = {
             // Car-sized buttons: the main one filled black, the other outlined (디자인 규칙).
             val closeBtn: @Composable () -> Unit = {
-                OutlinedButton(onClick = onDismiss, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, SheetEdge), modifier = Modifier.height(76.dp)) { Text("닫기", fontSize = 24.sp, color = Ink) }
+                CarCloseButton(onClick = onDismiss)
             }
             if (group == null && tripTitle != null) {
                 closeBtn()
-                Spacer(Modifier.width(12.dp))
                 Button(onClick = onShareTrip, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.height(76.dp)) { Text("이 여행에 초대하기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             } else closeBtn()
         },
@@ -823,7 +824,7 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, f
 /** 12장: the three cheapest stations near the car; one tap makes it the next waypoint. */
 @Composable
 private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Unit, onDismiss: () -> Unit) {
-    CarDialog(onDismiss = onDismiss, title = "가까운 최저가 주유소", buttons = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 26.sp, color = Soft) } }) {
+    CarDialog(onDismiss = onDismiss, title = "가까운 최저가 주유소", buttons = { CarCloseButton(onClick = onDismiss) }) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 stations.forEach { st ->
                     Button(onClick = { onPick(st) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
@@ -883,7 +884,7 @@ private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onSt
 /** 20장: demo controls — fuel %, car type, fake drive, arrival. */
 @Composable
 private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit) {
-    CarDialog(onDismiss = onDismiss, title = "시연 메뉴", buttons = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 26.sp, color = Ink) } }) {
+    CarDialog(onDismiss = onDismiss, title = "시연 메뉴", buttons = { CarCloseButton(onClick = onDismiss) }) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("연료/배터리  지금 ${v.fuelPercent?.toInt() ?: "—"}%  ·  ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"}", fontSize = 20.sp, color = Soft)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

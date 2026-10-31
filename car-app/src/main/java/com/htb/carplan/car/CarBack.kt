@@ -2,6 +2,7 @@ package com.htb.carplan.car
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -30,4 +31,14 @@ fun CarBackButton(onBack: () -> Unit, label: String = "뒤로") {
             Text(label, color = ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
         }
     }
+}
+
+/** A window's [닫기]: full-size outlined button, always first (bottom-left, driver side). */
+@Composable
+fun CarCloseButton(onClick: () -> Unit, label: String = "닫기") {
+    val c = LocalCarColors.current
+    androidx.compose.material3.OutlinedButton(
+        onClick = onClick, modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 160.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, c.sheetEdge),
+    ) { Text(label, color = c.ink, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
 }
