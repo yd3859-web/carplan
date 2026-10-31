@@ -53,6 +53,7 @@ class DriveSimulator(
     val state: StateFlow<SimState> = _state.asStateFlow()
     private var job: Job? = null
     private var heartbeat: Job? = null
+    private val routes = HashMap<String, com.htb.carplan.shared.net.Route>()
 
     fun play() {
         if (job?.isActive == true) return
@@ -148,7 +149,9 @@ class DriveSimulator(
         val here = navigator.simLocation()?.takeIf { RouteMath.metersBetween(it.first, it.second, target.lat, target.lng) < FAR_METERS }
             ?: (target.lat - 0.025 to target.lng - 0.03) // no sensible start (emulator GPS): begin ~4 km away
         val from = Place(name = "차", lat = here.first, lng = here.second)
-        val route = runCatching { kakao.route(from, target) }.onFailure { Log.w(TAG, "route: ${it.message}") }.getOrNull()
+        // Same leg in the next test run (≈100 m either end) → reuse the road instead of asking Kakao again (API quota).
+        val key = "%.3f,%.3f>%.3f,%.3f".format(from.lat, from.lng, target.lat, target.lng)
+        val route = routes[key] ?: runCatching { kakao.route(from, target) }.onFailure { Log.w(TAG, "route: ${it.message}") }.getOrNull()?.also { routes[key] = it }
         val path = route?.path?.takeIf { it.size >= 2 } ?: listOf(here, target.lat to target.lng)
         val cum = DoubleArray(path.size)
         for (i in 1 until path.size) cum[i] = cum[i - 1] + RouteMath.metersBetween(path[i - 1].first, path[i - 1].second, path[i].first, path[i].second)

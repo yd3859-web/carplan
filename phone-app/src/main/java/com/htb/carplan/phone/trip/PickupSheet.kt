@@ -53,7 +53,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     val sharing = day?.pickupSharing == true
     val carPos = car?.state?.let { s -> if (sharing && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
 
-    // 11장 4: the road from the car to my pickup place (Kakao Mobility); refetched once the car moved ~150 m.
+    // 11장 4: the road from the car to my pickup place (Kakao Mobility); refetched once the car moved ~500 m (API quota).
     var path by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
     var routeLeg by remember { mutableStateOf<Leg?>(null) }
     var pathFrom by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -61,7 +61,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     LaunchedEffect(carPos, target) {
         val c = carPos; val tg = target
         if (c == null || tg == null) { path = emptyList(); routeLeg = null; pathFrom = null; return@LaunchedEffect }
-        pathFrom?.let { if (RouteMath.metersBetween(it.first, it.second, c.first, c.second) < 150) return@LaunchedEffect }
+        pathFrom?.let { if (RouteMath.metersBetween(it.first, it.second, c.first, c.second) < 500) return@LaunchedEffect }
         runCatching { kakao.route(Place(name = "차", lat = c.first, lng = c.second), tg) }
             .onSuccess { path = it.path; routeLeg = it.leg; pathFrom = c }
             .onFailure { path = emptyList() }

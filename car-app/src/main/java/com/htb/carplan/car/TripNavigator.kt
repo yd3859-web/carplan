@@ -786,10 +786,13 @@ class TripNavigator(
      * While guiding, every 30 s: driving time from the car to the first pickup (→ pickups/{uid}.etaSeconds, phones
      * show "약 n분", Functions push "곧 도착" under 3 min) or to the next stop (≤ 5 min → parkingHintStopId → 12장
      * "주차장 찾아봐 주세요" push to the passengers).
+     * The time comes from the navigation's own driving info (the nearest point it is driving to — the pickup when one
+     * is in front); Kakao Mobility is only the fallback, at most every [KAKAO_ETA_MIN_MS], to keep the API quota.
      */
     private fun startEtaLoop() {
         etaJob?.cancel()
         etaJob = scope.launch {
+            var kakaoAt = 0L
             while (true) {
                 router.requestCurrentLocation()
                 delay(2_000)
@@ -797,14 +800,16 @@ class TripNavigator(
                 val here = lastLocation
                 if (t != null && here != null && !simActive) {
                     val from = Place(name = "차", lat = here.first, lng = here.second)
+                    suspend fun etaTo(place: Place): Int? = _live.value.remainSeconds
+                        ?: if (System.currentTimeMillis() - kakaoAt >= KAKAO_ETA_MIN_MS) { kakaoAt = System.currentTimeMillis(); runCatching { kakao.directions(from, place).seconds }.getOrNull() } else null
                     val pickup = routedPickups.firstOrNull()?.let { uid -> t.pickups.firstOrNull { it.uid == uid && it.status == PickupStatus.WAITING && it.place.hasCoords() } }
                     if (pickup != null) {
-                        val eta = runCatching { kakao.directions(from, pickup.place).seconds }.getOrNull()
+                        val eta = etaTo(pickup.place)
                         if (eta != null) runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, pickup.uid, eta.toLong()) }
                     } else {
                         val next = t.next?.takeIf { it.place.hasCoords() }
                         if (next != null && t.day?.parkingHintStopId != next.id) {
-                            val eta = runCatching { kakao.directions(from, next.place).seconds }.getOrNull()
+                            val eta = etaTo(next.place)
                             if (eta != null && eta <= PARKING_HINT_S) { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, next.id) }; askParking(next) }
                         }
                     }
@@ -907,7 +912,9 @@ class TripNavigator(
         private const val PICKUP_DONE_MS = 10 * 60_000L
         /** A second stop within this long and [NEAR_METERS] of an unplanned record reuses it. */
         private const val SAME_PARKING_MS = 30 * 60_000L
-        /** ETA refresh while guiding (Kakao Mobility call each time). */
+        /** Kakao Mobility fallback for the ETA when the navigation gives no driving info: at most this often. */
+        private const val KAKAO_ETA_MIN_MS = 5 * 60_000L
+        /** ETA refresh while guiding (navigation driving info; Kakao only as the fallback above). */
         private const val ETA_INTERVAL_MS = 30_000L
         /** 12장: "주차장 찾아봐 주세요" this many seconds before the next stop. */
         private const val PARKING_HINT_S = 5 * 60
