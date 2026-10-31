@@ -301,6 +301,26 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * 시연 메뉴: a commute that is due right now (16장 "회사로 갈까요?" needs a repeating event with a place within
+     * ±60 min). Every day, starting now, to "회사" in Pangyo. Pressing again replaces the previous test commute.
+     */
+    fun makeTestCommute() {
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                week.value.filter { it.event.memo == TEST_COMMUTE_MEMO }.forEach { calendar.setEventDeleted(it.groupId, it.event.id, true) }
+                val now = java.time.LocalTime.now()
+                val today = LocalDate.now().toString()
+                calendar.addEvent(u.soloGroupId, Event(
+                    title = "출근", memo = TEST_COMMUTE_MEMO, startDate = today, endDate = today, allDay = false,
+                    startTime = "%02d:%02d".format(now.hour, now.minute), repeat = "DAILY",
+                    place = Place(name = "회사", lat = 37.4012, lng = 127.1086, address = "판교 테크노밸리"), createdBy = u.uid,
+                ))
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     /** 시뮬 줄 [칸 하나 빼기]: what a passenger's phone would do (10장) — takes out the last stop still ahead. */
     fun testRemoveStop() {
         val t = trip.value ?: return
@@ -317,5 +337,10 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { calendar.addEvent(u.soloGroupId, event.copy(createdBy = u.uid)) }
                 .onFailure { _error.value = it.message }
         }
+    }
+
+    companion object {
+        /** Marks the 시연 메뉴 test commute so the next press can replace it. */
+        private const val TEST_COMMUTE_MEMO = "시연 메뉴 시험 출근"
     }
 }

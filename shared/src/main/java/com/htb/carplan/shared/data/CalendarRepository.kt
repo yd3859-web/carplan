@@ -51,6 +51,11 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
     suspend fun addEvent(groupId: String, event: Event): String =
         db.collection(FirestorePaths.events(groupId)).add(event).await().id
 
+    /** Soft delete (the calendar hides `deleted` events; nothing is erased). */
+    suspend fun setEventDeleted(groupId: String, eventId: String, deleted: Boolean) {
+        db.document(FirestorePaths.event(groupId, eventId)).update("deleted", deleted).await()
+    }
+
     fun observeEvent(groupId: String, eventId: String): Flow<Event?> =
         db.document(FirestorePaths.event(groupId, eventId)).observeDoc(Event::class.java)
 

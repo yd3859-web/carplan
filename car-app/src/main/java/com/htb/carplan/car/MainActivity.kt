@@ -781,6 +781,11 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 16.sp, color = Soft)
                 Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 16.sp, color = Soft)
                 HorizontalDivider(color = Line)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 18.sp, color = Ink) }
+                    Text("매일 반복 · 장소 회사. 오늘 남은 여행이 없을 때 \"회사로 갈까요?\"", fontSize = 16.sp, color = Soft)
+                }
+                HorizontalDivider(color = Line)
                 val split by vm.previewSplit.collectAsStateWithLifecycle()
                 FilterChip(selected = split, onClick = { vm.previewSplit.value = !split }, shape = Corner, colors = chipColors(), label = { Text("반반 미리보기 (내비 옆 화면)", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
             }
