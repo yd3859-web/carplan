@@ -216,7 +216,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
     if (dartOpen && !vehicle.drivingRestricted) CarDartGame(vm, onDismiss = { dartOpen = false })
     if (qr && !vehicle.drivingRestricted) {
-        InviteQrDialog(qrGroup, seated = seatedPrompt, hasTrip = trip != null, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
+        InviteQrDialog(qrGroup, seated = seatedPrompt, tripTitle = trip?.title, onShareTrip = vm::inviteToTodayTrip, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
     }
 }
 
@@ -682,10 +682,10 @@ private fun BigButton(label: String, enabled: Boolean = true, primary: Boolean =
  * No trip today → [새 그룹] makes one on the spot (Q16).
  */
 @Composable
-private fun InviteQrDialog(group: Group?, seated: Boolean, hasTrip: Boolean, onNewGroup: () -> Unit, onDismiss: () -> Unit) {
+private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, onShareTrip: () -> Unit, onNewGroup: () -> Unit, onDismiss: () -> Unit) {
     CarDialog(
         onDismiss = onDismiss,
-        title = if (seated) "같이 타셨나요? QR 찍고 들어오세요" else if (group == null) "같이 탄 사람 추가" else "${group.name}에 들어오기",
+        title = if (seated) "같이 타셨나요? QR 찍고 들어오세요" else if (group == null) "같이 탄 사람 추가" else "${group.name}에 같이 가기",
         buttons = {
             // Car-sized buttons: the main one filled black, the other outlined (디자인 규칙).
             val closeBtn: @Composable () -> Unit = {
@@ -694,20 +694,28 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, hasTrip: Boolean, onN
             if (group == null) {
                 closeBtn()
                 Spacer(Modifier.width(12.dp))
-                Button(onClick = onNewGroup, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink), modifier = Modifier.height(72.dp)) { Text("새 그룹 만들고 QR 보기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                if (tripTitle != null) Button(onClick = onShareTrip, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink), modifier = Modifier.height(72.dp)) { Text("이 여행에 초대하기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                else Button(onClick = onNewGroup, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink), modifier = Modifier.height(72.dp)) { Text("새 그룹 만들고 QR 보기", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
             } else closeBtn()
         },
     ) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (group == null) {
-                    Text(if (hasTrip) "오늘 여행은 혼자 쓰는 일정이라 들어올 그룹이 없어요." else "오늘 걸린 여행이 없어요.", fontSize = 22.sp, color = Ink, modifier = Modifier.fillMaxWidth())
-                    Text("새 그룹을 만들면 QR이 떠요. 같이 탄 사람이 폰으로 찍으면 들어와요.", fontSize = 20.sp, color = Soft, modifier = Modifier.fillMaxWidth())
+                    if (tripTitle != null) {
+                        Text("“$tripTitle”에 같이 갈 사람을 초대해요.", fontSize = 22.sp, color = Ink, modifier = Modifier.fillMaxWidth())
+                        Text("QR이 뜨면 폰으로 찍거나, 링크·코드로 들어와요. 칸·코멘트도 같이 보고 고칠 수 있어요.", fontSize = 20.sp, color = Soft, modifier = Modifier.fillMaxWidth())
+                    } else {
+                        Text("오늘 걸린 여행이 없어요.", fontSize = 22.sp, color = Ink, modifier = Modifier.fillMaxWidth())
+                        Text("새 그룹을 만들면 QR이 떠요. 같이 탄 사람이 폰으로 찍으면 들어와요.", fontSize = 20.sp, color = Soft, modifier = Modifier.fillMaxWidth())
+                    }
                 } else {
                     val link = InviteLinks.url(group.inviteCode)
                     val bitmap = remember(link) { qrBitmap(link, 560) }
                     Image(bitmap.asImageBitmap(), contentDescription = "초대 QR", modifier = Modifier.size(280.dp))
-                    Text("폰으로 QR을 찍으면 바로 그룹에 들어와요", fontSize = 20.sp, color = Ink)
-                    Text("코드  ${group.inviteCode}   ·   ${group.memberIds.size}명", fontSize = 20.sp, color = Soft)
+                    Text("폰으로 QR을 찍으면 바로 들어와요", fontSize = 20.sp, color = Ink)
+                    // Same invite without a camera: the link (carplan-htb.web.app/i/CODE) or the code typed in the app.
+                    Text("링크  ${link.removePrefix("https://")}", fontSize = 20.sp, color = Ink)
+                    Text("코드  ${group.inviteCode}   ·   지금 ${group.memberIds.size}명", fontSize = 20.sp, color = Soft)
                 }
             }
     }

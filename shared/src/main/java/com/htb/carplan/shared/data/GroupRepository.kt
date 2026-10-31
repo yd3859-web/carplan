@@ -25,6 +25,43 @@ class GroupRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
         awaitClose { reg.remove() }
     }
 
+    /**
+     * 초대 = 일정 단위 (정원 2026-10-31, A안): there is no "make a group first". The first invite to an event that
+     * still lives in the owner's solo group gives that event its own group (named after it) and moves it there with
+     * everything under it — days, stops, pickups, comments, records and their comments. The old copy is only marked
+     * deleted. An event already in a shared group stays where it is. Returns the group to invite into.
+     * Record photos stay at their old Storage path (only the owner can open them); rare, since people are usually
+     * invited before the trip.
+     */
+    suspend fun shareEvent(groupId: String, eventId: String): String {
+        val group = db.document(FirestorePaths.group(groupId)).get().await().toObject(Group::class.java) ?: return groupId
+        if (!group.solo) return groupId
+        val from = db.document(FirestorePaths.event(groupId, eventId))
+        val event = from.get().await()
+        val data = event.data ?: return groupId
+        val title = (data["title"] as? String)?.ifBlank { null } ?: "같이 가는 일정"
+        val newGroup = createGroup(title, group.ownerUid)
+        val to = db.document(FirestorePaths.event(newGroup, eventId))
+        val writes = ArrayList<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any?>>>()
+        writes += to to data
+        for (day in from.collection("days").get().await().documents) {
+            val dayTo = to.collection("days").document(day.id)
+            writes += dayTo to (day.data ?: emptyMap())
+            for (sub in listOf("stops", "pickups", "comments", "records")) {
+                for (doc in day.reference.collection(sub).get().await().documents) {
+                    val docTo = dayTo.collection(sub).document(doc.id)
+                    writes += docTo to (doc.data ?: emptyMap())
+                    if (sub == "records") for (c in doc.reference.collection("comments").get().await().documents)
+                        writes += docTo.collection("comments").document(c.id) to (c.data ?: emptyMap())
+                }
+            }
+        }
+        // Firestore batches hold 500 writes; a trip is far smaller, but stay safe.
+        writes.chunked(400).forEach { chunk -> db.runBatch { b -> chunk.forEach { (ref, d) -> b.set(ref, d) } }.await() }
+        from.update("deleted", true).await()
+        return newGroup
+    }
+
     /** Creates a shared group owned by [ownerUid]; returns its id. */
     suspend fun createGroup(name: String, ownerUid: String): String {
         val ref = db.collection(FirestorePaths.GROUPS).document()

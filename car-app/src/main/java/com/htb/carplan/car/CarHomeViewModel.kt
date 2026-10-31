@@ -235,6 +235,22 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * 초대 = 일정 단위 (A안): today's trip still in the owner's solo group gets its own group (moved with its days,
+     * stops and records) and the QR shows right away. The car follows the trip to its new place.
+     */
+    fun inviteToTodayTrip() {
+        val t = trip.value ?: return
+        val id = carId.value
+        viewModelScope.launch {
+            runCatching {
+                val gid = groups.shareEvent(t.groupId, t.eventId)
+                qrGroupId.value = gid
+                if (id != null && car.value?.activeEventId == t.eventId) cars.setActiveTrip(id, gid, t.eventId)
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     /** Q16: no trip today → make a group on the spot (owned by the car's host) and show its QR. */
     fun newGroupForQr() {
         val u = owner.value ?: return
