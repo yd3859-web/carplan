@@ -435,14 +435,15 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
     val fueled = p.reason == PromptReason.FUELED
     val pickup = p.reason == PromptReason.PICKUP
     val commute = p.reason == PromptReason.COMMUTE
-    val question = when { fuel || commute -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" }
+    val parking = p.reason == PromptReason.PARKING
+    val question = when { fuel || commute || parking -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" }
     val hint = when {
         p.listening -> "듣는 중 · \"응\" 또는 \"아니\""
         p.heard != null -> "들은 말 \"${p.heard}\" · 버튼으로 골라 주세요"
         else -> "말하거나 눌러 주세요"
     }
-    val yes = when { pickup -> "네, 출발"; fueled -> "네"; fuel -> "들를게요"; change -> "바꾸기"; else -> "가기" }
-    val no = when { pickup -> "공유 없이"; fuel -> "아니요"; change -> "그대로"; else -> "나중에" }
+    val yes = when { pickup -> "네, 출발"; fueled -> "네"; fuel -> "들를게요"; change -> "바꾸기"; parking -> "찾아보기"; else -> "가기" }
+    val no = when { pickup -> "공유 없이"; fuel || parking -> "아니요"; change -> "그대로"; else -> "나중에" }
     Column(Modifier.fillMaxWidth().background(Ink, Corner).padding(if (compact) 22.dp else 28.dp)) {
         Text(question, color = Color.White, fontSize = if (compact) 30.sp else 36.sp, lineHeight = if (compact) 38.sp else 44.sp, fontWeight = FontWeight.Bold)
         Text(hint, color = Color(0xFFB8BDC2), fontSize = 18.sp, modifier = Modifier.padding(top = 6.dp, bottom = 18.dp))

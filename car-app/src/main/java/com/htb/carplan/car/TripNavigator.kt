@@ -64,7 +64,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     val version: Long get() = day?.version ?: 0
 }
 
-enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE }
+enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE, PARKING }
 
 /** What the navigation tells us while guiding — the 주행 화면 draws this (the SDK has no map view to embed). */
 data class NaviLive(
@@ -119,6 +119,8 @@ class TripNavigator(
     /** Pickup uids currently in the navigation route (in front of [routed] stops). */
     private var routedPickups: List<String> = emptyList()
     private var fuelAtPark: Double? = null
+    /** The station the driver picked (12장), so the fill-up record says where and at what price. */
+    private var pickedStation: GasStation? = null
     private var fueledAsked = false
     /** 12장 설정: cars/{id}.fuelAlertPercent (default 20); the range threshold scales with it (20% → 50 km). */
     private var fuelAlertPercent = LOW_FUEL_PERCENT
@@ -241,7 +243,7 @@ class TripNavigator(
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
-                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
+                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && p.reason != PromptReason.PARKING && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
         }
     }
@@ -301,7 +303,9 @@ class TripNavigator(
                     _notice.value = "기록 칸: ${next.place.name} ($reason)"
                     onArrived() // ✓ + refill route
                 } else {
-                    val place = Place(name = lastAddress.ifBlank { "이름 없는 곳" }, lat = loc?.first ?: 0.0, lng = loc?.second ?: 0.0, address = lastAddress)
+                    // 13장: "건천휴게소" rather than the navigation's street address, when Kakao knows the spot.
+                    val known = loc?.let { (la, lo) -> runCatching { kakao.nearestPlace(la, lo) }.getOrNull() }
+                    val place = Place(name = known?.name ?: lastAddress.ifBlank { "이름 없는 곳" }, lat = loc?.first ?: 0.0, lng = loc?.second ?: 0.0, address = known?.address?.ifBlank { null } ?: lastAddress)
                     val (g, e) = if (t != null) t.groupId to t.eventId else dailyLogTarget(today) ?: return@runCatching
                     // Stopping again where we just stopped (traffic, a second look) is the same record, not a new one.
                     val again = records.recentUnplannedNear(g, e, today, place.lat, place.lng, NEAR_METERS, SAME_PARKING_MS)
@@ -428,7 +432,9 @@ class TripNavigator(
                 val car = carId.value?.let { calendar.observeCar(it).first() } ?: return@launch
                 val owner = car.ownerUid ?: return@launch
                 val user = groups.user(owner) ?: return@launch
-                maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, byUid = owner, auto = true, intervals = car.intervals)
+                val st = pickedStation?.also { pickedStation = null }
+                val memo = st?.let { "${it.name} · ${"%,d".format(it.price)}원/L" }.orEmpty()
+                maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, memo = memo, byUid = owner, auto = true, intervals = car.intervals)
                 _notice.value = (if (carState.isEv == true) "충전" else "주유") + " 기록 남김 — 금액은 폰 차량 탭에서"
             }.onFailure { _error.value = it.message }
         }
@@ -501,6 +507,7 @@ class TripNavigator(
     /** Driver picked a station from the list: it becomes the next waypoint, the plan follows. */
     fun goViaStation(st: GasStation) {
         _stations.value = emptyList()
+        pickedStation = st
         val rest = trip.value?.remaining?.map { it.place }.orEmpty().take(MAX_PLACES - 1)
         router.route(listOf(st.place) + rest)
         router.openNavigation()
@@ -554,7 +561,7 @@ class TripNavigator(
     fun simParkingHint() {
         val t = trip.value ?: return
         val n = t.next ?: return
-        if (t.day?.parkingHintStopId != n.id) scope.launch { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }
+        if (t.day?.parkingHintStopId != n.id) { scope.launch { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }; askParking(n) }
     }
 
     /** The car reached a pickup place (what the navigation's waypoint event does on a real road). */
@@ -594,8 +601,25 @@ class TripNavigator(
         }
     }
 
+    /** 12장: five minutes out — passengers get a push; the car offers the navigation's own parking search. */
+    private fun askParking(next: Stop) {
+        if (_prompt.value != null) return
+        val message = "곧 ${next.place.name} 도착이에요. 근처 주차장 찾아볼까요?"
+        _prompt.value = NextPrompt(next, PromptReason.PARKING, message = message)
+        askJob = scope.launch {
+            when (voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }) {
+                VoicePrompt.Answer.YES -> go()
+                VoicePrompt.Answer.NO -> later()
+                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
+            }
+        }
+    }
+
     /** "응" / [가기] (9장) or [바꾸기] (10장): route the remaining stops and open the navigation. */
     fun go() {
+        if (_prompt.value?.reason == PromptReason.PARKING) {
+            askJob?.cancel(); _prompt.value = null; router.search("주차장"); return
+        }
         if (_prompt.value?.reason == PromptReason.FUEL) {
             askJob?.cancel(); _prompt.value = null; findStation(); return
         }
@@ -633,7 +657,7 @@ class TripNavigator(
     fun later() {
         askJob?.cancel()
         if (_prompt.value?.reason == PromptReason.FUEL) { fuelDeclinedForRoute = true; _prompt.value = null; return }
-        if (_prompt.value?.reason == PromptReason.FUELED) { _prompt.value = null; return }
+        if (_prompt.value?.reason == PromptReason.FUELED || _prompt.value?.reason == PromptReason.PARKING) { _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.COMMUTE) { commuteDeclinedDate = LocalDate.now().toString(); _prompt.value = null; return }
         if (_prompt.value?.reason == PromptReason.PICKUP) {
             // "아니": still drive to the pickups, just without sharing the position.
@@ -779,7 +803,7 @@ class TripNavigator(
                         val next = t.next?.takeIf { it.place.hasCoords() }
                         if (next != null && t.day?.parkingHintStopId != next.id) {
                             val eta = runCatching { kakao.directions(from, next.place).seconds }.getOrNull()
-                            if (eta != null && eta <= PARKING_HINT_S) runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, next.id) }
+                            if (eta != null && eta <= PARKING_HINT_S) { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, next.id) }; askParking(next) }
                         }
                     }
                 }
