@@ -204,6 +204,8 @@ private fun CarHome(vm: CarHomeViewModel) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // Two shapes (정원 2026-10-30): alone → wide; next to the navigation (half the app area) → the day's timeline, big.
             val wide = maxWidth >= 1100.dp
+            // Our window is half the app area → the driver put us next to the navigation (Pleos 1:1 split).
+            LaunchedEffect(wide) { CarRuntime.splitScreen = !wide }
             val compact = !wide || forceSplit
             Row(Modifier.fillMaxSize()) {
                 if (forceSplit && wide) Box(Modifier.weight(1f).fillMaxHeight().background(LocalCarColors.current.placeholder), contentAlignment = Alignment.Center) {
@@ -462,6 +464,8 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk, disabledContainerColor = Disabled, disabledContentColor = Soft),
             ) { Text(if (guiding) "내비 보기" else "안내 시작", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+            // Full width while driving: the navigation can sit next to carplan instead of covering it.
+            if (guiding) Text("화면 가장자리 ⋮를 끌면 내비와 나란히 볼 수 있어요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 8.dp))
             if (!dayDone && !restricted) Spacer(Modifier.height(12.dp))
             if (!restricted) Button(
                 onClick = onMore, enabled = !restricted, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner,

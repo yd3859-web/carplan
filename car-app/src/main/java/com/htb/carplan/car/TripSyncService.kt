@@ -99,11 +99,14 @@ object CarRuntime {
     private var simulator: DriveSimulator? = null
 
     /** 시뮬레이션: plays today's trip through the Virtual Console (one per process). */
+    /** carplan shares the screen with another app (the driver dragged the window bar): set by [MainActivity]. */
+    @Volatile var splitScreen = false
+
     @Synchronized
     fun simulator(context: Context): DriveSimulator =
         simulator ?: DriveSimulator(navigator(context), monitor(context), scope) {
             val app = context.applicationContext
-            app.startActivity(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            if (!splitScreen) app.startActivity(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         }.also { simulator = it }
 
     /** 9장 "다음 목적지로 갈까요?" — one per process, shared by the service and the screen. */
@@ -112,6 +115,7 @@ object CarRuntime {
         navigator ?: TripNavigator(router(context), voice(context), scope).also { n ->
             navigator = n
             val app = context.applicationContext
-            n.bringToFront = { app.startActivity(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
+            // Side by side with the navigation (Pleos 1:1): both are already on screen — relaunching would swap the halves.
+            n.bringToFront = { if (!splitScreen) app.startActivity(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
         }
 }
