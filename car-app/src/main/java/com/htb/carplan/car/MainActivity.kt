@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.htb.carplan.car
 
 import android.Manifest
@@ -20,6 +22,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -168,7 +172,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
-        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen, onGroup = { qr = true })
+        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen, onGroup = { qr = true }, onDemo = { debug = true })
         val voiceState by vm.voiceState.collectAsStateWithLifecycle()
         VoiceBar(voiceState, onCommand = vm::runCommand, onClose = vm::closeVoice)
         val sim by vm.sim.collectAsStateWithLifecycle()
@@ -286,13 +290,15 @@ private fun chipColors(): SelectableChipColors = FilterChipDefaults.filterChipCo
 )
 
 @Composable
-private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit, onGroup: () -> Unit) {
+private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit, onGroup: () -> Unit, onDemo: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("carplan", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Black)
+        // 시연 메뉴 is not for drivers: hold the logo to open it (C5).
+        Text("carplan", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Black,
+            modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onDemo))
         Stat(if (v.isEv == true) "배터리" else "연료", v.fuelPercent?.let { "${it.toInt()}%" } ?: "—")
         // At or under the alert level (설정 cars.fuelAlertPercent): say it in words, no extra colour (one accent only).
         val alertAt = car?.fuelAlertPercent?.toDouble() ?: 20.0
@@ -304,8 +310,9 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         groupName?.let { Box(Modifier.clickable(enabled = !v.drivingRestricted, onClick = onGroup)) { Stat("그룹", it) } }
         if (passengers > 0) Stat("동승자", "${passengers}명")
         // ⑧ 음성 명령: always there, driving included — speaking is how the driver changes things on the move.
-        OutlinedButton(onClick = onListen, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Ink), modifier = Modifier.height(52.dp)) {
-            Text("말하기", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        // Voice is the main way to act while driving: a full-size button, filled so it reads first in the band.
+        Button(onClick = onListen, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 160.dp)) {
+            Text("말하기", fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
         // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
         if (v.drivingRestricted) {
@@ -342,7 +349,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     Text(trip.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f, fill = false))
                     if (allTrips.size > 1) {
                         Text("  오늘 여행 ${allTrips.size}개 중", color = Soft, fontSize = 20.sp)
-                        if (!restricted) TextButton(onClick = onOtherTrip) { Text("다른 여행", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                        if (!restricted) Box(Modifier.padding(start = 12.dp)) { CarCloseButton(onClick = onOtherTrip, label = "다른 여행") }
                     }
                 }
                 Spacer(Modifier.height(18.dp))
@@ -424,6 +431,14 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             }
             }
             Spacer(Modifier.weight(1f))
+            // 혼자여도 버튼 하나로 찾기 (차 화면 원칙): the two everyday searches, one tap each, parked only.
+            if (!restricted) Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(VoiceCommand.FUEL to "주유소·충전소", VoiceCommand.PARKING to "주차장").forEach { (c, label) ->
+                    OutlinedButton(onClick = { vm.runCommand(c) }, modifier = Modifier.weight(1f).heightIn(min = 76.dp), shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) {
+                        Text(label, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+            }
             later?.let { (d, item) ->
                 val label = if (d == today.plusDays(1)) "내일" else "${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}"
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
@@ -516,7 +531,7 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
                 }
             }
             // ⑩ in the half view too: more than one trip today → one tap to pick another (parked only).
-            if (!restricted && otherTrips > 0) TextButton(onClick = onOtherTrip) { Text("다른 여행", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            if (!restricted && otherTrips > 0) CarCloseButton(onClick = onOtherTrip, label = "다른 여행")
             if (!restricted) TextButton(onClick = onMore) { Text("더보기", color = Soft, fontSize = 26.sp) }
         }
         if (guiding) LegProgress(live, trip?.next?.place?.name)
@@ -541,15 +556,12 @@ private fun MoreDialog(guidingNext: String?, hasTrip: Boolean, onPick: (String) 
     CarDialog(onDismiss = onDismiss, title = "더보기", width = 900.dp, buttons = { CarCloseButton(onClick = onDismiss) }) {
         val tiles = buildList {
             // C1 (차 화면 원칙: 혼자여도 버튼 하나로 찾기) — each opens the navigation's own search once.
-            add("find:fuel" to "주유소·충전소 찾기")
-            add("find:parking" to "주차장 찾기")
             add("find:food" to "근처 맛집 찾기")
             add("qr" to "같이 탄 사람 추가")
             if (hasTrip) add("dart" to "다트 — 동네 뽑기")
             add("add" to "일정 추가")
             add("navi" to "내비 열기")
             if (hasTrip) add("ask" to "다음 목적지 다시 묻기")
-            add("debug" to "시연 메뉴")
         }
         tiles.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
