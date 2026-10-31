@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -45,110 +46,171 @@ import java.util.Locale
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 
 private val Corner = RoundedCornerShape(4.dp)
 
 private fun dayText(d: LocalDate) = "${d.monthValue}월 ${d.dayOfMonth}일 (${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})"
 
 /**
- * 기록 탭 (⑤, 정원 2026-10-31): the days with record slots, and one day's slots — when the car stopped, where,
- * how long, the short note, where it parked. Reading only: photos and notes are added on the phone.
+ * 기록 탭 (⑤, 정원 2026-10-31: 날짜 목록 대신 캘린더 + 오늘 화면 같은 타임라인). Left (half screen: top) the month —
+ * days the car stopped are marked with a bar per trip (일상 기록 grey). Right (below) the chosen day as a rail: when
+ * the car stood where, how long, the line written, parking, photos, and the drive between. Reading only: photos and
+ * lines are added on the phone.
  */
 @Composable
 fun RowScope.CarRecords(vm: CarHomeViewModel) {
     val c = LocalCarColors.current
     val days by vm.recordDays.collectAsStateWithLifecycle()
     val compact = LocalCompact.current
-    var picked by remember { mutableStateOf<RecordDay?>(null) }
+    val byDate = remember(days) { days.groupBy { it.date } }
+    var month by remember { mutableStateOf(java.time.YearMonth.now()) }
+    // Opens on the newest day with records (not an empty today).
+    var picked by remember { mutableStateOf<LocalDate?>(null) }
+    val shown = picked ?: days.firstOrNull()?.date ?: LocalDate.now()
+    androidx.compose.runtime.LaunchedEffect(days.firstOrNull()?.date) { if (picked == null) days.firstOrNull()?.date?.let { month = java.time.YearMonth.from(it) } }
+    val cal: @Composable (Modifier) -> Unit = { m -> RecordMonth(month, { month = it }, byDate, shown, { picked = it }, m) }
+    val line: @Composable (Modifier) -> Unit = { m ->
+        androidx.compose.animation.Crossfade(shown, m, animationSpec = carSpec(), label = "recordDay") { d -> DayTimeline(vm, d, byDate[d].orEmpty()) }
+    }
     if (!compact) {
-        // Wide: the first day is open from the start; another day fades in on the right.
-        val shown = picked ?: days.firstOrNull()
-        DayList(days, shown, compact = false, onPick = { picked = it }, modifier = Modifier.weight(0.8f).fillMaxHeight())
+        cal(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
         VerticalDivider(color = c.line)
-        androidx.compose.animation.Crossfade(shown, Modifier.weight(1f).fillMaxHeight(), animationSpec = carSpec(), label = "recordDay") { d ->
-            if (d != null) DayDetail(vm, d, compact = false, onBack = {})
-        }
-    } else {
-        // Half screen: the list first, a day after a tap — sliding in from the right, and back to the left.
-        val motion = LocalMotion.current
-        androidx.compose.animation.AnimatedContent(
-            targetState = picked, modifier = Modifier.weight(1f).fillMaxHeight(), label = "records",
-            transitionSpec = {
-                val dir = if (targetState != null) 1 else -1
-                if (!motion) (androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None)
-                else androidx.compose.animation.slideInHorizontally(tween(MOTION_MS)) { w -> dir * w } togetherWith androidx.compose.animation.slideOutHorizontally(tween(MOTION_MS)) { w -> -dir * w }
-            },
-        ) { d ->
-            if (d == null) DayList(days, null, compact = true, onPick = { picked = it }, modifier = Modifier.fillMaxSize())
-            else DayDetail(vm, d, compact = true, onBack = { picked = null })
-        }
+        line(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
+    } else Column(Modifier.weight(1f).fillMaxHeight()) {
+        cal(Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 12.dp))
+        HorizontalDivider(color = c.line)
+        line(Modifier.weight(1.1f).padding(horizontal = 20.dp, vertical = 12.dp))
     }
 }
 
+/** The month with the days that have records marked (one bar per trip; 일상 기록 grey). */
 @Composable
-private fun DayList(days: List<RecordDay>, shown: RecordDay?, compact: Boolean, onPick: (RecordDay) -> Unit, modifier: Modifier) {
+private fun RecordMonth(month: java.time.YearMonth, onMonth: (java.time.YearMonth) -> Unit, byDate: Map<LocalDate, List<RecordDay>>, picked: LocalDate, onPick: (LocalDate) -> Unit, modifier: Modifier) {
     val c = LocalCarColors.current
-    Column(modifier.padding(horizontal = if (compact) 20.dp else 28.dp, vertical = 20.dp)) {
-        Text("기록", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
-        if (days.isEmpty()) Text("아직 기록이 없어요 · 차를 세우면 기록 칸이 생겨요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
-        LazyColumn(Modifier.weight(1f)) {
-            items(days, key = { "${it.eventId}/${it.date}" }) { d ->
-                val on = d == shown
-                val bg by carColor(if (on) c.sheet else c.bg, "dayRow")
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 88.dp).background(bg, Corner).clickable { onPick(d) }.padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(dayText(d.date), color = c.soft, fontSize = 20.sp)
-                        Text(d.title, color = c.ink, fontSize = 26.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
+    val compact = LocalCompact.current
+    val today = LocalDate.now()
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { onMonth(month.minusMonths(1)) }, shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.heightIn(min = 76.dp).width(96.dp)) { Text("‹", color = c.ink, fontSize = 28.sp) }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("${month.monthValue}월 기록", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                if (!compact) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp)
+            }
+            OutlinedButton(onClick = { onMonth(month.plusMonths(1)) }, enabled = month < java.time.YearMonth.from(today), shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.heightIn(min = 76.dp).width(96.dp)) { Text("›", color = c.ink, fontSize = 28.sp) }
+        }
+        Row(Modifier.padding(top = 10.dp)) {
+            listOf("일", "월", "화", "수", "목", "금", "토").forEach { d -> Text(d, color = c.soft, fontSize = 20.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.weight(1f)) }
+        }
+        HorizontalDivider(color = c.line, modifier = Modifier.padding(top = 6.dp))
+        val lead = month.atDay(1).dayOfWeek.value % 7
+        val n = month.lengthOfMonth()
+        val rows = (lead + n + 6) / 7
+        val trip = androidx.compose.ui.graphics.Color(com.htb.carplan.shared.calendar.CategoryColors.of(com.htb.carplan.shared.model.BuiltInCategory.TRIP.id, emptyList()))
+        Column(Modifier.weight(1f)) {
+            for (r in 0 until rows) Row(Modifier.weight(1f)) {
+                for (col in 0 until 7) {
+                    val dn = r * 7 + col - lead + 1
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(2.dp)) {
+                        if (dn in 1..n) {
+                            val d = month.atDay(dn)
+                            val here = byDate[d].orEmpty()
+                            val on = d == picked
+                            val bg by carColor(if (on) c.ink else c.bg, "recCell")
+                            val fg by carColor(if (on) c.onInk else if (here.isEmpty()) c.soft else c.ink, "recText")
+                            Column(
+                                Modifier.fillMaxSize().background(bg, Corner)
+                                    .then(if (d == today && !on) Modifier.border(2.dp, c.ink, Corner) else Modifier)
+                                    .clickable(enabled = here.isNotEmpty()) { onPick(d) }.padding(if (compact) 4.dp else 6.dp),
+                            ) {
+                                Text("$dn", color = fg, fontSize = 24.sp, fontWeight = if (here.isNotEmpty()) FontWeight.Bold else FontWeight.Normal)
+                                here.take(2).forEach { rd ->
+                                    val color = if (rd.eventId.startsWith("log-")) c.soft else trip
+                                    if (compact) Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(6.dp).background(color))
+                                    else Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.width(8.dp).height(24.dp).background(color))
+                                        Text(rd.title, color = fg, fontSize = 20.sp, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, modifier = Modifier.padding(start = 6.dp))
+                                    }
+                                }
+                            }
+                        }
                     }
-                    if (compact) Text("›", color = c.soft, fontSize = 28.sp)
                 }
-                HorizontalDivider(color = c.line)
             }
         }
     }
 }
 
+/** One day as a rail, like the 오늘 timeline: every stop the car made, oldest first, trips under their own title. */
 @Composable
-private fun DayDetail(vm: CarHomeViewModel, shown: RecordDay, compact: Boolean, onBack: () -> Unit) {
+private fun DayTimeline(vm: CarHomeViewModel, date: LocalDate, rds: List<RecordDay>) {
     val c = LocalCarColors.current
-    Column(Modifier.fillMaxSize().padding(horizontal = if (compact) 20.dp else 28.dp, vertical = 20.dp)) {
-        if (compact) CarBackButton(onBack = onBack, label = "목록")
-        Text(shown.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-        Text(dayText(shown.date), color = c.soft, fontSize = 20.sp)
-        val recs by remember(shown) { vm.recordsOf(shown) }.collectAsState(initial = null)
-        Column(Modifier.weight(1f).padding(top = 12.dp).verticalScroll(rememberScrollState())) {
-            when {
-                recs == null -> Text("불러오는 중", color = c.soft, fontSize = 24.sp)
-                recs!!.isEmpty() -> Text("이 날은 기록 칸이 없어요", color = c.soft, fontSize = 24.sp)
-                else -> recs!!.forEach { RecordRow(it) }
+    Column(Modifier.fillMaxSize()) {
+        Text(dayText(date), color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        if (rds.isEmpty()) Text("이 날은 기록이 없어요 · 표시된 날을 눌러요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
+        Column(Modifier.weight(1f).padding(top = 8.dp).verticalScroll(rememberScrollState())) {
+            rds.forEach { rd ->
+                val recs by remember(rd) { vm.recordsOf(rd) }.collectAsState(initial = null)
+                Text(rd.title, color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+                when {
+                    recs == null -> Text("불러오는 중", color = c.soft, fontSize = 24.sp)
+                    recs!!.isEmpty() -> Text("기록 칸이 없어요", color = c.soft, fontSize = 24.sp)
+                    else -> recs!!.forEachIndexed { i, r -> RecordNode(r, recs!!.getOrNull(i + 1), first = i == 0) }
+                }
             }
         }
     }
 }
 
+/** A record on the rail: grey ✓ node (it happened), time and stay on the left, place, line, parking and photos. */
 @Composable
-private fun RecordRow(r: Record) {
+private fun RecordNode(r: Record, next: Record?, first: Boolean) {
     val c = LocalCarColors.current
     val hm = remember { SimpleDateFormat("HH:mm", Locale.KOREA) }
     val arrived = r.arrivedAt?.toDate()
     val left = r.leftAt?.toDate()
-    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
-        Column(Modifier.width(116.dp)) {
-            Text(arrived?.let(hm::format) ?: "—", color = c.ink, fontSize = 26.sp)
-            if (arrived != null && left != null) Text("${((left.time - arrived.time) / 60_000).coerceAtLeast(1)}분 머묾", color = c.soft, fontSize = 20.sp)
+    val passed = c.railPassed
+    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+        Box(
+            Modifier.width(56.dp).fillMaxHeight().drawBehind {
+                val x = size.width / 2
+                val cy = 20.dp.toPx()
+                val w = 4.dp.toPx()
+                if (!first) drawLine(passed, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Offset(x, cy), w)
+                if (next != null) drawLine(passed, androidx.compose.ui.geometry.Offset(x, cy), androidx.compose.ui.geometry.Offset(x, size.height), w)
+            },
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Box(Modifier.padding(top = 8.dp).size(24.dp).clip(CircleShape).background(passed), contentAlignment = Alignment.Center) {
+                Text("✓", color = androidx.compose.ui.graphics.Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
         }
-        Column(Modifier.weight(1f)) {
-            Text(r.place.name.ifBlank { "이름 없는 곳" }, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            listOfNotNull(if (r.unplanned) "계획 밖" else null, r.photoUrls.size.takeIf { it > 0 }?.let { "사진 ${it}장" }, r.parkingNote.ifBlank { null }?.let { "주차 $it" })
-                .joinToString(" · ").takeIf { it.isNotEmpty() }?.let { Text(it, color = c.soft, fontSize = 20.sp) }
-            if (r.note.isNotBlank()) Text("“${r.note}”", color = c.ink, fontSize = 24.sp, maxLines = 3, modifier = Modifier.padding(top = 4.dp))
+        Column(Modifier.weight(1f).padding(bottom = if (next != null) 28.dp else 8.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.width(110.dp)) {
+                    Text(arrived?.let(hm::format) ?: "—", color = c.ink, fontSize = 26.sp)
+                    if (arrived != null && left != null) Text("${((left.time - arrived.time) / 60_000).coerceAtLeast(1)}분 머묾", color = c.soft, fontSize = 20.sp)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(r.place.name.ifBlank { "이름 없는 곳" }, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    listOfNotNull(if (r.unplanned) "계획 밖" else null, r.photoUrls.size.takeIf { it > 0 }?.let { "사진 ${it}장" }, r.parkingNote.ifBlank { null }?.let { "주차 $it" })
+                        .joinToString(" · ").takeIf { it.isNotEmpty() }?.let { Text(it, color = c.soft, fontSize = 20.sp) }
+                    // The line written there, as a bubble (like the group's comments on the 오늘 rail).
+                    if (r.note.isNotBlank()) Text(
+                        r.note, color = c.ink, fontSize = 24.sp, maxLines = 3,
+                        modifier = Modifier.padding(top = 8.dp).border(1.dp, c.line, Corner).padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
+            }
+            // The drive to the next stop, from leaving here to arriving there.
+            val nextAt = next?.arrivedAt?.toDate()
+            if (left != null && nextAt != null && nextAt.after(left)) Text("이동 ${((nextAt.time - left.time) / 60_000).coerceAtLeast(1)}분", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(start = 110.dp, top = 10.dp))
         }
     }
-    HorizontalDivider(color = c.line)
 }
 
 /**

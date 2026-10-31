@@ -275,13 +275,13 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // ── ⑤ 기록·차량 탭 (주차 중, 정원 2026-10-31): the same data as the phone's 기록·차량 tabs, read on the car.
-    /** Days that can hold records: trips (each day of them up to today) and 일상 기록, last 60 days, newest first. */
+    /** Days that can hold records: trips (each day of them up to today) and 일상 기록, the last year, newest first. */
     val recordDays: StateFlow<List<RecordDay>> = owner
         .flatMapLatest { u ->
             if (u == null) flowOf(emptyList())
             else calendar.observeGroups(u.uid).map { gs -> gs.map { it.id } }.flatMapLatest { ids ->
                 val today = LocalDate.now()
-                calendar.observeEvents(ids, today.minusDays(60).toString(), today.toString())
+                calendar.observeEvents(ids, today.minusDays(365).toString(), today.toString())
             }
         }
         .map { list ->
