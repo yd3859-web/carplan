@@ -218,14 +218,10 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun goTo(item: CalendarEvent) {
         val place = item.event.place ?: return
-        // Name-only places (before Kakao search) go to the navigation's own search.
-        if (place.lat == 0.0 && place.lng == 0.0) {
-            router.search(place.name)
-        } else {
-            router.route(listOf(place))
-            router.openNavigation()
-        }
+        // Name-only places (before Kakao search) go to the navigation's own search; either way the screen shows "가는 중".
+        navigator.guideTo(item.event.id, item.event.title, place)
     }
+
 
     fun openNavigation() = router.openNavigation()
     /** Ask the navigation where the car is (answer lands in [live] / [lastLocation]). */
@@ -248,6 +244,24 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .map { g -> g?.takeIf { !it.solo } } // a solo "나만" group is not something to invite people into
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** 7장: someone joined the group on screen (QR / link / code) → the car says who, so the driver need not look. */
+    private var lastMembers: Set<String>? = null
+    init {
+        viewModelScope.launch {
+            qrGroup.collect { g ->
+                val now = g?.memberIds?.toSet() ?: run { lastMembers = null; return@collect }
+                val before = lastMembers
+                lastMembers = now
+                if (before == null) return@collect
+                for (uid in now - before) {
+                    val name = runCatching { groups.user(uid)?.name }.getOrNull()?.ifBlank { null } ?: "일행"
+                    navigator.notify("$name 님이 ${g.name}에 들어왔어요")
+                    navigator.sayOut("$name 님이 들어왔어요.")
+                }
+            }
+        }
+    }
 
     /**
      * 초대 = 일정 단위 (A안): today's trip still in the owner's solo group gets its own group (moved with its days,

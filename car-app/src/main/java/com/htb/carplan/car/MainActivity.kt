@@ -168,7 +168,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
-        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen)
+        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen, onGroup = { qr = true })
         val voiceState by vm.voiceState.collectAsStateWithLifecycle()
         VoiceBar(voiceState, onCommand = vm::runCommand, onClose = vm::closeVoice)
         val sim by vm.sim.collectAsStateWithLifecycle()
@@ -208,7 +208,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                     val promptSlot: (@Composable () -> Unit)? = prompt?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
                     if (compact) SplitDayView(trip, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
-                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true },
+                        today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true },
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
                         onNavi = { vm.openNavigation() },
                         onMore = { more = true },
@@ -284,7 +284,7 @@ private fun chipColors(): SelectableChipColors = FilterChipDefaults.filterChipCo
 )
 
 @Composable
-private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit) {
+private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit, onGroup: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
@@ -298,7 +298,8 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         v.rangeKm?.takeIf { it > 0 }?.let { Stat("주행가능", "${it.toInt()} km") }
         careDue?.let { Stat("정비", it) }
         Spacer(Modifier.weight(1f))
-        groupName?.let { Stat("그룹", it) }
+        // Tap the group to show its QR (7장) — the band is where the driver already looks.
+        groupName?.let { Box(Modifier.clickable(enabled = !v.drivingRestricted, onClick = onGroup)) { Stat("그룹", it) } }
         if (passengers > 0) Stat("동승자", "${passengers}명")
         // ⑧ 음성 명령: always there, driving included — speaking is how the driver changes things on the move.
         OutlinedButton(onClick = onListen, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Ink), modifier = Modifier.height(52.dp)) {
@@ -318,7 +319,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
  * thing to do next — where, when, one huge button. Everything else lives behind [더보기] (parked only).
  */
 @Composable
-private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onOtherTrip: () -> Unit, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
+private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeViewModel, trip: TodayTrip?, next: CalendarEvent?, guiding: Boolean, live: NaviLive, prompt: (@Composable () -> Unit)?, restricted: Boolean, comment: Pair<String, String>?, moving: Boolean, onOtherTrip: () -> Unit, onAdd: () -> Unit, onGo: () -> Unit, onNavi: () -> Unit, onMore: () -> Unit) {
     // Parked at a stop with the route still on: the next place is "다음", not "가는 중".
     val goingLabel = if (guiding && moving) "가는 중" else "다음"
     val todayEvents = vm.eventsOn(today, week)
@@ -389,7 +390,11 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 10.dp))
             } else {
             Text(goingLabel, color = Soft, fontSize = 20.sp)
-            Text(nextName ?: "갈 곳이 없어요", color = if (nextName != null) Accent else Soft, fontSize = 48.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
+            val emptyLine = when {
+                trip != null && trip.stops.isEmpty() -> "여행에 칸이 아직 없어요"
+                else -> "오늘 갈 곳이 없어요"
+            }
+            Text(nextName ?: emptyLine, color = if (nextName != null) Accent else Soft, fontSize = 48.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
             listOfNotNull(nextTime?.takeIf { !guiding || (live.remainSeconds == null && trip?.day?.etaNext == null) }?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 26.sp, modifier = Modifier.padding(top = 6.dp))
             }
@@ -421,8 +426,16 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 val label = if (d == today.plusDays(1)) "내일" else "${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}"
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
             }
+            // Nothing to go to: say how to get something, and offer the one action the car can do (parked).
+            if (nextName == null && !guiding && !dayDone) {
+                Text(if (trip != null) "폰에서 칸을 넣으면 여기 나와요" else "폰에서 일정을 넣거나, 여기서 바로 만들어요", color = Soft, fontSize = 24.sp, modifier = Modifier.padding(bottom = 16.dp))
+                if (!restricted) Button(
+                    onClick = onAdd, modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
+                    colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk),
+                ) { Text("일정 추가", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+            }
             // Driving: both buttons would only be greyed out; the status band keeps [내비 열기].
-            if (!dayDone && !restricted) Button(
+            else if (!dayDone && !restricted) Button(
                 onClick = { if (guiding) onNavi() else onGo() },
                 enabled = !restricted && (guiding || nextName != null),
                 modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
@@ -598,7 +611,7 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
     }
     val question = when { fuel || commute || parking -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" }
     // ★1: the start question carries "지금 출발하면 10:12 도착" in [NextPrompt.message].
-    val startLine = p.message?.takeIf { !(fuel || commute || parking || change) }
+    val startLine = p.sub
     val hint = when {
         p.listening -> "듣는 중 · \"응\" 또는 \"아니\""
         p.heard != null -> "들은 말 \"${p.heard}\" · 버튼으로 골라 주세요"

@@ -69,7 +69,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
 /** [말하기] on screen: the mic is open, or the known commands are shown as buttons (nothing understood). */
 data class VoiceState(val listening: Boolean = false, val choices: Boolean = false, val heard: String? = null)
 
-data class NaviEntry(val kind: Kind, val id: String, val place: Place) { enum class Kind { STOP, PICKUP, STATION } }
+data class NaviEntry(val kind: Kind, val id: String, val place: Place) { enum class Kind { STOP, PICKUP, STATION, EVENT } }
 
 enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE, PARKING }
 
@@ -95,6 +95,8 @@ data class NextPrompt(
     val stop: Stop, val reason: PromptReason, val listening: Boolean = false, val heard: String? = null, val message: String? = null,
     /** 차 화면 원칙 (정원 2026-10-31): not a question — spoken once, one big button ([button]) does the finding, nothing to answer. */
     val single: Boolean = false, val button: String? = null,
+    /** ★1: "지금 출발하면 10:12 도착" under a start or commute question. */
+    val sub: String? = null,
 )
 
 /**
@@ -360,6 +362,7 @@ class TripNavigator(
 
     /** Driver door opened (from [VehicleMonitor]): in P that means "내렸다" → arrival now (Q34). */
     fun onDriverDoorOpened() {
+        if (lastGear == Gear.P && drovenSinceRecord && inNavi.firstOrNull()?.kind == NaviEntry.Kind.EVENT) onArrived()
         if (lastGear == Gear.P && drovenSinceRecord) { parkTimer?.cancel(); confirmArrival(reason = "운전석 문") }
     }
 
@@ -492,7 +495,13 @@ class TripNavigator(
         val place = e.place ?: return
         commuteAskedDate = today
         val message = "${withRo(place.name)} 갈까요?"
-        show(NextPrompt(Stop(place = place), PromptReason.COMMUTE, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }
+        show(NextPrompt(Stop(place = place), PromptReason.COMMUTE, message = message)) {
+            askJob = scope.launch {
+                val eta = departEta(Stop(place = place))
+                eta?.let { e -> _prompt.update { p -> p?.takeIf { it.reason == PromptReason.COMMUTE }?.copy(sub = "지금 출발하면 $e 도착") } }
+                answer(voice.ask(message + (eta?.let { " 지금 출발하면 ${it.replace(":", "시 ")}분 도착이에요." } ?: ""), ::listening))
+            }
+        }
     }
 
     private fun listening(listening: Boolean, heard: String?) { _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
@@ -780,7 +789,7 @@ class TripNavigator(
             askJob = scope.launch {
                 // ★1 (차 쪽): "지금 출발하면 10시 12분 도착이에요" — one Kakao leg, cached (legSeconds), straight line when offline.
                 val eta = departEta(next)
-                eta?.let { e -> _prompt.update { p -> p?.takeIf { it.stop.id == next.id }?.copy(message = "지금 출발하면 $e 도착") } }
+                eta?.let { e -> _prompt.update { p -> p?.takeIf { it.stop.id == next.id }?.copy(sub = "지금 출발하면 $e 도착") } }
                 val q = "다음 목적지 ${withRo(next.place.name)} 갈까요?" + (eta?.let { " 지금 출발하면 ${it.replace(":", "시 ")}분 도착이에요." } ?: "")
                 answer(voice.ask(q, ::listening))
             }
@@ -817,9 +826,7 @@ class TripNavigator(
         }
         if (_prompt.value?.reason == PromptReason.COMMUTE) {
             askJob?.cancel(); closePrompt()
-            commuteEvent?.place?.let { p -> if (p.hasCoords()) { router.route(listOf(p)); router.openNavigation() } else router.search(p.name) }
-            lastRouteSentAt = System.currentTimeMillis()
-            _notice.value = "${commuteEvent?.title ?: "출근"} · ${commuteEvent?.place?.name} 안내"
+            commuteEvent?.let { e -> e.place?.let { guideTo(e.id, e.title, it) } }
             return
         }
         if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE) { revertRoute(); return }
@@ -867,6 +874,7 @@ class TripNavigator(
 
     fun clearNotice() { _notice.value = null }
     fun notify(text: String) { _notice.value = text }
+    fun sayOut(text: String) { scope.launch { voice.say(text) } }
 
     // ---------- 10장: plan changed while guiding ----------
 
@@ -1076,7 +1084,26 @@ class TripNavigator(
     }
 
     /** One place reached: mark it visited, then top the route up while more stops remain (Q22). */
+    /**
+     * One place that is not a trip stop (출퇴근, a plain event with a place): the screen goes to "가는 중" like a trip
+     * leg, and arriving there says so and ends guiding (it used to stay on [안내 시작] with no sign of the drive).
+     */
+    fun guideTo(eventId: String, title: String, place: Place) {
+        if (place.hasCoords()) { router.route(listOf(place)); if (!simActive) router.openNavigation() } else router.search(place.name)
+        lastRouteSentAt = System.currentTimeMillis()
+        inNavi = listOf(NaviEntry(NaviEntry.Kind.EVENT, eventId, place))
+        _live.update { it.copy(remainMeters = null, remainSeconds = null, nextName = place.name) } // not the last drive's numbers
+        _guiding.value = true
+        _notice.value = "$title · ${place.name} 안내"
+    }
+
     private fun onArrived() {
+        inNavi.firstOrNull()?.takeIf { it.kind == NaviEntry.Kind.EVENT }?.let { e ->
+            inNavi = emptyList(); _guiding.value = false
+            _notice.value = "${e.place.name} 도착"
+            scope.launch { voice.say("${e.place.name} 도착했어요.") }
+            return
+        }
         val t = trip.value ?: return
         // The first thing in the navigation is what we reached: a pickup, a station, or a planned stop.
         val first = inNavi.firstOrNull()
