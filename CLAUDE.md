@@ -56,6 +56,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 
 ## 디자인 규칙 — 현대(Pleos) 기본 UI에 녹아들게
 - **흰 바탕, 검정에 가까운 글자**(`Palette.TextStrong` #111), 보조 글자 회색(`TextSoft`). 어두운 카드·그라데이션 없음.
+- **차 화면은 현대(Pleos) 기준을 따른다**(2026-10-31 정원: 구글 기준 아님). 출처 document.pleos.ai 「Pleos Connect UI Design Guide」·「Typography」·「주행 안전을 고려한 설계」. 글자 단계(px = 에뮬 160dpi에서 dp/sp): Headline 48·56·60 / Title 32·36·40 / Body 26·28·30 / Label 20·24, **최소 20**. 대비 4.5:1 이상, 한 덩어리 3줄 이하, 1~2초 안에 읽히게, 입력 뒤 0.25초 안에 반응(늦으면 로딩 표시), 주간/야간 모드 지원, 터치는 진동·음성 피드백 권장, 주행 중 동영상·애니메이션·자동 스크롤 금지, 음성 우선. 버튼 크기 수치는 문서에 없음 → 우리는 76dp 이상 유지. 차 화면은 가로·세로(반반) 둘 다 맞아야 함.
 - **차 앱은 다크 모드가 있다**(2026-10-31 정원): 차가 밤 모드면 검정 바탕·밝은 글자(`car/CarTheme.kt`의 `DarkCarColors`, 파랑은 #4DA3FF로 밝게). 차 색은 `LocalCarColors`를 통해서만 쓴다(`Ink`·`Soft` 같은 getter). 그리기 람다(`drawBehind`·`Canvas`) 안에선 색을 미리 변수에 담는다. 시연 메뉴 [다크 모드 미리보기]로 확인.
 - **섹션은 둥근 카드로 나누지 않는다.** 얇은 구분선(`HorizontalDivider(color = Palette.Line)`)과 여백으로 나눈다. 색 바탕 칸 금지(입력 필드만 `InputBg`).
 - 모서리는 전부 **4dp**(`Corner`). 원형 점·배지 대신 숫자·짧은 글자.

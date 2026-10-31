@@ -115,7 +115,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                     TextButton(onClick = onDismiss) { Text("닫기", fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold) }
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
                         Text("다트 — 동네 뽑기", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                        Text("다트를 아래로 당겼다 놓으세요 · 폰에도 같이 떠요", fontSize = 18.sp, color = Palette.TextSoft)
+                        Text("다트를 아래로 당겼다 놓으세요 · 폰에도 같이 떠요", fontSize = 20.sp, color = Palette.TextSoft)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CarScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
@@ -126,7 +126,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                 if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Regions.sidoNames.forEach { s -> CarScopeChip(shortSido(s), region == s) { region = s } }
                 }
-                if (scope == DartScope.NEAR && here == null) Text("차 위치를 아직 몰라서 전국으로 보여 줘요", fontSize = 18.sp, color = Palette.TextSoft, modifier = Modifier.padding(horizontal = 28.dp))
+                if (scope == DartScope.NEAR && here == null) Text("차 위치를 아직 몰라서 전국으로 보여 줘요", fontSize = 20.sp, color = Palette.TextSoft, modifier = Modifier.padding(horizontal = 28.dp))
                 HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 8.dp))
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (regionsReady) DotMapBoard(
@@ -145,16 +145,16 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                             Modifier.widthIn(max = 520.dp).background(Palette.Background, Corner).border(1.dp, Palette.SheetEdge, Corner).padding(22.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(d.resultName.split(" ").first(), fontSize = 18.sp, color = Palette.TextSoft)
+                            Text(d.resultName.split(" ").first(), fontSize = 20.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 38.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
-                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 18.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
+                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 20.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
                             Button(
                                 onClick = { vm.addDartAsStop(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
                                 modifier = Modifier.padding(top = 14.dp).fillMaxWidth().height(76.dp),
                             ) { Text("오늘 일정에 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
                         }
                     }
-                    error?.let { Text(it, color = Palette.Teal, fontSize = 18.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
+                    error?.let { Text(it, color = Palette.Teal, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
                 }
             }
         }
