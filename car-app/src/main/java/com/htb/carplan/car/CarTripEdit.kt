@@ -45,6 +45,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Stop
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.animation.core.tween
 
 private val Corner = RoundedCornerShape(4.dp)
 
@@ -66,6 +68,7 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
     var adding by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.requestLocation() } // search near the car
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+        CarEnter(Entry.SCREEN) {
         Column(Modifier.fillMaxSize().background(c.bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CarBackButton(onBack = { if (compact && (adding || selectedId != null)) { adding = false; selectedId = null } else onDismiss() })
@@ -80,15 +83,19 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
             Row(Modifier.fillMaxSize().padding(top = 12.dp)) {
                 val panel = compact && (selected != null || adding)
                 if (!panel) Column(Modifier.weight(1.2f).fillMaxHeight().padding(end = if (compact) 0.dp else 28.dp)) {
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        if (t.stops.isEmpty()) Text(if (compact) "아직 칸이 없어요 · 아래 [장소 넣기]" else "아직 칸이 없어요 · 오른쪽에서 장소를 넣어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
-                        val ahead = t.remaining
-                        t.stops.forEachIndexed { i, s ->
+                    if (t.stops.isEmpty()) Text(if (compact) "아직 칸이 없어요 · 아래 [장소 넣기]" else "아직 칸이 없어요 · 오른쪽에서 장소를 넣어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
+                    val ahead = t.remaining
+                    val motion = LocalMotion.current
+                    // Keyed rows: [위]/[아래] slide the place to its new spot, a new place fades in, a removed one fades out.
+                    androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
+                        itemsIndexed(t.stops, key = { _, s -> s.id }) { i, s ->
+                        Column(if (motion) Modifier.animateItem(fadeInSpec = tween(MOTION_MS), placementSpec = tween(MOTION_MS), fadeOutSpec = tween(MOTION_MS)) else Modifier) {
                             val on = s.id == selectedId
                             val idx = ahead.indexOfFirst { it.id == s.id }
+                            val edge by carColor(if (on) c.ink else c.bg, "editEdge")
                             Row(
                                 Modifier.fillMaxWidth().heightIn(min = 96.dp)
-                                    .then(if (on) Modifier.border(2.dp, c.ink, Corner) else Modifier)
+                                    .border(2.dp, edge, Corner)
                                     .clickable(enabled = !s.visited) { selectedId = if (on) null else s.id }
                                     .padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -109,9 +116,13 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                             }
                             HorizontalDivider(color = c.line)
                         }
+                        }
                     }
                     // The one undo, right where the driver just pressed (폰의 되살리기와 같은 기록).
-                    removed?.let { r ->
+                    var lastRemoved by remember { mutableStateOf<Stop?>(null) }
+                    removed?.let { lastRemoved = it }
+                    CarAppear(removed != null) {
+                        val r = lastRemoved ?: return@CarAppear
                         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${r.place.name} 뺐어요", color = c.ink, fontSize = 24.sp, modifier = Modifier.weight(1f), maxLines = 1)
                             EditButton("되살리기") { vm.restoreStop(r.id); removed = null }
@@ -124,11 +135,18 @@ fun CarTripEdit(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                 }
                 if (!compact) VerticalDivider(color = c.line)
                 if (!compact || panel) Column(Modifier.weight(1f).fillMaxHeight().padding(start = if (compact) 0.dp else 28.dp)) {
-                    if (selected != null) TimePanel(selected, onTime = { vm.setStopTime(selected, it); selectedId = null }, onClose = { selectedId = null })
-                    else AddPanel(vm)
+                    // Time ⇄ add: a quick fade, not a jump.
+                    androidx.compose.animation.Crossfade(selected?.id, Modifier.fillMaxSize(), animationSpec = carSpec(), label = "panel") { id ->
+                        Column(Modifier.fillMaxSize()) {
+                            val st = t.stops.firstOrNull { it.id == id && !it.visited }
+                            if (st != null) TimePanel(st, onTime = { vm.setStopTime(st, it); selectedId = null }, onClose = { selectedId = null })
+                            else AddPanel(vm)
+                        }
+                    }
                 }
             }
         }
+    }
     }
 }
 
@@ -230,10 +248,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.AddPanel(vm: CarHomeV
 @Composable
 private fun Chip(label: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = LocalCarColors.current
+    val bg by carColor(if (on) c.ink else c.bg, "chip")
+    val fg by carColor(if (on) c.onInk else c.ink, "chipText")
     Text(
-        label, color = if (on) c.onInk else c.ink, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+        label, color = fg, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        modifier = modifier.heightIn(min = 76.dp).background(if (on) c.ink else c.bg, Corner).border(1.dp, if (on) c.ink else c.line, Corner)
+        modifier = modifier.heightIn(min = 76.dp).background(bg, Corner).border(1.dp, if (on) c.ink else c.line, Corner)
             .clickable(onClick = onClick).padding(top = 22.dp),
     )
 }

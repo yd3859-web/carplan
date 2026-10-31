@@ -42,6 +42,9 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxSize
 
 private val Corner = RoundedCornerShape(4.dp)
 
@@ -57,34 +60,63 @@ fun RowScope.CarRecords(vm: CarHomeViewModel) {
     val days by vm.recordDays.collectAsStateWithLifecycle()
     val compact = LocalCompact.current
     var picked by remember { mutableStateOf<RecordDay?>(null) }
-    // Wide: the first day is open from the start. Half screen: the list first, a day after a tap.
-    val shown = picked ?: if (compact) null else days.firstOrNull()
-    if (!compact || shown == null) {
-        Column(Modifier.weight(if (compact) 1f else 0.8f).fillMaxHeight().padding(horizontal = if (compact) 20.dp else 28.dp, vertical = 20.dp)) {
-            Text("기록", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-            Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
-            if (days.isEmpty()) Text("아직 기록이 없어요 · 차를 세우면 기록 칸이 생겨요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
-            LazyColumn(Modifier.weight(1f)) {
-                items(days, key = { "${it.eventId}/${it.date}" }) { d ->
-                    val on = d == shown
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 88.dp).background(if (on) c.sheet else c.bg, Corner).clickable { picked = d }.padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(dayText(d.date), color = c.soft, fontSize = 20.sp)
-                            Text(d.title, color = c.ink, fontSize = 26.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
-                        }
-                        if (compact) Text("›", color = c.soft, fontSize = 28.sp)
+    if (!compact) {
+        // Wide: the first day is open from the start; another day fades in on the right.
+        val shown = picked ?: days.firstOrNull()
+        DayList(days, shown, compact = false, onPick = { picked = it }, modifier = Modifier.weight(0.8f).fillMaxHeight())
+        VerticalDivider(color = c.line)
+        androidx.compose.animation.Crossfade(shown, Modifier.weight(1f).fillMaxHeight(), animationSpec = carSpec(), label = "recordDay") { d ->
+            if (d != null) DayDetail(vm, d, compact = false, onBack = {})
+        }
+    } else {
+        // Half screen: the list first, a day after a tap — sliding in from the right, and back to the left.
+        val motion = LocalMotion.current
+        androidx.compose.animation.AnimatedContent(
+            targetState = picked, modifier = Modifier.weight(1f).fillMaxHeight(), label = "records",
+            transitionSpec = {
+                val dir = if (targetState != null) 1 else -1
+                if (!motion) (androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None)
+                else androidx.compose.animation.slideInHorizontally(tween(MOTION_MS)) { w -> dir * w } togetherWith androidx.compose.animation.slideOutHorizontally(tween(MOTION_MS)) { w -> -dir * w }
+            },
+        ) { d ->
+            if (d == null) DayList(days, null, compact = true, onPick = { picked = it }, modifier = Modifier.fillMaxSize())
+            else DayDetail(vm, d, compact = true, onBack = { picked = null })
+        }
+    }
+}
+
+@Composable
+private fun DayList(days: List<RecordDay>, shown: RecordDay?, compact: Boolean, onPick: (RecordDay) -> Unit, modifier: Modifier) {
+    val c = LocalCarColors.current
+    Column(modifier.padding(horizontal = if (compact) 20.dp else 28.dp, vertical = 20.dp)) {
+        Text("기록", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
+        if (days.isEmpty()) Text("아직 기록이 없어요 · 차를 세우면 기록 칸이 생겨요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
+        LazyColumn(Modifier.weight(1f)) {
+            items(days, key = { "${it.eventId}/${it.date}" }) { d ->
+                val on = d == shown
+                val bg by carColor(if (on) c.sheet else c.bg, "dayRow")
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 88.dp).background(bg, Corner).clickable { onPick(d) }.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(dayText(d.date), color = c.soft, fontSize = 20.sp)
+                        Text(d.title, color = c.ink, fontSize = 26.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
                     }
-                    HorizontalDivider(color = c.line)
+                    if (compact) Text("›", color = c.soft, fontSize = 28.sp)
                 }
+                HorizontalDivider(color = c.line)
             }
         }
     }
-    if (!compact) VerticalDivider(color = c.line)
-    if (shown != null) Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = if (compact) 20.dp else 28.dp, vertical = 20.dp)) {
-        if (compact) CarBackButton(onBack = { picked = null }, label = "목록")
+}
+
+@Composable
+private fun DayDetail(vm: CarHomeViewModel, shown: RecordDay, compact: Boolean, onBack: () -> Unit) {
+    val c = LocalCarColors.current
+    Column(Modifier.fillMaxSize().padding(horizontal = if (compact) 20.dp else 28.dp, vertical = 20.dp)) {
+        if (compact) CarBackButton(onBack = onBack, label = "목록")
         Text(shown.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         Text(dayText(shown.date), color = c.soft, fontSize = 20.sp)
         val recs by remember(shown) { vm.recordsOf(shown) }.collectAsState(initial = null)

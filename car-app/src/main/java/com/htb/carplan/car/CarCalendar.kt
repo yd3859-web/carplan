@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -173,11 +174,21 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
             }
         }
         HorizontalDivider(color = c.line, modifier = Modifier.padding(top = 8.dp))
+        val motion = LocalMotion.current
+        androidx.compose.animation.AnimatedContent(
+            targetState = month, modifier = Modifier.weight(1f), label = "month",
+            transitionSpec = {
+                val dir = if (targetState > initialState) 1 else -1
+                if (!motion) (androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None)
+                else (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(MOTION_MS)) { w -> dir * w / 3 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MOTION_MS))) togetherWith
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MOTION_MS / 2))
+            },
+        ) { month ->
         val first = month.atDay(1)
         val lead = first.dayOfWeek.value % 7 // Sunday first
         val days = month.lengthOfMonth()
         val rows = (lead + days + 6) / 7
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.fillMaxSize()) {
             for (r in 0 until rows) {
                 Row(Modifier.weight(1f)) {
                     for (col in 0 until 7) {
@@ -188,14 +199,17 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                                 // What the user registered shows, repeating ones too; the 시연 메뉴 test commute doesn't (정원 2026-10-31).
                                 val dayEvents = vm.eventsOn(d, events).filterNot { vm.isTestEvent(it.event) }
                                 val isPicked = d == picked
+                                // The chosen day fades to ink instead of flipping (정원 2026-10-31: 부드럽게).
+                                val cellBg by carColor(if (isPicked) c.ink else c.bg, "cellBg")
+                                val onCell by carColor(if (isPicked) c.onInk else c.ink, "cellText")
                                 Column(
                                     Modifier.fillMaxSize()
-                                        .background(if (isPicked) c.ink else c.bg, Corner)
+                                        .background(cellBg, Corner)
                                         .then(if (d == today && !isPicked) Modifier.border(2.dp, c.ink, Corner) else Modifier)
                                         .clickable { onPick(d) }
                                         .padding(if (compact) 4.dp else 8.dp),
                                 ) {
-                                    Text("$n", color = if (isPicked) c.onInk else if (col == 0) c.warn else c.ink, fontSize = 24.sp, fontWeight = if (d == today) FontWeight.Bold else FontWeight.Normal)
+                                    Text("$n", color = if (isPicked) onCell else if (col == 0) c.warn else onCell, fontSize = 24.sp, fontWeight = if (d == today) FontWeight.Bold else FontWeight.Normal)
                                     // Up to three events as "colour bar + name"; the rest as "+n".
                                     // Half screen: a cell is too narrow for names — one colour bar per event, the names are below.
                                     if (compact) dayEvents.take(3).forEach { e ->
@@ -203,7 +217,7 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                                     } else dayEvents.take(3).forEach { e ->
                                         Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Box(Modifier.width(8.dp).height(24.dp).background(Color(CategoryColors.of(e.event.categoryId, categories))))
-                                            Text(e.event.title, color = if (isPicked) c.onInk else c.ink, fontSize = 20.sp, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, modifier = Modifier.padding(start = 6.dp))
+                                            Text(e.event.title, color = onCell, fontSize = 20.sp, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, modifier = Modifier.padding(start = 6.dp))
                                         }
                                     }
                                     if (dayEvents.size > 3) Text("+${dayEvents.size - 3}", color = if (isPicked) c.onInk else c.soft, fontSize = 20.sp)
@@ -213,6 +227,7 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                     }
                 }
             }
+        }
         }
     }
 }
@@ -228,7 +243,8 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
     Column(modifier) {
         Text("${picked.monthValue}월 ${picked.dayOfMonth}일 (${picked.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})", color = c.ink, fontSize = if (compact) 28.sp else 32.sp, fontWeight = FontWeight.Bold)
         val dayEvents = vm.eventsOn(picked, events).filterNot { vm.isTestEvent(it.event) }
-        Column(Modifier.weight(1f).padding(top = if (compact) 4.dp else 12.dp).verticalScroll(rememberScrollState())) {
+        androidx.compose.animation.Crossfade(picked, Modifier.weight(1f), animationSpec = carSpec(), label = "day") { _ ->
+        Column(Modifier.fillMaxSize().padding(top = if (compact) 4.dp else 12.dp).verticalScroll(rememberScrollState())) {
             if (dayEvents.isEmpty()) Text("일정이 없어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
             dayEvents.forEach { item ->
                 val e = item.event
@@ -249,6 +265,7 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
                 }
                 HorizontalDivider(color = c.line)
             }
+        }
         }
         Button(
             onClick = { onAdd(picked) }, modifier = Modifier.fillMaxWidth().heightIn(min = if (compact) 76.dp else 96.dp), shape = Corner,

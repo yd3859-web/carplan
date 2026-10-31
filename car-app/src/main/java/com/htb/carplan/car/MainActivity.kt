@@ -177,12 +177,14 @@ private fun CarHome(vm: CarHomeViewModel) {
     // A notice ("기록 칸: 판교역") is news, not state: it goes after a few seconds.
     LaunchedEffect(notice) { if (notice != null) { kotlinx.coroutines.delay(8_000); vm.clearNotice() } }
 
+    // Pleos: no animation while driving — every CarMotion helper snaps then.
+    androidx.compose.runtime.CompositionLocalProvider(LocalMotion provides !vehicle.drivingRestricted) {
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
         StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen, onGroup = { qr = true }, onDemo = { debug = true })
         val voiceState by vm.voiceState.collectAsStateWithLifecycle()
-        VoiceBar(voiceState, onCommand = vm::runCommand, onClose = vm::closeVoice)
+        CarAppear(voiceState.listening || voiceState.choices) { VoiceBar(voiceState, onCommand = vm::runCommand, onClose = vm::closeVoice) }
         val sim by vm.sim.collectAsStateWithLifecycle()
         if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim, onRemoveStop = vm::testRemoveStop)
         // The driver gets one plain line; the raw message goes to the log (차 화면 원칙).
@@ -195,7 +197,9 @@ private fun CarHome(vm: CarHomeViewModel) {
             }
             Text(plain, color = Warn, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp))
         }
-        notice?.let { Text(it, color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
+        var lastNotice by remember { mutableStateOf("") }
+        notice?.let { lastNotice = it }
+        CarAppear(notice != null) { Text(lastNotice, color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
             LinkCodeScreen(car?.linkCode)
             return@Column
@@ -245,7 +249,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                             (p.reason in RAIL_ASK_START && trip!!.stops.any { it.id == p.stop.id && !it.visited }) ||
                                 (p.reason == PromptReason.FUEL && (railFuel != null || railNeed != null)))
                     }
-                    val promptSlot: (@Composable () -> Unit)? = prompt?.takeIf { askOnRail == null }?.let { p -> { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } }
+                    val promptSlot: (@Composable () -> Unit)? = prompt?.takeIf { askOnRail == null }?.let { p -> { CarEnter(Entry.FADE, key = p.reason to p.stop.id) { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } } }
                     if (compact) SplitDayView(trip, vm.dayComments.collectAsStateWithLifecycle().value, vm.fuelSuggestion.collectAsStateWithLifecycle().value?.takeIf { it.eventId == trip?.eventId }, vm::goViaSuggested, vm.fuelNeed.collectAsStateWithLifecycle().value, vm::findFuelOnRoute, askOnRail, vm::go, vm::later, trip?.let { fuelLine(it, vehicle, vm.fuelUsage.collectAsStateWithLifecycle().value) }, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
                         today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, ask = askOnRail, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true }, onEdit = { editing = true },
@@ -263,6 +267,7 @@ private fun CarHome(vm: CarHomeViewModel) {
             CarTabBar(tab, onTab = { tab = it })
         }
         }
+    }
     }
 
     if (more && !vehicle.drivingRestricted) MoreDialog(
@@ -312,6 +317,7 @@ private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, 
             Modifier.fillMaxSize().background(Color(0x8C131417)),
             contentAlignment = Alignment.Center,
         ) {
+            CarEnter(Entry.SHEET) {
             Column(
                 Modifier.widthIn(max = width).fillMaxWidth(if (LocalCompact.current) 0.94f else 0.72f).shadow(24.dp, Corner).clip(Corner).background(Sheet).border(1.dp, SheetEdge, Corner)
                     .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { }
@@ -323,6 +329,7 @@ private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, 
                 Spacer(Modifier.height(16.dp))
                 // Driver side first: the window's buttons sit bottom-left, [닫기] as a full-size button.
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { buttons() }
+            }
             }
         }
     }
@@ -868,13 +875,13 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
     trip.stops.forEachIndexed { i, s ->
         if (i < hidden || i > lastShown) return@forEachIndexed
         // A station before the next place (filling up right away) sits just above it, under the places already passed.
-        if (fuelStop != null && fuelStop.afterStopId == null && s.id == nextId) FuelStopRow(fuelStop, rail, showButton = detail, onFuelVia, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo)
-        if (need != null && need.afterStopId == null && s.id == nextId) FuelNeedRow(need, rail, showButton = detail, onFindFuel, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo)
+        if (fuelStop != null && fuelStop.afterStopId == null && s.id == nextId) CarEnter(Entry.FADE, key = fuelStop) { FuelStopRow(fuelStop, rail, showButton = detail, onFuelVia, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo) }
+        if (need != null && need.afterStopId == null && s.id == nextId) CarEnter(Entry.FADE, key = need) { FuelNeedRow(need, rail, showButton = detail, onFindFuel, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo) }
         val isNext = s.id == nextId
-        val color = when { s.visited -> Soft; isNext -> Accent; else -> Ink }
+        val color by carColor(when { s.visited -> Soft; isNext -> Accent; else -> Ink })
         val below = trip.stops.getOrNull(i + 1)
         val fill by animateFloatAsState(if (below?.visited == true) 1f else 0f, tween(450), label = "railFill")
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Row(Modifier.fillMaxWidth().carSize().height(IntrinsicSize.Min)) {
             Box(
                 Modifier.width(rail).fillMaxHeight().drawBehind {
                     val x = size.width / 2
@@ -932,8 +939,8 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
                     Text("이동 약 ${(sec / 60).coerceAtLeast(1)}분 · ${"%.1f".format(m / 1000)}km", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(start = timeW, top = 10.dp))
                 }
                 // Q55: the station to fill up at, right after the place it comes after (정원 2026-10-31).
-                if (fuelStop != null && fuelStop.afterStopId == s.id) FuelStopRow(fuelStop, timeW, showButton = detail, onFuelVia, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo)
-                if (need != null && need.afterStopId == s.id && below != null) FuelNeedRow(need, timeW, showButton = detail, onFindFuel, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo)
+                if (fuelStop != null && fuelStop.afterStopId == s.id) CarEnter(Entry.FADE, key = fuelStop) { FuelStopRow(fuelStop, timeW, showButton = detail, onFuelVia, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo) }
+                if (need != null && need.afterStopId == s.id && below != null) CarEnter(Entry.FADE, key = need) { FuelNeedRow(need, timeW, showButton = detail, onFindFuel, ask?.takeIf { it.reason == PromptReason.FUEL }, onYes, onNo) }
             }
         }
     }
@@ -1172,6 +1179,7 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
     var place by remember { mutableStateOf("") }
     val time = hour?.let { "%02d:%02d".format(it, if (half) 30 else 0) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+        CarEnter(Entry.SCREEN) {
         Column(Modifier.fillMaxSize().background(Bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CarBackButton(onBack = onDismiss)
@@ -1210,6 +1218,7 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
                 colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk, disabledContainerColor = Disabled, disabledContentColor = Soft),
             ) { Text(listOfNotNull(dayLabel(LocalDate.now().plusDays(dayOffset)), time ?: "종일", title.ifBlank { null }).joinToString("  ") + "  추가", fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
         }
+    }
     }
 }
 

@@ -116,6 +116,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
     var flying by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+        CarEnter(Entry.SCREEN) {
         Box(Modifier.fillMaxSize().background(Palette.Background)) {
             Column(Modifier.fillMaxSize()) {
                 val compact = LocalCompact.current
@@ -201,6 +202,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                 }
             }
         }
+    }
     }
 }
 
