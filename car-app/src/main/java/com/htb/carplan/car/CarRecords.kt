@@ -51,6 +51,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import kotlinx.coroutines.launch
 
 private val Corner = RoundedCornerShape(4.dp)
 
@@ -81,10 +85,56 @@ fun RowScope.CarRecords(vm: CarHomeViewModel) {
         cal(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
         VerticalDivider(color = c.line)
         line(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
-    } else Column(Modifier.weight(1f).fillMaxHeight()) {
-        cal(Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 12.dp))
-        HorizontalDivider(color = c.line)
-        line(Modifier.weight(1.1f).padding(horizontal = 20.dp, vertical = 12.dp))
+    } else androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+        // Half screen (정원 2026-10-31): month on top, the day below — pushing the day up folds the month away
+        // (it slides up out of sight) so the records get the whole height; pulling down at the top brings it back.
+        val full = maxHeight * 0.48f
+        val fullPx = with(androidx.compose.ui.platform.LocalDensity.current) { full.toPx() }
+        var frac by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+        // Which way the last push went: on release the month finishes going that way.
+        var lastDir by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        val uiScope = androidx.compose.runtime.rememberCoroutineScope()
+        val motion = LocalMotion.current
+        fun settle(to: Float) { uiScope.launch { if (motion) androidx.compose.animation.core.animate(frac, to, animationSpec = tween(MOTION_MS)) { v, _ -> frac = v } else frac = to } }
+        val fold = remember(fullPx) {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (available.y >= 0 || frac <= 0f) return androidx.compose.ui.geometry.Offset.Zero
+                    lastDir = -1f
+                    val before = frac
+                    frac = (frac + available.y / fullPx).coerceIn(0f, 1f)
+                    return androidx.compose.ui.geometry.Offset(0f, (frac - before) * fullPx)
+                }
+                override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (available.y <= 0 || frac >= 1f) return androidx.compose.ui.geometry.Offset.Zero
+                    lastDir = 1f
+                    val before = frac
+                    frac = (frac + available.y / fullPx).coerceIn(0f, 1f)
+                    return androidx.compose.ui.geometry.Offset(0f, (frac - before) * fullPx)
+                }
+                // Called when the finger lifts (with or without a fling): never left half-open.
+                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                    if (frac > 0f && frac < 1f) settle(if (lastDir < 0f) 0f else if (lastDir > 0f) 1f else if (frac < 0.5f) 0f else 1f)
+                    return androidx.compose.ui.unit.Velocity.Zero
+                }
+            }
+        }
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().height(full * frac).clipToBounds()) {
+                // Bottom-anchored: as the box shrinks the month leaves upward.
+                cal(Modifier.fillMaxWidth().wrapContentHeight(Alignment.Bottom, unbounded = true).height(full).padding(horizontal = 20.dp, vertical = 12.dp))
+            }
+            // The handle: one tap folds or unfolds, for when swiping is not what the driver does.
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { settle(if (frac > 0.5f) 0f else 1f) }.padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f).height(1.dp).background(c.line))
+                Text(if (frac > 0.5f) "  달력 접기 ▴  " else "  ${month.monthValue}월 달력 ▾  ", color = c.soft, fontSize = 20.sp)
+                Box(Modifier.weight(1f).height(1.dp).background(c.line))
+            }
+            Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(fold)) { line(Modifier.fillMaxSize().padding(horizontal = 20.dp)) }
+        }
     }
 }
 
