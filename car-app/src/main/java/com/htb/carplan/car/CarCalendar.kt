@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -42,32 +45,53 @@ import com.htb.carplan.shared.model.BuiltInCategory
 import com.htb.carplan.shared.calendar.CategoryColors
 import androidx.compose.ui.graphics.Color
 import java.time.LocalDate
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** 주차 중 차 화면의 탭 (정원 2026-10-31: 폰 앱 기능을 차에도). Driving shows only [TODAY]. */
-enum class CarTab(val label: String) { TODAY("오늘"), CALENDAR("캘린더") }
+/** 주차 중 차 화면의 탭 (정원 2026-10-31: 폰 앱 기능을 차에도). Driving shows only [TODAY], no bar. */
+enum class CarTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    TODAY("오늘", Icons.Filled.Home),
+    CALENDAR("캘린더", Icons.Filled.DateRange),
+    PEOPLE("같이 탈 사람", Icons.Filled.Person),
+}
 
 private val Corner = RoundedCornerShape(4.dp)
 
-/** Driver-side tab rail: big text tabs, the chosen one bold with a bar (no colour: blue is only for where the car goes). */
+/**
+ * The tab bar (정원 2026-10-31, 넷플릭스 하단 바 참고): one dark rounded bar floating at the bottom centre,
+ * icon over label, the chosen tab on a lighter rounded patch. The bar is the one place that is round —
+ * it reads as "move between screens", not as content.
+ */
 @Composable
-fun TabRail(tab: CarTab, onTab: (CarTab) -> Unit) {
+fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifier) {
     val c = LocalCarColors.current
-    Row(Modifier.fillMaxHeight()) {
-        Column(Modifier.width(150.dp).fillMaxHeight().padding(top = 12.dp)) {
-            CarTab.entries.forEach { t ->
-                val on = t == tab
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 96.dp).clickable { onTab(t) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.width(6.dp).height(48.dp).background(if (on) c.ink else c.bg))
-                    Text(t.label, color = if (on) c.ink else c.soft, fontSize = 26.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(start = 22.dp))
-                }
+    val bar = if (c.dark) Color(0xFF313236) else Color(0xFF26272B)
+    val chosen = if (c.dark) Color(0xFF4A4B50) else Color(0xFF45464C)
+    Row(
+        modifier
+            .shadow(12.dp, RoundedCornerShape(50))
+            .background(bar, RoundedCornerShape(50))
+            .border(1.dp, Color(0xFF44464E), RoundedCornerShape(50))
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        CarTab.entries.forEach { t ->
+            val on = t == tab
+            Column(
+                Modifier.widthIn(min = 200.dp).heightIn(min = 100.dp)
+                    .background(if (on) chosen else bar, RoundedCornerShape(50))
+                    .clickable { onTab(t) }
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+            ) {
+                androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) Color.White else Color(0xFFAAAAAB), modifier = Modifier.size(42.dp))
+                Text(t.label, color = if (on) Color.White else Color(0xFFAAAAAB), fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
             }
         }
-        VerticalDivider(color = c.line)
     }
 }
 

@@ -203,12 +203,13 @@ private fun CarHome(vm: CarHomeViewModel) {
         val restricted = vehicle.drivingRestricted
         val forceSplit by vm.previewSplit.collectAsStateWithLifecycle()
         val nextComment by vm.nextComment.collectAsStateWithLifecycle()
-        // 주차 중엔 폰 앱처럼 (정원 2026-10-31): a tab rail on the driver's side. Driving: only 오늘, no rail.
+        // 주차 중엔 폰 앱처럼 (정원 2026-10-31): a tab bar at the bottom (넷플릭스 하단 바 참고). Driving: only 오늘, no bar.
         var tab by remember { mutableStateOf(CarTab.TODAY) }
         LaunchedEffect(restricted) { if (restricted) tab = CarTab.TODAY }
-        Row(Modifier.fillMaxSize()) {
-        if (!restricted) TabRail(tab, onTab = { tab = it })
+        Column(Modifier.fillMaxSize()) {
+        Row(Modifier.weight(1f).fillMaxWidth()) {
         if (tab == CarTab.CALENDAR) CarCalendar(vm, onAdd = { d -> addDate = d; adding = true }, onGoTo = { e -> vm.goTo(e); tab = CarTab.TODAY })
+        else if (tab == CarTab.PEOPLE) CarPeople(vm)
         else BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
             // Two shapes (정원 2026-10-30): alone → wide; next to the navigation (half the app area) → the day's timeline, big.
             val wide = maxWidth >= 1100.dp
@@ -231,6 +232,10 @@ private fun CarHome(vm: CarHomeViewModel) {
                 }
             }
         // Pleos 주행 제한: buttons are disabled while moving (view only); the voice question's two buttons stay usable.
+        }
+        }
+        if (!restricted) Box(Modifier.fillMaxWidth().padding(bottom = 14.dp, top = 4.dp), contentAlignment = Alignment.Center) {
+            CarTabBar(tab, onTab = { tab = it })
         }
         }
     }
@@ -974,7 +979,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
 }
 
 /** zxing core → black-on-white bitmap. */
-private fun qrBitmap(text: String, size: Int): Bitmap {
+internal fun qrBitmap(text: String, size: Int): Bitmap {
     val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, mapOf(EncodeHintType.MARGIN to 1))
     val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     for (x in 0 until size) for (y in 0 until size) bmp.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)

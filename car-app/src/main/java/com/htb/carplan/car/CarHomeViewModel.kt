@@ -323,6 +323,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 같이 탈 사람 탭: names only (no chat, 정원 2026-10-31). Today's trip group without the owner, and the owner's friends. */
+    val memberNames: StateFlow<List<String>> = qrGroup
+        .map { g -> g?.memberIds.orEmpty().filter { it != owner.value?.uid }.map { commenterNames[it] ?: loadName(it) } }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val friendNames: StateFlow<List<String>> = owner.filterNotNull()
+        .flatMapLatest { groups.observeFriends(it.uid) }
+        .map { list -> list.map { commenterNames[it.uid] ?: loadName(it.uid) } }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun clearNotice() = navigator.clearNotice()
     fun go() = navigator.go()
     fun later() = navigator.later()
