@@ -387,7 +387,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     if (!restricted) Box(Modifier.padding(start = 12.dp)) { CarCloseButton(onClick = onEdit, label = "칸 편집") }
                 }
                 Spacer(Modifier.height(18.dp))
-                TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving)
+                TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving, detail = !moving, comments = vm.dayComments.collectAsStateWithLifecycle().value)
             } else if (todayEvents.isEmpty()) {
                 Text("오늘은 일정이 없어요", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text("폰 캘린더에 일정을 넣으면 여기로 와요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 8.dp))
@@ -715,7 +715,25 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
  * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
  */
 @Composable
-private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false) {
+private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false, detail: Boolean = false, comments: Map<String, List<StopComment>> = emptyMap()) {
+    // detail (주차 중, 정원 2026-10-31: 폰 타임라인처럼): expected times for blank slots, the planned time under a moved
+    // one, every memo, the group's comments (read-only) and the drive between places — straight-line, no API call.
+    val legs = remember(trip.stops) {
+        trip.stops.zipWithNext().associate { (a, b) ->
+            a.id to if (with(com.htb.carplan.shared.calendar.RouteMath) { a.place.hasCoords() && b.place.hasCoords() })
+                com.htb.carplan.shared.calendar.RouteMath.metersBetween(a.place.lat, a.place.lng, b.place.lat, b.place.lng).let { m -> m to com.htb.carplan.shared.calendar.RouteMath.estimateSeconds(m) }
+            else null
+        }
+    }
+    // A guess already in the past says nothing for a place still ahead (the plan ran long): leave it blank.
+    val estimated = remember(trip.stops, legs) {
+        if (!detail) emptyMap() else {
+            val now = java.time.LocalTime.now().toString().take(5)
+            com.htb.carplan.shared.calendar.Schedule.estimate(trip.stops, { id -> legs[id]?.second })
+                .filter { (id, t) -> trip.stops.firstOrNull { it.id == id }?.visited == true || t >= now }
+        }
+    }
+    val timeW = if (detail) 116.dp else if (big) 100.dp else 64.dp
     val node = if (big) 30.dp else 22.dp; val small = if (big) 24.dp else 18.dp; val rail = if (big) 64.dp else 44.dp
     val fs = if (big) 28.sp else 24.sp; val fsNext = if (big) 36.sp else 24.sp; val gap = if (big) 22.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
     val nextId = trip.next?.id
@@ -758,18 +776,36 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
                 }
             }
             Column(Modifier.weight(1f).padding(bottom = if (below != null) gap else 0.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    (times[s.id] ?: s.time)?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = if (big) 26.sp else 24.sp, modifier = Modifier.width(if (big) 100.dp else 64.dp)) }
-                    Text(s.place.name, color = color, fontSize = if (isNext) fsNext else fs, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                val shown = times[s.id] ?: s.time ?: estimated[s.id]
+                Row(verticalAlignment = Alignment.Top) {
+                    if (shown != null || detail) Column(Modifier.width(timeW)) {
+                        shown?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = if (big) 26.sp else 24.sp) }
+                        // Under a moved time, what was planned; under a guessed one, that it is a guess (폰과 같은 말).
+                        if (detail) when {
+                            times[s.id] != null && s.time != null && times[s.id] != s.time -> Text("예정 ${s.time}", color = Soft, fontSize = 20.sp)
+                            s.time == null && estimated[s.id] != null && times[s.id] == null -> Text("예상", color = Soft, fontSize = 20.sp)
+                        }
+                    }
+                    Text(s.place.name, color = color, fontSize = if (isNext) fsNext else fs, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (s.skipped) Text("  건너뜀", color = Soft, fontSize = 20.sp)
                     if (isNext && !big) Text("  다음", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
-                if (s.memo.isNotBlank() && (isNext || !big)) {
+                if (s.memo.isNotBlank() && (isNext || !big || detail)) {
                     val (tag, rest) = com.htb.carplan.shared.calendar.StopMemo.split(s.memo)
-                    Row(Modifier.padding(start = if (s.time != null) (if (big) 100.dp else 64.dp) else 0.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(start = if (detail || s.time != null) timeW else 0.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         tag?.let { Text(it, color = Soft, fontSize = 20.sp, modifier = Modifier.border(1.dp, Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
-                        if (rest.isNotBlank()) Text(rest, color = Soft, fontSize = if (big) 20.sp else 20.sp, maxLines = 1, modifier = Modifier.padding(start = if (tag != null) 8.dp else 0.dp))
+                        if (rest.isNotBlank()) Text(rest, color = Soft, fontSize = if (detail) 24.sp else 20.sp, maxLines = 1, modifier = Modifier.padding(start = if (tag != null) 8.dp else 0.dp))
                     }
+                }
+                // What the group said, as speech bubbles under the place — to read, not to answer (남기기는 폰에서).
+                if (detail) comments[s.id].orEmpty().forEach { c ->
+                    Column(Modifier.padding(start = timeW, top = 8.dp).border(1.dp, Line, Corner).padding(horizontal = 14.dp, vertical = 8.dp)) {
+                        Text(c.text, color = Ink, fontSize = 24.sp, maxLines = 3)
+                        Text(listOfNotNull(c.who, c.at).joinToString(" · "), color = Soft, fontSize = 20.sp)
+                    }
+                }
+                if (detail && below != null) legs[s.id]?.let { (m, sec) ->
+                    Text("이동 약 ${(sec / 60).coerceAtLeast(1)}분 · ${"%.1f".format(m / 1000)}km", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(start = timeW, top = 10.dp))
                 }
             }
         }

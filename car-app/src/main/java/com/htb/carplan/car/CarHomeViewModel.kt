@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -39,6 +40,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
+
+/** One comment under a stop on the car's timeline: who, what, when (HH:mm). */
+data class StopComment(val who: String, val text: String, val at: String?)
 
 /**
  * 8장 차 첫 화면. The car shows its owner's (host's) calendar: every group the
@@ -67,6 +71,18 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
             .map { c -> c?.let { (commenterNames[it.uid] ?: loadName(it.uid)) to it.text } }
     }.catch { emit(null) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val commenterNames = HashMap<String, String>()
+    /** Every comment of today's trip by stop, oldest first — read-only on the car (정원 2026-10-31: 보기만, 남기기는 폰). */
+    val dayComments: StateFlow<Map<String, List<StopComment>>> = trip.map { t -> t?.let { Triple(it.groupId, it.eventId, it.date) } }
+        .distinctUntilChanged()
+        .flatMapLatest { k ->
+            if (k == null) flowOf(emptyMap())
+            else com.htb.carplan.shared.data.TripRepository().observeDayComments(k.first, k.second, k.third).map { list ->
+                list.filter { it.stopId != null }.sortedBy { it.createdAt?.toDate()?.time ?: Long.MAX_VALUE }.map { c ->
+                    val at = c.createdAt?.toDate()?.let { d -> java.text.SimpleDateFormat("HH:mm", java.util.Locale.KOREA).format(d) }
+                    c.stopId!! to StopComment(commenterNames[c.uid] ?: loadName(c.uid), c.text, at)
+                }.groupBy({ it.first }, { it.second })
+            }
+        }.catch { emit(emptyMap()) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
     private suspend fun loadName(uid: String): String =
         runCatching { GroupRepository().user(uid)?.name }.getOrNull()?.ifBlank { null }?.also { commenterNames[uid] = it } ?: "일행"
 
