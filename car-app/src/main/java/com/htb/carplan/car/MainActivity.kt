@@ -94,7 +94,7 @@ import java.util.Locale
 // Hyundai (Pleos) system look: white ground, near-black text, hairlines, one blue accent, black primary button.
 private val Bg = Color(0xFFFFFFFF)
 private val Ink = Color(0xFF111111)
-private val Soft = Color(0xFF8A9096)
+private val Soft = Color(0xFF666C73)
 private val Line = Color(0xFFE4E6E9)
 private val Accent = Color(0xFF0066B3)
 private val Warn = Color(0xFFD9342B)
@@ -160,8 +160,17 @@ private fun CarHome(vm: CarHomeViewModel) {
         StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation)
         val sim by vm.sim.collectAsStateWithLifecycle()
         if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim, onRemoveStop = vm::testRemoveStop)
-        error?.let { Text("오류: $it", color = Warn, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
-        notice?.let { Text(it, color = Accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
+        // The driver gets one plain line; the raw message goes to the log (차 화면 원칙).
+        error?.let { raw ->
+            LaunchedEffect(raw) { android.util.Log.w("CarHome", raw) }
+            val plain = when {
+                raw.contains("PERMISSION", true) -> "서버 연결에 잠깐 문제가 있어요"
+                raw.contains("UNAVAILABLE", true) || raw.contains("network", true) -> "인터넷이 잠깐 끊겼어요"
+                else -> "문제가 생겼어요 · 잠시 뒤 다시 해 봐요"
+            }
+            Text(plain, color = Warn, fontSize = 20.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp))
+        }
+        notice?.let { Text(it, color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
             LinkCodeScreen(car?.linkCode)
             return@Column
@@ -259,7 +268,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         Stat(if (v.isEv == true) "배터리" else "연료", v.fuelPercent?.let { "${it.toInt()}%" } ?: "—")
         // At or under the alert level (설정 cars.fuelAlertPercent): say it in words, no extra colour (one accent only).
         val alertAt = car?.fuelAlertPercent?.toDouble() ?: 20.0
-        if ((v.fuelPercent ?: 101.0) <= alertAt) Text(if (v.isEv == true) "충전 필요" else "주유 필요", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.border(1.dp, Ink, Corner).padding(horizontal = 8.dp, vertical = 2.dp))
+        if ((v.fuelPercent ?: 101.0) <= alertAt) Text(if (v.isEv == true) "충전 필요" else "주유 필요", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.border(1.dp, Ink, Corner).padding(horizontal = 8.dp, vertical = 2.dp))
         v.rangeKm?.takeIf { it > 0 }?.let { Stat("주행가능", "${it.toInt()} km") }
         careDue?.let { Stat("정비", it) }
         Spacer(Modifier.weight(1f))
@@ -267,7 +276,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         if (passengers > 0) Stat("동승자", "${passengers}명")
         // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
         if (v.drivingRestricted) {
-            Text("주행 중 · 보기만", color = Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("주행 중 · 보기만", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             TextButton(onClick = onNavi) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         }
     }
@@ -289,17 +298,17 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
     val later = (1..6L).asSequence().flatMap { d -> vm.eventsOn(today.plusDays(d), week).map { today.plusDays(d) to it } }.firstOrNull()
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1.45f).fillMaxHeight().padding(horizontal = 40.dp, vertical = 28.dp).verticalScroll(rememberScrollState())) {
-            Text("오늘  ${dayTitle(today)}", color = Soft, fontSize = 18.sp)
+            Text("오늘  ${dayTitle(today)}", color = Soft, fontSize = 20.sp)
             Spacer(Modifier.height(10.dp))
             if (trip != null) {
                 Text(trip.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(18.dp))
-                TripStops(trip, big = true, times = drivenTimes(trip, live, guiding))
+                TripStops(trip, big = true, foldVisited = moving, times = drivenTimes(trip, live, guiding), driving = moving)
             } else if (todayEvents.isEmpty()) {
                 Text("오늘은 일정이 없어요", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                 Text("폰 캘린더에 일정을 넣으면 여기로 와요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 8.dp))
             }
-            if (others.isNotEmpty()) {
+            if (others.isNotEmpty() && !moving) {
                 if (trip != null) HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 22.dp))
                 others.forEach { item ->
                     val e = item.event
@@ -318,7 +327,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 prompt()
                 // A question while driving (주차장, 경로 바꾸기) must not hide where we are going and how far.
                 if (guiding && nextName != null) {
-                    Text(goingLabel, color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 24.dp))
+                    Text(goingLabel, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 24.dp))
                     Text(nextName, color = Accent, fontSize = 30.sp, fontWeight = FontWeight.Black, maxLines = 1)
                     remainText(live, trip, guiding)?.let { Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 4.dp)) }
                     LegProgress(live, nextName)
@@ -353,19 +362,19 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
             comment?.let { (who, text) ->
                 Column(Modifier.padding(top = 18.dp).fillMaxWidth().border(1.dp, Line, Corner).padding(16.dp)) {
                     Text("“$text”", color = Ink, fontSize = 24.sp, maxLines = 3)
-                    Text(who, color = Soft, fontSize = 17.sp, modifier = Modifier.padding(top = 4.dp))
+                    Text(who, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
             // While driving, the one after: what comes once this stop is done.
             trip?.remaining?.getOrNull(1)?.takeIf { guiding }?.let { after ->
                 HorizontalDivider(color = Line, modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))
-                Text("그다음", color = Soft, fontSize = 18.sp)
+                Text("그다음", color = Soft, fontSize = 20.sp)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(after.place.name, color = Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     (drivenTimes(trip, live, guiding)[after.id] ?: after.time)?.let { Text("  $it", color = Soft, fontSize = 22.sp) }
                 }
                 val more = trip.remaining.size - 2
-                if (more > 0) Text("그 뒤 ${more}곳 더", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp))
+                if (more > 0) Text("그 뒤 ${more}곳 더", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
             }
             }
             Spacer(Modifier.weight(1f))
@@ -410,7 +419,7 @@ private fun HeldLine(vm: CarHomeViewModel) {
 
 @Composable
 private fun HeldText(message: String) =
-    Text("보류 중 · ${message.substringAfter("님이 ")} · 내비는 그대로, 세우면 다시 물어요", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
+    Text("보류 중 · ${message.substringAfter("님이 ")} · 내비는 그대로, 세우면 다시 물어요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 10.dp))
 
 /** How much of this leg is behind us: a thin blue line (blue = where the car goes). The leg's length is the
  * largest distance seen since the target changed, so it needs no extra data from the navigation. */
@@ -464,7 +473,7 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
         prompt?.let { it(); Spacer(Modifier.height(18.dp)) }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (trip != null) {
-                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding))
+                TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding), driving = restricted)
                 if (trip.stops.isNotEmpty() && trip.next == null) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 18.dp))
             } else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
         }
@@ -504,7 +513,7 @@ private fun MoreDialog(guidingNext: String?, hasTrip: Boolean, onPick: (String) 
 @Composable
 private fun Stat(label: String, value: String) {
     Row(verticalAlignment = Alignment.Bottom) {
-        Text(label, color = Soft, fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp, bottom = 3.dp))
+        Text(label, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(end = 8.dp, bottom = 3.dp))
         Text(value, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -516,7 +525,7 @@ private fun LinkCodeScreen(code: String?) {
         Spacer(Modifier.height(24.dp))
         Text(code?.chunked(3)?.joinToString(" ") ?: "…", color = Ink, fontSize = 96.sp, fontWeight = FontWeight.Black, letterSpacing = 8.sp)
         Spacer(Modifier.height(16.dp))
-        Text("이 차의 차주가 일정의 호스트가 됩니다", color = Soft, fontSize = 18.sp)
+        Text("이 차의 차주가 일정의 호스트가 됩니다", color = Soft, fontSize = 20.sp)
     }
 }
 
@@ -532,6 +541,21 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
     val pickup = p.reason == PromptReason.PICKUP
     val commute = p.reason == PromptReason.COMMUTE
     val parking = p.reason == PromptReason.PARKING
+    if (p.single) {
+        // 차 화면 원칙: a notice with one button — spoken already, nothing to answer; [닫기] just hides it.
+        Column(Modifier.fillMaxWidth().background(Ink, Corner).padding(if (compact) 22.dp else 28.dp)) {
+            Text(p.message.orEmpty(), color = Color.White, fontSize = if (compact) 30.sp else 36.sp, lineHeight = if (compact) 38.sp else 44.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button(
+                    onClick = onGo, modifier = Modifier.weight(1f).height(if (compact) 76.dp else 88.dp), shape = Corner,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink),
+                ) { Text(p.button ?: "찾기", fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+                TextButton(onClick = onLater, modifier = Modifier.padding(start = 8.dp)) { Text("닫기", color = Color(0xFFB8BDC2), fontSize = 22.sp) }
+            }
+        }
+        return
+    }
     val question = when { fuel || commute || parking -> p.message.orEmpty(); change -> "${p.message}. 경로를 바꿀까요?"; else -> "다음 목적지 ${TripNavigator.withRo(p.stop.place.name)} 갈까요?" }
     val hint = when {
         p.listening -> "듣는 중 · \"응\" 또는 \"아니\""
@@ -542,7 +566,7 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
     val no = when { pickup -> "공유 없이"; fuel || parking -> "아니요"; change -> "그대로"; else -> "나중에" }
     Column(Modifier.fillMaxWidth().background(Ink, Corner).padding(if (compact) 22.dp else 28.dp)) {
         Text(question, color = Color.White, fontSize = if (compact) 30.sp else 36.sp, lineHeight = if (compact) 38.sp else 44.sp, fontWeight = FontWeight.Bold)
-        Text(hint, color = Color(0xFFB8BDC2), fontSize = 18.sp, modifier = Modifier.padding(top = 6.dp, bottom = 18.dp))
+        Text(hint, color = Color(0xFFB8BDC2), fontSize = 20.sp, modifier = Modifier.padding(top = 6.dp, bottom = 18.dp))
         val btn: @Composable (String, Boolean, () -> Unit, Modifier) -> Unit = { label, primary, onClick, m ->
             Button(
                 onClick = onClick, modifier = m.height(if (compact) 76.dp else 88.dp).then(if (primary) Modifier else Modifier.border(1.dp, Color(0xFF55595E), Corner)), shape = Corner,
@@ -555,7 +579,7 @@ private fun PromptPanel(p: NextPrompt, compact: Boolean, onGo: () -> Unit, onLat
 }
 
 @Composable
-private fun SectionTitle(text: String) = Text(text, color = Soft, fontSize = 16.sp, modifier = Modifier.padding(bottom = 10.dp))
+private fun SectionTitle(text: String) = Text(text, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 10.dp))
 
 @Composable
 private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: CalendarEvent?, trip: TodayTrip?, modifier: Modifier) {
@@ -573,7 +597,7 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
                 Column {
                     val care = e.categoryId == com.htb.carplan.shared.model.BuiltInCategory.CAR.id
                     Text(if (care) "차량 관리 · ${e.title}" else e.title, color = if (care) Soft else Ink, fontSize = if (hot) 28.sp else if (care) 20.sp else 24.sp, fontWeight = if (hot) FontWeight.Bold else FontWeight.Normal)
-                    if (isTrip) TripStops(trip!!) else e.place?.name?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = 19.sp) }
+                    if (isTrip) TripStops(trip!!) else e.place?.name?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = 21.sp) }
                 }
             }
         }
@@ -585,16 +609,20 @@ private fun TodayList(today: LocalDate, events: List<CalendarEvent>, next: Calen
  * The only motion on the car screen: the rail segment fills down when a stop is reached (Design for Driving).
  */
 @Composable
-private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap()) {
+private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolean = false, times: Map<String, String> = emptyMap(), driving: Boolean = false) {
     val node = if (big) 30.dp else 22.dp; val small = if (big) 24.dp else 18.dp; val rail = if (big) 64.dp else 44.dp
     val fs = if (big) 28.sp else 21.sp; val fsNext = if (big) 34.sp else 21.sp; val gap = if (big) 22.dp else 10.dp; val cyDp = if (big) 22.dp else 15.dp
     val nextId = trip.next?.id
-    if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 · 폰에서 추가", color = Soft, fontSize = 19.sp)
+    if (trip.stops.isEmpty()) Text("장소 칸이 아직 없어요 · 폰에서 추가", color = Soft, fontSize = 21.sp)
     val visitedCount = trip.stops.count { it.visited }
     val hidden = if (foldVisited && visitedCount > 1) visitedCount - 1 else 0
-    if (hidden > 0) Text("✓  앞의 ${hidden}곳 다녀옴", color = Soft, fontSize = if (big) 20.sp else 16.sp, modifier = Modifier.padding(start = rail, bottom = 10.dp))
+    if (hidden > 0) Text("✓  앞의 ${hidden}곳 다녀옴", color = Soft, fontSize = if (big) 20.sp else 20.sp, modifier = Modifier.padding(start = rail, bottom = 10.dp))
+    // 차 화면 원칙: while moving, only what the driver needs — the next stop and the one after; the rest is for the phones.
+    val nextIdx = trip.stops.indexOfFirst { it.id == nextId }
+    val lastShown = if (driving && nextIdx >= 0) nextIdx + 1 else Int.MAX_VALUE
+    val more = if (lastShown < Int.MAX_VALUE) (trip.stops.size - 1 - lastShown).coerceAtLeast(0) else 0
     trip.stops.forEachIndexed { i, s ->
-        if (i < hidden) return@forEachIndexed
+        if (i < hidden || i > lastShown) return@forEachIndexed
         val isNext = s.id == nextId
         val color = when { s.visited -> Soft; isNext -> Accent; else -> Ink }
         val below = trip.stops.getOrNull(i + 1)
@@ -626,18 +654,19 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     (times[s.id] ?: s.time)?.let { Text(it, color = if (isNext) Accent else Soft, fontSize = if (big) 22.sp else 21.sp, modifier = Modifier.width(if (big) 84.dp else 64.dp)) }
                     Text(s.place.name, color = color, fontSize = if (isNext) fsNext else fs, fontWeight = if (isNext) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
-                    if (isNext && !big) Text("  다음", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    if (isNext && !big) Text("  다음", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
                 if (s.memo.isNotBlank() && (isNext || !big)) {
                     val (tag, rest) = com.htb.carplan.shared.calendar.StopMemo.split(s.memo)
                     Row(Modifier.padding(start = if (s.time != null) (if (big) 84.dp else 64.dp) else 0.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         tag?.let { Text(it, color = Soft, fontSize = if (big) 15.sp else 12.sp, modifier = Modifier.border(1.dp, Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
-                        if (rest.isNotBlank()) Text(rest, color = Soft, fontSize = if (big) 20.sp else 17.sp, maxLines = 1, modifier = Modifier.padding(start = if (tag != null) 8.dp else 0.dp))
+                        if (rest.isNotBlank()) Text(rest, color = Soft, fontSize = if (big) 20.sp else 20.sp, maxLines = 1, modifier = Modifier.padding(start = if (tag != null) 8.dp else 0.dp))
                     }
                 }
             }
         }
     }
+    if (more > 0) Text("그 뒤 ${more}곳 더", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(start = rail, top = 6.dp))
 }
 
 @Composable
@@ -652,9 +681,9 @@ private fun WeekList(vm: CarHomeViewModel, week: List<CalendarEvent>, modifier: 
                 Text(
                     "${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}",
                     Modifier.width(76.dp),
-                    color = if (isToday) Accent else Soft, fontSize = 19.sp, fontWeight = FontWeight.SemiBold,
+                    color = if (isToday) Accent else Soft, fontSize = 21.sp, fontWeight = FontWeight.SemiBold,
                 )
-                Text(items.joinToString(", ") { it.event.title }.ifEmpty { "—" }, color = if (items.isEmpty()) Soft else Ink, fontSize = 19.sp, maxLines = 2)
+                Text(items.joinToString(", ") { it.event.title }.ifEmpty { "—" }, color = if (items.isEmpty()) Soft else Ink, fontSize = 21.sp, maxLines = 2)
             }
         }
     }
@@ -730,10 +759,10 @@ private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Un
                     Button(onClick = { onPick(st) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
                         Text(st.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         Text("${"%,d".format(st.price)}원", fontSize = 22.sp, color = Accent, fontWeight = FontWeight.Bold)
-                        Text("  ${if (st.meters >= 1000) "%.1fkm".format(st.meters / 1000.0) else "${st.meters}m"}", fontSize = 18.sp, color = Soft)
+                        Text("  ${if (st.meters >= 1000) "%.1fkm".format(st.meters / 1000.0) else "${st.meters}m"}", fontSize = 20.sp, color = Soft)
                     }
                 }
-                Text("고르면 다음 경유지로 들어가고, 그다음 원래 일정으로 이어져요", fontSize = 16.sp, color = Soft)
+                Text("고르면 다음 경유지로 들어가고, 그다음 원래 일정으로 이어져요", fontSize = 20.sp, color = Soft)
             }
     }
 }
@@ -742,16 +771,16 @@ private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Un
 @Composable
 private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onStop: () -> Unit, onRemoveStop: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("시뮬레이션", color = Soft, fontSize = 18.sp)
+        Text("시뮬레이션", color = Soft, fontSize = 20.sp)
         Text(sim.phase, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         sim.remainMeters?.let { Text(if (it >= 1000) "%.1f km".format(it / 1000.0) else "$it m", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold) }
-        if (!sim.viaConsole) Text("콘솔 없이", color = Soft, fontSize = 16.sp)
+        if (!sim.viaConsole) Text("콘솔 없이", color = Soft, fontSize = 20.sp)
         Spacer(Modifier.weight(1f))
         // 10장 check while driving (the menu is closed in D): a passenger takes a stop out on their phone.
-        OutlinedButton(onClick = onRemoveStop, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text("칸 하나 빼기", color = Ink, fontSize = 18.sp) }
-        OutlinedButton(onClick = onPause, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.paused) "계속" else "일시정지", color = Ink, fontSize = 18.sp) }
-        OutlinedButton(onClick = onSpeed, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.speedX == 1) "2배속" else "1배속", color = Ink, fontSize = 18.sp) }
-        TextButton(onClick = onStop) { Text("끝", color = Soft, fontSize = 18.sp) }
+        OutlinedButton(onClick = onRemoveStop, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text("칸 하나 빼기", color = Ink, fontSize = 20.sp) }
+        OutlinedButton(onClick = onPause, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.paused) "계속" else "일시정지", color = Ink, fontSize = 20.sp) }
+        OutlinedButton(onClick = onSpeed, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Line)) { Text(if (sim.speedX == 1) "2배속" else "1배속", color = Ink, fontSize = 20.sp) }
+        TextButton(onClick = onStop) { Text("끝", color = Soft, fontSize = 20.sp) }
     }
     HorizontalDivider(color = Line)
 }
@@ -761,33 +790,33 @@ private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onSt
 private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit) {
     CarDialog(onDismiss = onDismiss, title = "시연 메뉴", buttons = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) } }) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("연료/배터리  지금 ${v.fuelPercent?.toInt() ?: "—"}%  ·  ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"}", fontSize = 18.sp, color = Soft)
+                Text("연료/배터리  지금 ${v.fuelPercent?.toInt() ?: "—"}%  ·  ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"}", fontSize = 20.sp, color = Soft)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(10.0, 20.0, 50.0, 100.0).forEach { p -> FilterChip(selected = v.fuelPercent == p, onClick = { vm.setFuelOverride(p) }, shape = Corner, colors = chipColors(), label = { Text("${p.toInt()}%", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) }) }
-                    FilterChip(selected = false, onClick = { vm.setFuelOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                    listOf(10.0, 20.0, 50.0, 100.0).forEach { p -> FilterChip(selected = v.fuelPercent == p, onClick = { vm.setFuelOverride(p) }, shape = Corner, colors = chipColors(), label = { Text("${p.toInt()}%", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) }) }
+                    FilterChip(selected = false, onClick = { vm.setFuelOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = v.isEv == false, onClick = { vm.setEvOverride(false) }, shape = Corner, colors = chipColors(), label = { Text("연료차로", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
-                    FilterChip(selected = v.isEv == true, onClick = { vm.setEvOverride(true) }, shape = Corner, colors = chipColors(), label = { Text("전기차로", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
-                    FilterChip(selected = false, onClick = { vm.setEvOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                    FilterChip(selected = v.isEv == false, onClick = { vm.setEvOverride(false) }, shape = Corner, colors = chipColors(), label = { Text("연료차로", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
+                    FilterChip(selected = v.isEv == true, onClick = { vm.setEvOverride(true) }, shape = Corner, colors = chipColors(), label = { Text("전기차로", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
+                    FilterChip(selected = false, onClick = { vm.setEvOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
                 }
                 HorizontalDivider(color = Line)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("시뮬레이션 재생", fontSize = 18.sp) }
-                    TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 18.sp, color = Soft) }
-                    if (vm.guiding.value) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 18.sp, color = Ink) }
-                    TextButton(onClick = { vm.makeTestTrip() }) { Text(if (vm.trip.value?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 18.sp, color = Ink) }
+                    Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink)) { Text("시뮬레이션 재생", fontSize = 20.sp) }
+                    TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 20.sp, color = Soft) }
+                    if (vm.guiding.value) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.makeTestTrip() }) { Text(if (vm.trip.value?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 20.sp, color = Ink) }
                 }
-                Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 16.sp, color = Soft)
-                Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 16.sp, color = Soft)
+                Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 20.sp, color = Soft)
+                Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 20.sp, color = Soft)
                 HorizontalDivider(color = Line)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 18.sp, color = Ink) }
-                    Text("매일 반복 · 장소 회사. 오늘 남은 여행이 없을 때 \"회사로 갈까요?\"", fontSize = 16.sp, color = Soft)
+                    TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 20.sp, color = Ink) }
+                    Text("매일 반복 · 장소 회사. 오늘 남은 여행이 없을 때 \"회사로 갈까요?\"", fontSize = 20.sp, color = Soft)
                 }
                 HorizontalDivider(color = Line)
                 val split by vm.previewSplit.collectAsStateWithLifecycle()
-                FilterChip(selected = split, onClick = { vm.previewSplit.value = !split }, shape = Corner, colors = chipColors(), label = { Text("반반 미리보기 (내비 옆 화면)", fontSize = 18.sp, modifier = Modifier.padding(6.dp)) })
+                FilterChip(selected = split, onClick = { vm.previewSplit.value = !split }, shape = Corner, colors = chipColors(), label = { Text("반반 미리보기 (내비 옆 화면)", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
             }
     }
 }
@@ -821,13 +850,13 @@ private fun CarAddDialog(onSave: (Event) -> Unit, onDismiss: () -> Unit) {
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, color = Ink), modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(18.dp))
-            Text("언제", color = Soft, fontSize = 18.sp)
+            Text("언제", color = Soft, fontSize = 20.sp)
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf("오늘" to 0L, "내일" to 1L, "모레" to 2L).forEach { (label, off) ->
                     FilterChip(selected = dayOffset == off, onClick = { dayOffset = off }, shape = Corner, colors = chipColors(), label = { Text(label, fontSize = 22.sp, modifier = Modifier.padding(10.dp)) })
                 }
             }
-            Text("몇 시", color = Soft, fontSize = 18.sp, modifier = Modifier.padding(top = 14.dp))
+            Text("몇 시", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 14.dp))
             Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilterChip(selected = hour == null, onClick = { hour = null }, shape = Corner, colors = chipColors(), label = { Text("종일", fontSize = 22.sp, modifier = Modifier.padding(10.dp)) })
                 (6..22).forEach { h -> FilterChip(selected = hour == h, onClick = { hour = h }, shape = Corner, colors = chipColors(), label = { Text("${h}시", fontSize = 22.sp, modifier = Modifier.padding(10.dp)) }) }

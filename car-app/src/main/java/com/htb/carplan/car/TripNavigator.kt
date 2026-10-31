@@ -84,7 +84,11 @@ data class NaviLive(
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
  * "정원님이 서현역을 뺐어요" and the buttons read 바꾸기 / 그대로 instead of 가기 / 나중에.
  */
-data class NextPrompt(val stop: Stop, val reason: PromptReason, val listening: Boolean = false, val heard: String? = null, val message: String? = null)
+data class NextPrompt(
+    val stop: Stop, val reason: PromptReason, val listening: Boolean = false, val heard: String? = null, val message: String? = null,
+    /** 차 화면 원칙 (정원 2026-10-31): not a question — spoken once, one big button ([button]) does the finding, nothing to answer. */
+    val single: Boolean = false, val button: String? = null,
+)
 
 /**
  * 9장 "다음 목적지로 갈까요?" + 10장 일정 변경 → 내비 갱신.
@@ -315,6 +319,7 @@ class TripNavigator(
                     val id = records.addRecord(t.groupId, t.eventId, today, Record(place = next.place, stopId = next.id, createdBy = carUid))
                     parkedRecord = Triple(t.groupId, t.eventId, id); parkedDate = today
                     _notice.value = "기록 칸: ${next.place.name} ($reason)"
+                    scope.launch { voice.say("${next.place.name} 도착. 기록 남겼어요.") }
                     onArrived() // ✓ + refill route
                 } else {
                     // 13장: "건천휴게소" rather than the navigation's street address, when Kakao knows the spot.
@@ -327,6 +332,7 @@ class TripNavigator(
                     val id = records.addRecord(g, e, today, Record(place = place, unplanned = true, createdBy = carUid))
                     parkedRecord = Triple(g, e, id); parkedDate = today
                     _notice.value = "계획 밖 기록 칸: ${place.name} ($reason)"
+                    scope.launch { voice.say("계획에 없던 곳이에요. ${place.name}에 기록 남겼어요.") }
                 }
             }.onFailure { _error.value = it.message }
         }
@@ -412,17 +418,11 @@ class TripNavigator(
         val what = if (ev) "충전소" else "주유소"
         // A range of 0 means the car does not report one (the emulator): fall back to the percent wording.
         val why = if (remainingKm != null && range != null && range > 0 && _guiding.value) "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요" else "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
-        val message = "$why. ${what} 들를까요?"
+        // Not a question (차 화면 원칙): say it once, leave one button; passengers can look on their phones.
+        val message = "$why. ${what}${ga(what)} 필요해요."
         askJob?.cancel()
-        _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message)
-        askJob = scope.launch {
-            val answer = voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
-            when (answer) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
-            }
-        }
+        _prompt.value = NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")
+        askJob = scope.launch { voice.say(message) }
     }
 
     private fun askFueled(ev: Boolean) {
@@ -618,15 +618,9 @@ class TripNavigator(
     /** 12장: five minutes out — passengers get a push; the car offers the navigation's own parking search. */
     private fun askParking(next: Stop) {
         if (_prompt.value != null) return
-        val message = "곧 ${next.place.name} 도착이에요. 근처 주차장 찾아볼까요?"
-        _prompt.value = NextPrompt(next, PromptReason.PARKING, message = message)
-        askJob = scope.launch {
-            when (voice.ask(message) { listening, heard -> _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }) {
-                VoicePrompt.Answer.YES -> go()
-                VoicePrompt.Answer.NO -> later()
-                VoicePrompt.Answer.UNKNOWN -> _prompt.update { it?.copy(listening = false) }
-            }
-        }
+        val message = "곧 ${next.place.name} 도착이에요."
+        _prompt.value = NextPrompt(next, PromptReason.PARKING, message = message, single = true, button = "근처 주차장 찾기")
+        askJob = scope.launch { voice.say(message) }
     }
 
     /** "응" / [가기] (9장) or [바꾸기] (10장): route the remaining stops and open the navigation. */
@@ -963,6 +957,13 @@ class TripNavigator(
                 moved -> "순서를 바꿨어요"
                 else -> null
             }
+        }
+
+        /** "충전소가" / "주유소가" / "휴게소가" — 이/가 by the last syllable's final consonant. */
+        private fun ga(name: String): String {
+            val last = name.lastOrNull() ?: return "가"
+            if (last !in '가'..'힣') return "이(가)"
+            return if ((last - '가') % 28 == 0) "가" else "이"
         }
 
         private fun eul(name: String): String {
