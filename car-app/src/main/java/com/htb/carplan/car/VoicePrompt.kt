@@ -71,6 +71,17 @@ class VoicePrompt(context: Context) {
         Answer.UNKNOWN
     }
 
+    /** ⑧ 음성 명령: say [prompt], then listen once; null when nothing was heard (or there is no STT). */
+    suspend fun listenOnce(prompt: String, onListening: (Boolean) -> Unit = {}): String? = lock.withLock {
+        speak(prompt)
+        if (!sttReady) return null
+        onListening(true)
+        val heard = listen(LISTEN_MS)
+        onListening(false)
+        Log.i(TAG, "command heard='$heard'")
+        heard
+    }
+
     /** Speaks [text] and returns when playback is done (or at once when TTS is unavailable). */
     suspend fun say(text: String) = lock.withLock { speak(text) }
 

@@ -177,9 +177,9 @@ class DriveSimulator(
         while (done < 1.0) {
             delay(TICK_MS)
             if (_state.value.paused) { speed(0); continue }
-            // The driver picked a petrol station: the navigation now leads there first — this leg is over.
+            // The navigation now leads somewhere else (a station picked, a stop skipped or removed): this leg is over.
             val nowEntry = navigator.simTarget()
-            if (nowEntry != null && nowEntry.kind == NaviEntry.Kind.STATION && startEntry?.kind != NaviEntry.Kind.STATION) return false
+            if (startEntry != null && (nowEntry == null || nowEntry.kind != startEntry.kind || nowEntry.id != startEntry.id)) return false
             done = (done + TICK_MS * _state.value.speedX / screenMs).coerceAtMost(1.0)
             val at = pointAt(path, cum, total * done)
             val remainM = (total * (1 - done)).toInt()

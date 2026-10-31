@@ -280,6 +280,10 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun go() = navigator.go()
     fun later() = navigator.later()
     fun askNow() = navigator.askNow()
+    val voiceState: StateFlow<VoiceState> = navigator.voiceState
+    fun listen() = navigator.listenForCommand()
+    fun runCommand(c: VoiceCommand) = navigator.runCommand(c)
+    fun closeVoice() = navigator.closeVoice()
     fun debugArrive() = navigator.debugArrive()
 
     /** 차에서 일정 만들기 (Q19), parked only. Goes to the owner's solo group. */

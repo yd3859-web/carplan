@@ -166,7 +166,9 @@ private fun CarHome(vm: CarHomeViewModel) {
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
-        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation)
+        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen)
+        val voiceState by vm.voiceState.collectAsStateWithLifecycle()
+        VoiceBar(voiceState, onCommand = vm::runCommand, onClose = vm::closeVoice)
         val sim by vm.sim.collectAsStateWithLifecycle()
         if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim, onRemoveStop = vm::testRemoveStop)
         // The driver gets one plain line; the raw message goes to the log (차 화면 원칙).
@@ -267,7 +269,7 @@ private fun chipColors(): SelectableChipColors = FilterChipDefaults.filterChipCo
 )
 
 @Composable
-private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit) {
+private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
@@ -283,6 +285,10 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         Spacer(Modifier.weight(1f))
         groupName?.let { Stat("그룹", it) }
         if (passengers > 0) Stat("동승자", "${passengers}명")
+        // ⑧ 음성 명령: always there, driving included — speaking is how the driver changes things on the move.
+        OutlinedButton(onClick = onListen, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Ink), modifier = Modifier.height(52.dp)) {
+            Text("말하기", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
         // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
         if (v.drivingRestricted) {
             Text("주행 중 · 보기만", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -764,6 +770,31 @@ private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Un
                 }
                 Text("고르면 다음 경유지로 들어가고, 그다음 원래 일정으로 이어져요", fontSize = 20.sp, color = Soft)
             }
+    }
+}
+
+/**
+ * ⑧ [말하기]: "듣는 중" while the mic is open; when nothing was understood, the commands it knows as big buttons
+ * for a few seconds (Q21: the buttons are the fallback for voice).
+ */
+@Composable
+private fun VoiceBar(state: VoiceState, onCommand: (VoiceCommand) -> Unit, onClose: () -> Unit) {
+    if (!state.listening && !state.choices) return
+    Column(Modifier.fillMaxWidth().background(Band).padding(horizontal = 32.dp, vertical = 14.dp)) {
+        if (state.listening) {
+            Text("듣는 중 · \"주유소\" \"주차장\" \"다음 어디야\" \"건너뛰기\" \"원래대로\"", color = OnBand, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(state.heard?.takeIf { it.isNotBlank() }?.let { "들은 말 \"$it\" · 골라 주세요" } ?: "골라 주세요", color = BandSoft, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClose) { Text("닫기", color = BandSoft, fontSize = 20.sp) }
+            }
+            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(VoiceCommand.FUEL to "주유소", VoiceCommand.PARKING to "주차장", VoiceCommand.WHERE to "다음 어디", VoiceCommand.SKIP to "건너뛰기", VoiceCommand.REVERT to "원래대로").forEach { (c, label) ->
+                    Button(onClick = { onCommand(c) }, modifier = Modifier.weight(1f).height(72.dp), shape = Corner,
+                        colors = ButtonDefaults.buttonColors(containerColor = OnBand, contentColor = Color(0xFF111111))) { Text(label, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+                }
+            }
+        }
     }
 }
 

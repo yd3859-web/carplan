@@ -66,6 +66,9 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
 }
 
 /** One place the navigation is driving to right now, in order (묶음 2: 칸·픽업·주유소가 한 목록). */
+/** [말하기] on screen: the mic is open, or the known commands are shown as buttons (nothing understood). */
+data class VoiceState(val listening: Boolean = false, val choices: Boolean = false, val heard: String? = null)
+
 data class NaviEntry(val kind: Kind, val id: String, val place: Place) { enum class Kind { STOP, PICKUP, STATION } }
 
 enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE, PARKING }
@@ -304,6 +307,8 @@ class TripNavigator(
 
     private fun takeNext() {
         if (_prompt.value != null) return
+        // A start question that waited is stale once the car is already guiding (it was answered by another one).
+        if (_guiding.value) waiting.removeAll { it.first.reason in START_REASONS }
         val (p, start) = waiting.removeFirstOrNull() ?: return
         _prompt.value = p
         start()
@@ -400,6 +405,68 @@ class TripNavigator(
 
     /** The 🎤 button: ask again now. */
     fun askNow() = ask(PromptReason.MANUAL)
+
+    // ---------- ⑧ 음성 명령 ----------
+
+    private val _voice = MutableStateFlow(VoiceState())
+    /** [말하기] on the car screen: listening, or showing the commands it knows after it did not understand. */
+    val voiceState: StateFlow<VoiceState> = _voice.asStateFlow()
+    private var voiceJob: Job? = null
+
+    /** [말하기]: listen once and do what was said; nothing understood → say the commands and show them as buttons. */
+    fun listenForCommand() {
+        voiceJob?.cancel()
+        // The driver pressed [말하기]: a question still listening lets go of the mic (its buttons stay, Q21).
+        if (_prompt.value?.single != true) { askJob?.cancel(); _prompt.update { it?.copy(listening = false) } }
+        voiceJob = scope.launch {
+            _voice.value = VoiceState(listening = true)
+            val heard = voice.listenOnce("말씀하세요.") { on -> _voice.update { it.copy(listening = on) } }
+            val cmd = VoiceCommand.parse(heard)
+            if (cmd != null) { _voice.value = VoiceState(); runCommand(cmd); return@launch }
+            _voice.value = VoiceState(choices = true, heard = heard)
+            voice.say(if (heard.isNullOrBlank()) VoiceCommand.HELP else "잘 못 들었어요. ${VoiceCommand.HELP}")
+            delay(VOICE_CHOICES_MS)
+            _voice.update { if (it.choices) VoiceState() else it }
+        }
+    }
+
+    fun closeVoice() { voiceJob?.cancel(); _voice.value = VoiceState() }
+
+    /** One spoken (or tapped) command. Each answers out loud — the driver is not looking. */
+    fun runCommand(cmd: VoiceCommand) {
+        _voice.value = VoiceState()
+        val t = trip.value
+        when (cmd) {
+            VoiceCommand.FUEL -> { scope.launch { voice.say(if (carState.isEv == true) "충전소를 찾을게요." else "주유소를 찾을게요.") }; fuelPlan?.let { goViaStation(it) } ?: findStation() }
+            VoiceCommand.PARKING -> { scope.launch { voice.say("근처 주차장을 찾을게요.") }; router.search("주차장") }
+            VoiceCommand.WHERE -> scope.launch { voice.say(whereSentence(t)) }
+            VoiceCommand.REVERT -> if (previousRoute.isNotEmpty() && _guiding.value) revertRoute() else scope.launch { voice.say("되돌릴 경로가 없어요.") }
+            VoiceCommand.SKIP -> skipNext(t)
+            VoiceCommand.START -> if (_guiding.value) scope.launch { voice.say("이미 안내 중이에요. ${whereSentence(t)}") } else if (t?.next != null) go() else scope.launch { voice.say("오늘 갈 곳이 없어요.") }
+        }
+    }
+
+    /** "다음은 율동공원, 12분 뒤 15:23 도착이에요. 그다음은 정자역이에요." */
+    private fun whereSentence(t: TodayTrip?): String {
+        val next = t?.next ?: return "오늘 남은 일정이 없어요."
+        val secs = _live.value.remainSeconds?.takeIf { _guiding.value }
+        val eta = secs?.let { LocalTime.now().plusSeconds(it.toLong()) }?.let { "%d시 %d분".format(it.hour, it.minute) }
+        val time = if (secs != null && eta != null) " ${(secs / 60).coerceAtLeast(1)}분 뒤 $eta 도착이에요." else next.time?.let { " $it 예정이에요." } ?: "예요."
+        val after = t.remaining.getOrNull(1)?.let { " 그다음은 ${it.place.name}이에요." }.orEmpty()
+        return "다음은 ${next.place.name}.$time$after"
+    }
+
+    /** "건너뛰어": the next stop is ticked off without a record and the navigation goes on to the one after. */
+    private fun skipNext(t: TodayTrip?) {
+        val next = t?.next ?: run { scope.launch { voice.say("건너뛸 곳이 없어요.") }; return }
+        val after = t.remaining.filterNot { it.id == next.id }
+        scope.launch {
+            voice.say("${next.place.name}은 건너뛸게요." + (after.firstOrNull()?.let { " ${withRo(it.place.name)} 갈게요." } ?: ""))
+            runCatching { trips.setVisited(t.groupId, t.eventId, t.date, next.id, true, t.stops.indexOfFirst { it.id == after.firstOrNull()?.id }.coerceAtLeast(0)) }
+            if (after.isEmpty()) { router.route(emptyList()); inNavi = emptyList(); _guiding.value = false; return@launch }
+            if (_guiding.value) sendRoute(t.copy(stops = t.stops.map { if (it.id == next.id) it.copy(visited = true) else it }))
+        }
+    }
 
     /** 16장: a commute is due now. Asked once per day unless there is a trip (9장 asks first). */
     fun offerCommute(e: Event) {
@@ -724,6 +791,7 @@ class TripNavigator(
             return
         }
         if (_prompt.value?.reason == PromptReason.ROUTE_CHANGE) { revertRoute(); return }
+        waiting.removeAll { it.first.reason in START_REASONS } // one "가기" answers every start question
         val wasPickup = _prompt.value?.reason == PromptReason.PICKUP
         val t = trip.value ?: return
         if (wasPickup) startSharing(t)
@@ -1046,6 +1114,9 @@ class TripNavigator(
         private const val SAME_PARKING_MS = 30 * 60_000L
         /** Kakao Mobility fallback for the ETA when the navigation gives no driving info: at most this often. */
         private const val KAKAO_ETA_MIN_MS = 5 * 60_000L
+        private val START_REASONS = setOf(PromptReason.APP_START, PromptReason.GEAR_D, PromptReason.MANUAL, PromptReason.PICKUP)
+        /** How long the command buttons stay after [말하기] did not understand. */
+        private const val VOICE_CHOICES_MS = 10_000L
         /** How often the car's ETA goes to the day document at most (묶음 5). */
         private const val ETA_PUBLISH_MS = 20_000L
         /** ETA refresh while guiding (navigation driving info; Kakao only as the fallback above). */
