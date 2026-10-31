@@ -62,20 +62,21 @@ enum class CarTab(val label: String, val icon: androidx.compose.ui.graphics.vect
 private val Corner = RoundedCornerShape(4.dp)
 
 /**
- * The tab bar (정원 2026-10-31, 넷플릭스 하단 바 참고): one dark rounded bar floating at the bottom centre,
- * icon over label, the chosen tab on a lighter rounded patch. The bar is the one place that is round —
+ * The tab bar (정원 2026-10-31, 넷플릭스 하단 바 참고): one rounded bar floating at the bottom centre,
+ * icon over label, the chosen tab on a grey rounded patch. The bar is the one place that is round —
  * it reads as "move between screens", not as content.
  */
 @Composable
 fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifier) {
     val c = LocalCarColors.current
-    val bar = if (c.dark) Color(0xFF313236) else Color(0xFF26272B)
-    val chosen = if (c.dark) Color(0xFF4A4B50) else Color(0xFF45464C)
+    // Same colours as the rest of the screen (Pleos light/dark): a white bar by day, the popup grey by night.
+    val bar = if (c.dark) c.sheet else c.bg
+    val chosen = if (c.dark) c.sheetEdge else c.sheet
     Row(
         modifier
             .shadow(12.dp, RoundedCornerShape(50))
             .background(bar, RoundedCornerShape(50))
-            .border(1.dp, Color(0xFF44464E), RoundedCornerShape(50))
+            .border(1.dp, c.sheetEdge, RoundedCornerShape(50))
             .padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -88,8 +89,8 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
                     .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
             ) {
-                androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) Color.White else Color(0xFFAAAAAB), modifier = Modifier.size(42.dp))
-                Text(t.label, color = if (on) Color.White else Color(0xFFAAAAAB), fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) c.ink else c.soft, modifier = Modifier.size(42.dp))
+                Text(t.label, color = if (on) c.ink else c.soft, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
             }
         }
     }
