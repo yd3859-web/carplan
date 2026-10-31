@@ -244,6 +244,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun clearNotice() = navigator.clearNotice()
     fun go() = navigator.go()
     fun later() = navigator.later()
     fun askNow() = navigator.askNow()

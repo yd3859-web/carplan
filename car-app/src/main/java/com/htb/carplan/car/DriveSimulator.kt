@@ -9,6 +9,7 @@ import com.htb.carplan.shared.net.KakaoApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,9 +62,11 @@ class DriveSimulator(
             if (viaConsole) heartbeat = scope.launch { while (isActive) { console.heartbeat(); delay(1_000) } }
             navigator.simActive = true
             try { runDay() } finally {
+                // [끝] mid-drive must not leave the car in D at speed (the next app start would be "주행 중").
+                withContext(NonCancellable) { speed(0); gear(Gear.P); door("front_left", false) }
                 navigator.simActive = false
+                navigator.simParked()
                 heartbeat?.cancel()
-                speed(0)
                 _state.update { it.copy(running = false, paused = false) }
             }
         }

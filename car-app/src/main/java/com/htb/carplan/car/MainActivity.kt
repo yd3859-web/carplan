@@ -138,17 +138,26 @@ private fun CarHome(vm: CarHomeViewModel) {
     var adding by remember { mutableStateOf(false) }
     var qr by remember { mutableStateOf(false) }
     var seatedPrompt by remember { mutableStateOf(false) }
+    /** Someone sat down while a question was on screen: the QR waits until it is answered. */
+    var seatedWaiting by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        vm.passengerSeated.collect { if (!vm.vehicle.value.drivingRestricted) { seatedPrompt = true; qr = true } }
+        vm.passengerSeated.collect {
+            if (vm.vehicle.value.drivingRestricted) return@collect
+            seatedPrompt = true
+            if (vm.prompt.value == null) qr = true else seatedWaiting = true
+        }
     }
+    LaunchedEffect(prompt == null, seatedWaiting) { if (prompt == null && seatedWaiting) { seatedWaiting = false; qr = true } }
     // Moving off closes the boarding QR: nobody scans while the car drives.
-    LaunchedEffect(vehicle.gear) { if (vehicle.gear == com.htb.carplan.shared.model.Gear.D && seatedPrompt) { qr = false; seatedPrompt = false } }
+    LaunchedEffect(vehicle.gear) { if (vehicle.gear == com.htb.carplan.shared.model.Gear.D && seatedPrompt) { qr = false; seatedPrompt = false; seatedWaiting = false } }
+    // A notice ("기록 칸: 판교역") is news, not state: it goes after a few seconds.
+    LaunchedEffect(notice) { if (notice != null) { kotlinx.coroutines.delay(8_000); vm.clearNotice() } }
 
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
-        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue)
+        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation)
         val sim by vm.sim.collectAsStateWithLifecycle()
         if (sim.running) SimBar(sim, onPause = vm::pauseSim, onSpeed = vm::speedSim, onStop = vm::stopSim)
         error?.let { Text("오류: $it", color = Warn, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
@@ -163,13 +172,6 @@ private fun CarHome(vm: CarHomeViewModel) {
         val tripNext = trip?.next
         val live by vm.live.collectAsStateWithLifecycle()
         val restricted = vehicle.drivingRestricted
-        if (restricted) {
-            Row(Modifier.fillMaxWidth().background(Color(0xFFF4F5F7)).padding(horizontal = 28.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("주행 중 · 보기만 돼요. 바꿀 건 동승자 폰에서", color = Ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                TextButton(onClick = vm::openNavigation) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
-            }
-            HorizontalDivider(color = Line)
-        }
         val forceSplit by vm.previewSplit.collectAsStateWithLifecycle()
         val nextComment by vm.nextComment.collectAsStateWithLifecycle()
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -214,7 +216,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
     if (dartOpen && !vehicle.drivingRestricted) CarDartGame(vm, onDismiss = { dartOpen = false })
     if (qr && !vehicle.drivingRestricted) {
-        InviteQrDialog(qrGroup, seated = seatedPrompt, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
+        InviteQrDialog(qrGroup, seated = seatedPrompt, hasTrip = trip != null, onNewGroup = vm::newGroupForQr, onDismiss = { qr = false; seatedPrompt = false })
     }
 }
 
@@ -247,7 +249,7 @@ private fun chipColors(): SelectableChipColors = FilterChipDefaults.filterChipCo
 )
 
 @Composable
-private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?) {
+private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(32.dp),
@@ -260,7 +262,11 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         Spacer(Modifier.weight(1f))
         groupName?.let { Stat("그룹", it) }
         if (passengers > 0) Stat("동승자", "${passengers}명")
-        if (v.drivingRestricted) Text("주행 중", color = Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
+        if (v.drivingRestricted) {
+            Text("주행 중 · 보기만", color = Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = onNavi) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+        }
     }
     HorizontalDivider(color = Line)
 }
@@ -304,6 +310,14 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
         VerticalDivider(color = Line)
         Column(Modifier.weight(1f).fillMaxHeight().padding(32.dp)) {
             if (prompt != null) { prompt(); return@Column }
+            // The trip is over: say so, instead of "갈 곳이 없어요" (which reads like nothing was planned).
+            val dayDone = trip != null && trip.stops.isNotEmpty() && trip.next == null && nextName == null
+            if (dayDone) {
+                Text(trip!!.title, color = Soft, fontSize = 20.sp)
+                Text("오늘 일정 끝", color = Ink, fontSize = 44.sp, fontWeight = FontWeight.Black)
+                Text("${trip.stops.size}곳 다녀왔어요", color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp))
+            } else {
             Text(if (guiding) "가는 중" else "다음", color = Soft, fontSize = 20.sp)
             Text(nextName ?: "갈 곳이 없어요", color = if (nextName != null) Accent else Soft, fontSize = 44.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
             listOfNotNull(nextTime?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
@@ -319,18 +333,19 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     Text(who, color = Soft, fontSize = 17.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
+            }
             Spacer(Modifier.weight(1f))
             later?.let { (d, item) ->
                 val label = if (d == today.plusDays(1)) "내일" else "${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}"
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
             }
-            Button(
+            if (!dayDone) Button(
                 onClick = { if (guiding) onNavi() else onGo() },
                 enabled = !restricted && (guiding || nextName != null),
                 modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = Color.White, disabledContainerColor = Color(0xFFD5D8DC), disabledContentColor = Soft),
             ) { Text(if (guiding) "내비 보기" else "안내 시작", fontSize = 32.sp, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.height(12.dp))
+            if (!dayDone) Spacer(Modifier.height(12.dp))
             Button(
                 onClick = onMore, enabled = !restricted, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
@@ -586,7 +601,7 @@ private fun BigButton(label: String, enabled: Boolean = true, primary: Boolean =
  * No trip today → [새 그룹] makes one on the spot (Q16).
  */
 @Composable
-private fun InviteQrDialog(group: Group?, seated: Boolean, onNewGroup: () -> Unit, onDismiss: () -> Unit) {
+private fun InviteQrDialog(group: Group?, seated: Boolean, hasTrip: Boolean, onNewGroup: () -> Unit, onDismiss: () -> Unit) {
     CarDialog(
         onDismiss = onDismiss,
         title = if (seated) "같이 타셨나요? QR 찍고 들어오세요" else if (group == null) "같이 탄 사람 추가" else "${group.name}에 들어오기",
@@ -597,7 +612,7 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, onNewGroup: () -> Uni
     ) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (group == null) {
-                    Text("오늘 걸린 여행이 없어요. 새 그룹을 만들면 QR이 떠요.", fontSize = 20.sp, color = Soft)
+                    Text(if (hasTrip) "오늘 여행은 혼자 쓰는 일정이라 들어올 그룹이 없어요. 새 그룹을 만들면 QR이 떠요." else "오늘 걸린 여행이 없어요. 새 그룹을 만들면 QR이 떠요.", fontSize = 20.sp, color = Soft)
                 } else {
                     val link = InviteLinks.url(group.inviteCode)
                     val bitmap = remember(link) { qrBitmap(link, 560) }

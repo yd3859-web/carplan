@@ -243,7 +243,7 @@ class TripNavigator(
                 // 10장: the plan changed under an active route → wait 5 s for more edits, then compare.
                 if (_guiding.value && routedVersion >= 0 && t.version != routedVersion && t.version != heldVersion) scheduleChangeCheck()
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
-                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && p.reason != PromptReason.PARKING && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
+                _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
         }
     }
@@ -258,6 +258,8 @@ class TripNavigator(
         if (prev == Gear.D && gear == Gear.P && pendingChange) { heldVersion = -1; scheduleChangeCheck(delayMs = 0) }
         // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
         if (gear == Gear.P && prev != Gear.P) {
+            // Parked = arrived: "근처 주차장 찾아볼까요?" is no longer a question.
+            if (_prompt.value?.reason == PromptReason.PARKING) { askJob?.cancel(); _prompt.value = null }
             fuelAtPark = carState.fuelPercent; fueledAsked = false
             router.requestCurrentLocation()
             parkTimer?.cancel()
