@@ -302,7 +302,9 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
     val goingLabel = if (guiding && moving) "가는 중" else "다음"
     val todayEvents = vm.eventsOn(today, week)
     val others = todayEvents.filter { it.event.id != trip?.eventId }
-    val nextName = trip?.next?.place?.name ?: next?.event?.place?.name
+    // 11장: while someone is still to be collected, the car is going to them, not to the first stop.
+    val pickupFirst = trip?.waitingPickups?.firstOrNull()?.takeIf { guiding }
+    val nextName = pickupFirst?.let { "${it.name.ifBlank { "일행" }} 태우러 · ${it.place.name}" } ?: trip?.next?.place?.name ?: next?.event?.place?.name
     val nextTime = trip?.next?.time ?: next?.event?.startTime
     val later = (1..6L).asSequence().flatMap { d -> vm.eventsOn(today.plusDays(d), week).map { today.plusDays(d) to it } }.firstOrNull()
     Row(Modifier.fillMaxSize()) {
@@ -363,11 +365,11 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text(it, color = Ink, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp))
             }
             if (guiding) LegProgress(live, nextName)
-            trip?.next?.memo?.let { com.htb.carplan.shared.calendar.StopMemo.split(it).second }?.takeIf { it.isNotBlank() }?.let {
+            trip?.next?.memo?.takeIf { pickupFirst == null }?.let { com.htb.carplan.shared.calendar.StopMemo.split(it).second }?.takeIf { it.isNotBlank() }?.let {
                 Text(it, color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp), maxLines = 2)
             }
             // What the group said about this place — the thing the driver can't look up while driving.
-            comment?.let { (who, text) ->
+            comment?.takeIf { pickupFirst == null }?.let { (who, text) ->
                 Column(Modifier.padding(top = 18.dp).fillMaxWidth().border(1.dp, Line, Corner).padding(16.dp)) {
                     Text("“$text”", color = Ink, fontSize = 24.sp, maxLines = 3)
                     Text(who, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
@@ -452,7 +454,8 @@ private fun SplitDayView(trip: TodayTrip?, next: CalendarEvent?, live: NaviLive,
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 // The rail already names the next place (big, blue); the header only says what the day is and how far.
-                Text(trip?.title ?: "오늘", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                val pickupFirst = trip?.waitingPickups?.firstOrNull()?.takeIf { guiding }
+                Text(pickupFirst?.let { "${it.name.ifBlank { "일행" }} 태우러 · ${it.place.name}" } ?: trip?.title ?: "오늘", color = if (pickupFirst != null) Accent else Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 val done = trip != null && trip.stops.isNotEmpty() && trip.next == null
                 val remain = remainText(live, trip, guiding)
                 when {
@@ -809,8 +812,9 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 HorizontalDivider(color = Line)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 20.sp, color = Ink) }
-                    Text("매일 반복 · 장소 회사. 오늘 남은 여행이 없을 때 \"회사로 갈까요?\"", fontSize = 20.sp, color = Soft)
+                    TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
                 }
+                Text("출근: 매일 반복·장소 회사, 오늘 남은 여행이 없을 때 \"회사로 갈까요?\" / 픽업: 백현동에서 기다리는 일행, 시뮬이 먼저 태우러 감", fontSize = 18.sp, color = Soft)
                 HorizontalDivider(color = Line)
                 val split by vm.previewSplit.collectAsStateWithLifecycle()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

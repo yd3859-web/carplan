@@ -717,7 +717,7 @@
       <div class="sb-row"><code>cars/{carId}</code>에 추가: 주행거리(odometerKm, 차가 올림), 항목별 주기(intervals: 항목→{km, days}, 15장) / 차량 관리 예정 일정은 <code>events/due-{항목}</code>(auto=true, 기록할 때마다 다시 계산)</div>
       <div class="sb-row"><code>…/days/{date}/comments/{id}</code> 칸 아래 말풍선 코멘트(3장): stopId, uid, 글, 시각. 경로 version은 안 올림</div>
       <div class="sb-row"><code>…/days/{date}/pickups/{uid}</code> 장소, 순서(차가 출발 때 총 시간 기준으로 다시 매김), 상태(대기/탔음/끝), 예상도착(etaSeconds, 차가 30초마다 카카오모빌리티로; 3분 안이면 "곧 도착해요" 푸시), 차 도착 시각(arrivedAt; 10분 뒤 끝). 그날 문서에 <code>pickupSharing</code>(운전자 동의, 끝나면 false), 차 위치는 <code>cars/{{id}}.state.lat/lng</code>(공유 중에만)</div>
-      <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[](최대 10), 한 줄 글(note), 만든 주체(차 id). 코멘트는 <code>days/{date}/comments</code>에 stopId = 연결 stopId 또는 record id</div>
+      <div class="sb-row"><code>…/days/{date}/records/{id}</code> 기록 칸: 장소, 연결 stopId?, 계획밖여부, 도착·떠난 시각, 사진 URL[](최대 10), 한 줄 글(note), 만든 주체(차 id), <b>주차 위치</b>(parkedLat/Lng = 차가 P로 선 자리, parkingNote = 폰에서 적는 "B2 C-14"; ★3, 2026-10-31). 코멘트는 <code>days/{date}/comments</code>에 stopId = 연결 stopId 또는 record id</div>
       <div class="sb-row"><code>groups/{solo}/events/log-{date}</code> 여행 없는 날의 "일상 기록" 일정(자동, 카테고리 다른 일정) — 그 밑에 days/{date}/records</div>
       <div class="sb-row"><code>…/records/{id}/comments/{id}</code> uid, 글, 시각</div>
       <div class="sb-row"><code>groups/{gid}/darts/{id}</code> 다트 방(6장): 범위(전국/근처/지역), 결과{이름, 좌표}, 던진 횟수, 던진 사람, 연결 eventId?</div>

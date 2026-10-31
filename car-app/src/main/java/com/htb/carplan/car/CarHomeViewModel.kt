@@ -12,6 +12,7 @@ import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.GroupRepository
 import com.htb.carplan.shared.data.DartRepository
 import com.htb.carplan.shared.data.Regions
+import com.htb.carplan.shared.data.PickupRepository
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.Dart
 import com.htb.carplan.shared.model.DartScope
@@ -227,6 +228,18 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openNavigation() = router.openNavigation()
+    /** Ask the navigation where the car is (answer lands in [live] / [lastLocation]). */
+    fun requestLocation() = router.requestCurrentLocation()
+    fun lastLocation(): Pair<Double, Double>? = navigator.simLocation()
+
+    /** 시연 메뉴: a passenger waiting near Pangyo for today's trip (11장) — the simulation picks them up first. */
+    fun makeTestPickup() {
+        val t = trip.value ?: return
+        viewModelScope.launch {
+            runCatching { PickupRepository().setMine(t.groupId, t.eventId, t.date, TEST_PICKUP_UID, "시험 일행", Place(name = "백현동 카페거리", lat = 37.3870, lng = 127.1180, address = "성남시 분당구 백현동")) }
+                .onFailure { _error.value = it.message }
+        }
+    }
 
     /** 7장 3: the group the QR invites to — today's trip's group, or the one made with [새 그룹] (Q16). */
     private val qrGroupId = MutableStateFlow<String?>(null)
@@ -285,6 +298,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                     trips.observeStops(t.groupId, t.eventId, t.date).first().filter { it.deleted }
                         .forEach { trips.setDeleted(t.groupId, t.eventId, t.date, it.id, false, owner.value?.uid.orEmpty()) }
                     trips.setDayStatus(t.groupId, t.eventId, t.date, com.htb.carplan.shared.model.DayStatus.READY)
+                    runCatching { PickupRepository().remove(t.groupId, t.eventId, t.date, TEST_PICKUP_UID) }
                 }.onFailure { _error.value = it.message }
             }
             return
@@ -343,5 +357,6 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Marks the 시연 메뉴 test commute so the next press can replace it. */
         private const val TEST_COMMUTE_MEMO = "시연 메뉴 시험 출근"
+        private const val TEST_PICKUP_UID = "test-passenger"
     }
 }

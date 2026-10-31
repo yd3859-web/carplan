@@ -237,6 +237,10 @@ data class Record(
     val note: String = "",
     /** The car id that created it, or a user uid for a manual record. */
     val createdBy: String = "",
+    /** ★3 주차 위치: where the car was parked (the car's position at P), and the spot written on a phone ("B2 C-14"). */
+    val parkedLat: Double? = null,
+    val parkedLng: Double? = null,
+    val parkingNote: String = "",
 )
 
 /**

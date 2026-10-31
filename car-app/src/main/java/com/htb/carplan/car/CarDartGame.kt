@@ -98,7 +98,10 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { vm.ensureRegions(); regionsReady = true }
     var scope by remember { mutableStateOf(DartScope.NATIONAL) }
     var region by remember { mutableStateOf("서울특별시") }
-    val here = vehicle.let { s -> if (scope == DartScope.NEAR && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
+    // Q56 3: the car's position comes from the navigation (asked once when the game opens), not the car document.
+    val live by vm.live.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.requestLocation() }
+    val here = if (scope == DartScope.NEAR) (live.lat?.let { la -> live.lng?.let { lo -> la to lo } } ?: vm.lastLocation()) else null
     val pool = remember(scope, region, here, regionsReady) {
         Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null).ifEmpty { Regions.all }
     }

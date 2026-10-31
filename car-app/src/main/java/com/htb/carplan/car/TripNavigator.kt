@@ -315,7 +315,8 @@ class TripNavigator(
             runCatching {
                 val carUid = carId.value.orEmpty()
                 if (t != null && nearNext && next != null) {
-                    val id = records.addRecord(t.groupId, t.eventId, today, Record(place = next.place, stopId = next.id, createdBy = carUid))
+                    // ★3 주차 위치: where the car actually stopped (may differ from the stop's own point).
+                    val id = records.addRecord(t.groupId, t.eventId, today, Record(place = next.place, stopId = next.id, createdBy = carUid, parkedLat = loc?.first, parkedLng = loc?.second))
                     parkedRecord = Triple(t.groupId, t.eventId, id); parkedDate = today
                     _notice.value = "기록 칸: ${next.place.name} ($reason)"
                     scope.launch { voice.say("${next.place.name} 도착. 기록 남겼어요.") }
@@ -328,7 +329,7 @@ class TripNavigator(
                     // Stopping again where we just stopped (traffic, a second look) is the same record, not a new one.
                     val again = records.recentUnplannedNear(g, e, today, place.lat, place.lng, NEAR_METERS, SAME_PARKING_MS)
                     if (again != null) { parkedRecord = Triple(g, e, again.id); parkedDate = today; return@runCatching }
-                    val id = records.addRecord(g, e, today, Record(place = place, unplanned = true, createdBy = carUid))
+                    val id = records.addRecord(g, e, today, Record(place = place, unplanned = true, createdBy = carUid, parkedLat = loc?.first, parkedLng = loc?.second))
                     parkedRecord = Triple(g, e, id); parkedDate = today
                     _notice.value = "계획 밖 기록 칸: ${place.name} ($reason)"
                     scope.launch { voice.say("계획에 없던 곳이에요. ${place.name}에 기록 남겼어요.") }
@@ -583,7 +584,9 @@ class TripNavigator(
         routedPickups = routedPickups.filterNot { it == uid }
         scope.launch {
             runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
-            _notice.value = "픽업 장소 도착 · ${t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"}"
+            val who = t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"
+            _notice.value = "픽업 장소 도착 · $who"
+            voice.say("$who 픽업 장소예요.")
         }
     }
 
@@ -848,11 +851,15 @@ class TripNavigator(
             _guiding.value = false
             return
         }
-        val withCoords = batch.filter { it.place.hasCoords() }
+        // A name-only stop (no coordinates) cannot ride in a route: route up to it, and when it is the next one
+        // hand its name to the navigation's own search — never drop it quietly (2026-10-31 bug).
+        val withCoords = batch.takeWhile { it.place.hasCoords() }
         if (withCoords.isEmpty() && pick.isEmpty()) {
-            // Name-only stops (no Kakao key yet): hand the name to the navigation's own search.
-            router.search(batch.first().place.name)
-            routed = listOf(batch.first().id)
+            val first = batch.first()
+            router.search(first.place.name)
+            routed = listOf(first.id)
+            _notice.value = "${first.place.name}: 주소가 없어 내비 검색으로 찾아요"
+            scope.launch { voice.say("${first.place.name}은 주소가 없어서 내비에서 찾아 주세요.") }
         } else {
             // 11장 3: pickups ride in front of the planned stops.
             router.route(pick.map { it.place } + withCoords.map { it.place })
@@ -883,7 +890,9 @@ class TripNavigator(
             routedPickups = routedPickups.drop(1)
             scope.launch {
                 runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
-                _notice.value = "픽업 장소 도착 · ${t.pickups.firstOrNull { it.uid == uid }?.name ?: "일행"}"
+                val who = t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"
+                _notice.value = "픽업 장소 도착 · $who"
+                voice.say("$who 픽업 장소예요.")
             }
             return
         }
