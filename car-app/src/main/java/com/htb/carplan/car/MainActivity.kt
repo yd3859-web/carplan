@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.heightIn
@@ -207,9 +208,18 @@ private fun CarHome(vm: CarHomeViewModel) {
         var tab by remember { mutableStateOf(CarTab.TODAY) }
         LaunchedEffect(restricted) { if (restricted) tab = CarTab.TODAY }
         Column(Modifier.fillMaxSize()) {
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-        if (tab == CarTab.CALENDAR) CarCalendar(vm, onAdd = { d -> addDate = d; adding = true }, onGoTo = { e -> vm.goTo(e); tab = CarTab.TODAY })
-        else if (tab == CarTab.PEOPLE) CarPeople(vm)
+        // Tabs slide sideways in the bar's direction (정원 2026-10-31). Parked only: driving has no tabs, so no motion.
+        androidx.compose.animation.AnimatedContent(
+            targetState = tab, modifier = Modifier.weight(1f).fillMaxWidth(), label = "tabs",
+            transitionSpec = {
+                val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                val spec = androidx.compose.animation.core.tween<androidx.compose.ui.unit.IntOffset>(TAB_SLIDE_MS)
+                (androidx.compose.animation.slideInHorizontally(spec) { w -> dir * w } togetherWith androidx.compose.animation.slideOutHorizontally(spec) { w -> -dir * w })
+            },
+        ) { shown ->
+        Row(Modifier.fillMaxSize()) {
+        if (shown == CarTab.CALENDAR) CarCalendar(vm, onAdd = { d -> addDate = d; adding = true }, onGoTo = { e -> vm.goTo(e); tab = CarTab.TODAY })
+        else if (shown == CarTab.PEOPLE) CarPeople(vm)
         else BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
             // Two shapes (정원 2026-10-30): alone → wide; next to the navigation (half the app area) → the day's timeline, big.
             val wide = maxWidth >= 1100.dp
@@ -232,6 +242,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 }
             }
         // Pleos 주행 제한: buttons are disabled while moving (view only); the voice question's two buttons stay usable.
+        }
         }
         }
         if (!restricted) Box(Modifier.fillMaxWidth().padding(bottom = 14.dp, top = 4.dp), contentAlignment = Alignment.Center) {

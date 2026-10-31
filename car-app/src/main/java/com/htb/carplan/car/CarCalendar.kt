@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -72,29 +74,37 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
     // Same colours as the rest of the screen (Pleos light/dark): a white bar by day, the popup grey by night.
     val bar = if (c.dark) c.sheet else c.bg
     val chosen = if (c.dark) c.sheetEdge else c.sheet
-    Row(
+    // The grey patch slides to the chosen tab (정원 2026-10-31: 순간이동 말고 옆으로 흐르게). Tabs are one width so it can.
+    val tabW = 220.dp
+    val gap = 4.dp
+    val x by androidx.compose.animation.core.animateDpAsState((tabW + gap) * tab.ordinal, androidx.compose.animation.core.tween(TAB_SLIDE_MS), label = "tab")
+    Box(
         modifier
             .shadow(12.dp, RoundedCornerShape(50))
             .background(bar, RoundedCornerShape(50))
             .border(1.dp, c.sheetEdge, RoundedCornerShape(50))
             .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        CarTab.entries.forEach { t ->
-            val on = t == tab
-            Column(
-                Modifier.widthIn(min = 200.dp).heightIn(min = 100.dp)
-                    .background(if (on) chosen else bar, RoundedCornerShape(50))
-                    .clickable { onTab(t) }
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-            ) {
-                androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) c.ink else c.soft, modifier = Modifier.size(42.dp))
-                Text(t.label, color = if (on) c.ink else c.soft, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+        Box(Modifier.offset(x = x).width(tabW).height(100.dp).background(chosen, RoundedCornerShape(50)))
+        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+            CarTab.entries.forEach { t ->
+                val on = t == tab
+                Column(
+                    Modifier.width(tabW).height(100.dp)
+                        .clip(RoundedCornerShape(50))
+                        .clickable { onTab(t) },
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                ) {
+                    androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) c.ink else c.soft, modifier = Modifier.size(42.dp))
+                    Text(t.label, color = if (on) c.ink else c.soft, fontSize = 24.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                }
             }
         }
     }
 }
+
+/** One length for the bar patch and the screen slide, so both move together. */
+const val TAB_SLIDE_MS = 300
 
 /**
  * 캘린더 탭: the month on the left (each day shows its first event or "n개"), the chosen day on the right with
