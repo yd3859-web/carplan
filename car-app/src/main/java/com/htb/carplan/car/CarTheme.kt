@@ -8,10 +8,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.DeviceFontFamilyName
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontWeight
 
 /**
- * Car colours in two sets (정원 2026-10-31: 다크 모드). Day = the Pleos look (white ground, near-black text, one
- * blue accent). Night = the same drawing on a black ground, so the screen stops glaring when the car dims.
+ * Car colours in two sets (정원 2026-10-31: 다크 모드, 현대 기준). Day = the Pleos look (white ground, near-black text,
+ * one blue accent). Night = the Pleos dark mode ground, so the screen stops glaring when the car dims.
  * The screen follows the car's night mode; the 시연 메뉴 can force it for a look.
  */
 data class CarColors(
@@ -40,25 +47,37 @@ data class CarColors(
     val dark: Boolean,
 )
 
+// Values from Hyundai's Pleos Connect design assets (Figma variables, Light/Dark modes; 2026-10-31):
+// text/dark/primary #131417, text tertiary = 64%, divider/secondary = 10%, background/secondary, background/popup,
+// button/filled/enabled, informative/positive (the system blue), Secondary/Basic/Nagative. Alpha tokens are
+// pre-mixed over the screen background so they stay readable on both.
 val LightCarColors = CarColors(
-    bg = Color(0xFFFFFFFF), ink = Color(0xFF111111), soft = Color(0xFF666C73), line = Color(0xFFE4E6E9),
-    accent = Color(0xFF0066B3), warn = Color(0xFFD9342B), railPassed = Color(0xFFB9BEC4), nodeEdge = Color(0xFFAEB4BA),
-    sheet = Color(0xFFF0F2F5), sheetEdge = Color(0xFFC9CED4),
-    band = Color(0xFF111111), onBand = Color(0xFFFFFFFF), bandSoft = Color(0xFFB8BDC2), bandEdge = Color(0xFF55595E),
-    onInk = Color(0xFFFFFFFF), disabled = Color(0xFFD5D8DC), placeholder = Color(0xFFE9ECEF), dark = false,
+    bg = Color(0xFFFFFFFF), ink = Color(0xFF131417), soft = Color(0xFF68696A), line = Color(0xFFE7E7E8),
+    accent = Color(0xFF0064FF), warn = Color(0xFFFE3D16), railPassed = Color(0xFFB8B9BB), nodeEdge = Color(0xFFA1A1A2),
+    sheet = Color(0xFFEDEEF2), sheetEdge = Color(0xFFD0D0D1),
+    band = Color(0xFF131417), onBand = Color(0xFFFFFFFF), bandSoft = Color(0xFFB8B9BB), bandEdge = Color(0xFF44464E),
+    onInk = Color(0xFFFFFFFF), disabled = Color(0xFFE0E1E6), placeholder = Color(0xFFEDEEF2), dark = false,
 )
 
 val DarkCarColors = CarColors(
-    bg = Color(0xFF000000), ink = Color(0xFFF2F3F4), soft = Color(0xFFA3A8AE), line = Color(0xFF2A2E33),
-    // A lighter blue: the day blue (#0066B3) is too dim on black.
-    accent = Color(0xFF4DA3FF), warn = Color(0xFFFF6B5E), railPassed = Color(0xFF5A6068), nodeEdge = Color(0xFF5A6068),
-    sheet = Color(0xFF17191C), sheetEdge = Color(0xFF353A40),
-    // On black the band is a dark grey with an edge, not black-on-black.
-    band = Color(0xFF1E2227), onBand = Color(0xFFFFFFFF), bandSoft = Color(0xFFAEB4BA), bandEdge = Color(0xFF4A5056),
-    onInk = Color(0xFF111111), disabled = Color(0xFF34383D), placeholder = Color(0xFF15181B), dark = true,
+    bg = Color(0xFF131417), ink = Color(0xFFFFFFFF), soft = Color(0xFFAAAAAB), line = Color(0xFF2B2C2F),
+    accent = Color(0xFF0082FF), warn = Color(0xFFFF4C28), railPassed = Color(0xFF5A5B5D), nodeEdge = Color(0xFF6B6C6E),
+    sheet = Color(0xFF313236), sheetEdge = Color(0xFF44464E),
+    // On the dark screen the band is the popup grey with an edge, not black-on-black.
+    band = Color(0xFF313236), onBand = Color(0xFFFFFFFF), bandSoft = Color(0xFFAAAAAB), bandEdge = Color(0xFF44464E),
+    onInk = Color(0xFF131417), disabled = Color(0xFF313236), placeholder = Color(0xFF1D1E21), dark = true,
 )
 
 val LocalCarColors = staticCompositionLocalOf { LightCarColors }
+
+/** The car's own UI font when present (Pleos: Asta Sans as "pretendard"); Typeface.create falls back to the default. */
+@OptIn(ExperimentalTextApi::class)
+private val PleosFont: FontFamily = DeviceFontFamilyName("pretendard").let { f ->
+    FontFamily(
+        listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold, FontWeight.Black)
+            .map { w -> Font(familyName = f, weight = w) },
+    )
+}
 
 /** The car app's theme: night colours when the car is in night mode or the 시연 메뉴 forces them. */
 @Composable
@@ -68,6 +87,9 @@ fun CarTheme(forceDark: Boolean = false, content: @Composable () -> Unit) {
     val scheme = if (dark) darkColorScheme(primary = c.ink, secondary = c.accent, background = c.bg, surface = c.bg, onSurface = c.ink, outline = c.line)
     else lightColorScheme(primary = c.ink, secondary = c.accent, background = c.bg, surface = c.bg, onSurface = c.ink, outline = c.line)
     CompositionLocalProvider(LocalCarColors provides c) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme) {
+            // Pleos system font (Asta Sans, registered on the car as the "pretendard" family); default font elsewhere.
+            ProvideTextStyle(LocalTextStyle.current.copy(fontFamily = PleosFont), content)
+        }
     }
 }

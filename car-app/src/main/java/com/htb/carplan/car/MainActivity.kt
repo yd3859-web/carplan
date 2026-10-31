@@ -260,7 +260,7 @@ private fun CarHome(vm: CarHomeViewModel) {
 private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, buttons: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Box(
-            Modifier.fillMaxSize().background(Color(0x8C000000)).clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
+            Modifier.fillMaxSize().background(Color(0x8C131417)).clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
             contentAlignment = Alignment.Center,
         ) {
             Column(
