@@ -75,6 +75,10 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     /** 시연 메뉴: night colours (CarTheme) without waiting for the car to dim. */
     val previewDark = MutableStateFlow(false)
     val stations = navigator.stations
+    val nearby = navigator.nearby
+    val detour = navigator.detour
+    fun goViaNearby(item: NearPlace, kind: NaviEntry.Kind) = navigator.goViaNearby(item, kind)
+    fun dismissNearby() = navigator.dismissNearby()
     private val monitor = CarRuntime.monitor(app)
 
     fun goViaStation(st: com.htb.carplan.shared.net.GasStation) = navigator.goViaStation(st)

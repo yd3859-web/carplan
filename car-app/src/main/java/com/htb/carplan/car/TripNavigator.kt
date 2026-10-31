@@ -27,6 +27,7 @@ import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.net.GasStation
 import com.htb.carplan.shared.net.KakaoApi
+import com.htb.carplan.shared.net.KakaoCategory
 import com.htb.carplan.shared.net.OpinetApi
 import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.BuiltInCategory
@@ -69,7 +70,12 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
 /** [말하기] on screen: the mic is open, or the known commands are shown as buttons (nothing understood). */
 data class VoiceState(val listening: Boolean = false, val choices: Boolean = false, val heard: String? = null)
 
-data class NaviEntry(val kind: Kind, val id: String, val place: Place) { enum class Kind { STOP, PICKUP, STATION, EVENT } }
+/** One place in a "가까운 ○○" list on the car screen (주유소·충전소·주차장·맛집). [priceWon] only for 주유소. */
+data class NearPlace(val id: String, val name: String, val meters: Int, val place: Place, val priceWon: Int? = null)
+/** The list shown in our own window — the driver picks without leaving carplan (no hop into the navigation). */
+data class NearbyList(val title: String, val kind: NaviEntry.Kind, val items: List<NearPlace>, val note: String)
+
+data class NaviEntry(val kind: Kind, val id: String, val place: Place) { enum class Kind { STOP, PICKUP, STATION, EVENT, EXTRA } }
 
 enum class PromptReason { APP_START, GEAR_D, MANUAL, ROUTE_CHANGE, FUEL, FUELED, PICKUP, COMMUTE, PARKING }
 
@@ -157,6 +163,10 @@ class TripNavigator(
      * station arrival ticked off the next stop).
      */
     private var inNavi: List<NaviEntry> = emptyList()
+        set(v) { field = v; _detour.value = v.firstOrNull()?.takeIf { it.kind != NaviEntry.Kind.STOP && it.kind != NaviEntry.Kind.PICKUP } }
+    private val _detour = MutableStateFlow<NaviEntry?>(null)
+    /** What the car is driving to when it is not a trip stop (주유소·주차장·맛집 picked on the way, 출퇴근): the screen shows it. */
+    val detour: StateFlow<NaviEntry?> = _detour.asStateFlow()
     /** Every remaining stop at the moment the route was last sent (what the navigation "knows"). */
     private var routedPlan: List<Stop> = emptyList()
     private var routedVersion = -1L
@@ -188,11 +198,24 @@ class TripNavigator(
     /** Q55: the fill-up planned at departure ("율동공원 지나서 ○○ 주유소"); while it stands, the plain low-fuel notice keeps quiet. */
     private var fuelPlan: GasStation? = null
     private var fuelPlanVersion = -1L
+    private val _nearby = MutableStateFlow<NearbyList?>(null)
+    /** 주유소·충전소·주차장·맛집 near the car, shown in our window; picking one makes it the next waypoint. */
+    val nearby: StateFlow<NearbyList?> = _nearby.asStateFlow()
     private val _stations = MutableStateFlow<List<GasStation>>(emptyList())
     /** Cheapest stations near the car after "응" (12장); the screen lists the top 3. */
     val stations: StateFlow<List<GasStation>> = _stations.asStateFlow()
     /** The simulator is playing the day: position, remaining distance and ETA come from it, not the navigation. */
     @Volatile var simActive = false
+    /** Brings carplan back in front (set by [CarRuntime]); the navigation pops up when it gets a route while idle. */
+    var bringToFront: () -> Unit = {}
+
+    /** Route picked inside carplan (주유소·주차장·맛집 list): the navigation takes it, carplan comes back on top. */
+    private fun routeQuietly(places: List<Place>) {
+        _live.update { it.copy(remainMeters = null, remainSeconds = null, nextName = places.firstOrNull()?.name) } // not the last drive's numbers
+        router.route(places)
+        lastRouteSentAt = System.currentTimeMillis()
+        scope.launch { repeat(2) { delay(1_500); bringToFront() } }
+    }
     private var simEtaAt = 0L
     /** The car has driven since the last record: getting in (door / P at start) is not an arrival. */
     private var drovenSinceRecord = false
@@ -455,8 +478,8 @@ class TripNavigator(
         val t = trip.value
         when (cmd) {
             VoiceCommand.FUEL -> { scope.launch { voice.say(if (carState.isEv == true) "충전소를 찾을게요." else "주유소를 찾을게요.") }; fuelPlan?.let { goViaStation(it) } ?: findStation() }
-            VoiceCommand.PARKING -> { scope.launch { voice.say("근처 주차장을 찾을게요.") }; router.search("주차장") }
-            VoiceCommand.FOOD -> { scope.launch { voice.say("근처 맛집을 찾을게요.") }; router.search("맛집") }
+            VoiceCommand.PARKING -> { scope.launch { voice.say("근처 주차장을 찾을게요.") }; findNearby("주차장", KakaoCategory.PARKING, null) }
+            VoiceCommand.FOOD -> { scope.launch { voice.say("근처 맛집을 찾을게요.") }; findNearby("맛집", KakaoCategory.FOOD, null) }
             VoiceCommand.WHERE -> scope.launch { voice.say(whereSentence(t)) }
             VoiceCommand.REVERT -> if (previousRoute.isNotEmpty() && _guiding.value) revertRoute() else scope.launch { voice.say("되돌릴 경로가 없어요.") }
             VoiceCommand.SKIP -> skipNext(t)
@@ -676,14 +699,13 @@ class TripNavigator(
                 runCatching { opinet.around(loc.first, loc.second) }
                     .onSuccess { list ->
                         // Q30: cheapest first, but only ones reasonably close (within 3 km of the car)
-                        val near = list.filter { it.meters <= 3_000 }.ifEmpty { list }
-                        _stations.value = near.take(3)
-                        if (near.isEmpty()) router.search("주유소")
+                        val near = list.filter { it.meters <= 3_000 }.ifEmpty { list }.take(3)
+                        if (near.isEmpty()) findNearby("주유소", KakaoCategory.GAS, null)
+                        else _nearby.value = NearbyList("가까운 최저가 주유소", NaviEntry.Kind.STATION, near.map { NearPlace(it.id, it.name, it.meters, it.place, it.price) }, "고르면 다음 경유지로 들어가고, 그다음 원래 일정으로 이어져요")
                     }
-                    .onFailure { _error.value = it.message; router.search("주유소") }
-            } else {
-                router.search(if (ev) "충전소" else "주유소")
-            }
+                    .onFailure { findNearby("주유소", KakaoCategory.GAS, null) }
+            } else if (ev) findNearby("충전소", null, "전기차 충전소")
+            else findNearby("주유소", KakaoCategory.GAS, null)
         }
     }
 
@@ -697,13 +719,55 @@ class TripNavigator(
         val tail = (t?.waitingPickups.orEmpty().map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } +
             t?.remaining.orEmpty().filter { it.place.hasCoords() }.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }).take(MAX_PLACES - 1)
         inNavi = listOf(NaviEntry(NaviEntry.Kind.STATION, st.id, st.place)) + tail
-        router.route(inNavi.map { it.place })
+        routeQuietly(inNavi.map { it.place })
+        _guiding.value = true
         lastRouteSentAt = System.currentTimeMillis()
         _notice.value = "${st.name} (${st.price}원) 들렀다 가요"
         fuelDeclinedForRoute = false
     }
 
     fun dismissStations() { _stations.value = emptyList() }
+
+    /**
+     * One Kakao call (category, or [keyword] for chargers) around the car → our own list window. Only when that is not
+     * possible (no key, no position, nothing found) does the navigation's own search open — then the way back is the
+     * carplan icon in the bar below.
+     */
+    private fun findNearby(what: String, category: KakaoCategory?, keyword: String?) {
+        router.requestCurrentLocation()
+        scope.launch {
+            delay(600) // let the location answer arrive
+            val loc = lastLocation
+            val found = if (loc == null || !kakao.available) null else runCatching {
+                (if (category != null) kakao.searchCategory(category, loc.first, loc.second, radiusMeters = 3000, size = 5)
+                else kakao.searchKeyword(keyword!!, near = loc, size = 5))
+                    .filter { it.hasCoords() }
+                    .map { p -> NearPlace(p.kakaoId ?: p.name, p.name, RouteMath.metersBetween(loc.first, loc.second, p.lat, p.lng).toInt(), p) }
+                    .sortedBy { it.meters }.take(5)
+            }.getOrNull()
+            if (found.isNullOrEmpty()) { router.search(what); return@launch }
+            val kind = if (what == "주유소" || what == "충전소") NaviEntry.Kind.STATION else NaviEntry.Kind.EXTRA
+            _nearby.value = NearbyList("가까운 $what", kind, found, "고르면 다음 경유지로 들어가요 · 내비 화면은 [내비 보기]로")
+        }
+    }
+
+    fun dismissNearby() { _nearby.value = null }
+
+    /** The driver picked from our list: it goes in front of the route, our screen stays (the navigation follows). */
+    fun goViaNearby(item: NearPlace, kind: NaviEntry.Kind) {
+        _nearby.value = null
+        if (kind == NaviEntry.Kind.STATION) {
+            goViaStation(GasStation(item.id, item.name, "", item.priceWon ?: 0, item.meters, item.place)); return
+        }
+        val t = trip.value
+        val tail = (t?.waitingPickups.orEmpty().map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } +
+            t?.remaining.orEmpty().filter { it.place.hasCoords() }.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }).take(MAX_PLACES - 1)
+        inNavi = listOf(NaviEntry(NaviEntry.Kind.EXTRA, item.id, item.place)) + tail
+        routeQuietly(inNavi.map { it.place })
+        _guiding.value = true
+        _notice.value = "${item.name} 들렀다 가요"
+        scope.launch { voice.say("${item.name}${ro(item.name)} 안내할게요.") }
+    }
 
     private fun remainingKm(stops: List<Stop>): Double? {
         val withCoords = stops.filter { it.place.hasCoords() }
@@ -813,7 +877,7 @@ class TripNavigator(
     /** "응" / [가기] (9장) or [바꾸기] (10장): route the remaining stops and open the navigation. */
     fun go() {
         if (_prompt.value?.reason == PromptReason.PARKING) {
-            askJob?.cancel(); closePrompt(); router.search("주차장"); return
+            askJob?.cancel(); closePrompt(); findNearby("주차장", KakaoCategory.PARKING, null); return
         }
         if (_prompt.value?.reason == PromptReason.FUEL) {
             askJob?.cancel(); closePrompt()
@@ -1116,6 +1180,14 @@ class TripNavigator(
                     _notice.value = "픽업 장소 도착 · $who"
                     voice.say("$who 픽업 장소예요.")
                 }
+                return
+            }
+            NaviEntry.Kind.EXTRA -> {
+                // A parking lot or a restaurant picked on the way: not a planned stop, nothing is ticked.
+                inNavi = inNavi.drop(1)
+                if (inNavi.isEmpty()) _guiding.value = false
+                _notice.value = "${first.place.name} 도착"
+                scope.launch { voice.say("${first.place.name} 도착했어요.") }
                 return
             }
             NaviEntry.Kind.STATION -> {

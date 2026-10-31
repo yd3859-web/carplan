@@ -109,5 +109,9 @@ object CarRuntime {
     /** 9장 "다음 목적지로 갈까요?" — one per process, shared by the service and the screen. */
     @Synchronized
     fun navigator(context: Context): TripNavigator =
-        navigator ?: TripNavigator(router(context), voice(context), scope).also { navigator = it }
+        navigator ?: TripNavigator(router(context), voice(context), scope).also { n ->
+            navigator = n
+            val app = context.applicationContext
+            n.bringToFront = { app.startActivity(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
+        }
 }

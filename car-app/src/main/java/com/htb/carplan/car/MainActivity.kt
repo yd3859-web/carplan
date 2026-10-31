@@ -145,6 +145,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     val qrGroup by vm.qrGroup.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
     val stations by vm.stations.collectAsStateWithLifecycle()
+    val nearby by vm.nearby.collectAsStateWithLifecycle()
     var debug by remember { mutableStateOf(false) }
     var dartOpen by remember { mutableStateOf(false) }
     val dart by vm.dart.collectAsStateWithLifecycle()
@@ -252,6 +253,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                     }
     }
     if (stations.isNotEmpty()) StationDialog(stations, onPick = vm::goViaStation, onDismiss = vm::dismissStations)
+    nearby?.let { n -> NearbyDialog(n, onPick = { vm.goViaNearby(it, n.kind) }, onDismiss = vm::dismissNearby) }
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
     if (dartOpen && !vehicle.drivingRestricted) CarDartGame(vm, onDismiss = { dartOpen = false })
     if (qr && !vehicle.drivingRestricted) {
@@ -335,7 +337,9 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
     val others = todayEvents.filter { it.event.id != trip?.eventId }
     // 11장: while someone is still to be collected, the car is going to them, not to the first stop.
     val pickupFirst = trip?.waitingPickups?.firstOrNull()?.takeIf { guiding }
-    val nextName = pickupFirst?.let { "${it.name.ifBlank { "일행" }} 태우러 · ${it.place.name}" } ?: trip?.next?.place?.name ?: next?.event?.place?.name
+    // A place picked on the way (주차장·주유소·맛집) or a single event comes first: that is where the car is going.
+    val detour by vm.detour.collectAsStateWithLifecycle()
+    val nextName = detour?.takeIf { guiding }?.place?.name ?: pickupFirst?.let { "${it.name.ifBlank { "일행" }} 태우러 · ${it.place.name}" } ?: trip?.next?.place?.name ?: next?.event?.place?.name
     val nextTime = trip?.next?.time ?: next?.event?.startTime
     val later = (1..6L).asSequence().flatMap { d -> vm.eventsOn(today.plusDays(d), week).map { today.plusDays(d) to it } }.firstOrNull()
     Row(Modifier.fillMaxSize()) {
@@ -830,6 +834,23 @@ private fun InviteQrDialog(group: Group?, seated: Boolean, tripTitle: String?, f
                     Text("코드  ${group.inviteCode}   ·   지금 ${group.memberIds.size}명", fontSize = 20.sp, color = Soft)
                 }
             }
+    }
+}
+
+/** 주유소·충전소·주차장·맛집 near the car, in our own window: one tap = next waypoint, carplan stays on screen. */
+@Composable
+private fun NearbyDialog(list: NearbyList, onPick: (NearPlace) -> Unit, onDismiss: () -> Unit) {
+    CarDialog(onDismiss = onDismiss, title = list.title, buttons = { CarCloseButton(onClick = onDismiss) }) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            list.items.forEach { p ->
+                Button(onClick = { onPick(p) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
+                    Text(p.name, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
+                    p.priceWon?.let { Text("${"%,d".format(it)}원", fontSize = 26.sp, color = Accent, fontWeight = FontWeight.Bold) }
+                    Text("  ${if (p.meters >= 1000) "%.1fkm".format(p.meters / 1000.0) else "${p.meters}m"}", fontSize = 24.sp, color = Soft)
+                }
+            }
+            Text(list.note, fontSize = 20.sp, color = Soft)
+        }
     }
 }
 
