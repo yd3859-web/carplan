@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.htb.carplan.shared.data.CalendarEvent
 import com.htb.carplan.shared.model.BuiltInCategory
+import com.htb.carplan.shared.calendar.CategoryColors
+import androidx.compose.ui.graphics.Color
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -78,6 +80,7 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
     val c = LocalCarColors.current
     val month by vm.calMonth.collectAsStateWithLifecycle()
     val events by vm.monthEvents.collectAsStateWithLifecycle()
+    val categories by vm.categories.collectAsStateWithLifecycle()
     val today = LocalDate.now()
     var picked by remember { mutableStateOf(today) }
     // Paging months moves the chosen day along (else the right side would show a day from another month, half-loaded).
@@ -99,7 +102,14 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
                 Text("오늘", color = c.ink, fontSize = 24.sp)
             }
         }
-        Spacer(Modifier.height(16.dp))
+        // What the colours mean (정원 2026-10-31: 개수 대신 무슨 일정인지 — 여행과 차량 관리는 다른 색).
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            (BuiltInCategory.entries.map { it.id } + categories.map { it.id }).forEach { id ->
+                Box(Modifier.width(8.dp).height(24.dp).background(Color(CategoryColors.of(id, categories))))
+                Text(CategoryColors.label(id, categories), color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(start = 8.dp, end = 20.dp))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         Row {
             listOf("일", "월", "화", "수", "목", "금", "토").forEach { d ->
                 Text(d, color = c.soft, fontSize = 20.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
@@ -128,10 +138,14 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
                                         .padding(8.dp),
                                 ) {
                                     Text("$n", color = if (isPicked) c.onInk else if (col == 0) c.warn else c.ink, fontSize = 24.sp, fontWeight = if (d == today) FontWeight.Bold else FontWeight.Normal)
-                                    when {
-                                        dayEvents.size == 1 -> Text(dayEvents.first().event.title, color = if (isPicked) c.onInk else c.soft, fontSize = 20.sp, maxLines = 1)
-                                        dayEvents.size > 1 -> Text("${dayEvents.size}개", color = if (isPicked) c.onInk else c.soft, fontSize = 20.sp)
+                                    // Up to three events as "colour bar + name"; the rest as "+n".
+                                    dayEvents.take(3).forEach { e ->
+                                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Box(Modifier.width(8.dp).height(24.dp).background(Color(CategoryColors.of(e.event.categoryId, categories))))
+                                            Text(e.event.title, color = if (isPicked) c.onInk else c.ink, fontSize = 20.sp, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, modifier = Modifier.padding(start = 6.dp))
+                                        }
                                     }
+                                    if (dayEvents.size > 3) Text("+${dayEvents.size - 3}", color = if (isPicked) c.onInk else c.soft, fontSize = 20.sp)
                                 }
                             }
                         }
@@ -149,12 +163,13 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
             if (dayEvents.isEmpty()) Text("일정이 없어요", color = c.soft, fontSize = 26.sp, modifier = Modifier.padding(top = 12.dp))
             dayEvents.forEach { item ->
                 val e = item.event
-                val kind = when (e.categoryId) { BuiltInCategory.TRIP.id -> "여행"; BuiltInCategory.CAR.id -> "차량 관리"; else -> null }
+                val kind = CategoryColors.label(e.categoryId, categories)
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.padding(end = 12.dp).width(6.dp).height(56.dp).background(Color(CategoryColors.of(e.categoryId, categories))))
                     Text(e.startTime ?: "종일", color = c.soft, fontSize = 24.sp, modifier = Modifier.width(96.dp))
                     Column(Modifier.weight(1f)) {
                         Text(e.title, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        listOfNotNull(kind, e.place?.name).joinToString(" · ").takeIf { it.isNotEmpty() }?.let { Text(it, color = c.soft, fontSize = 20.sp, maxLines = 1) }
+                        listOfNotNull(kind, e.place?.name?.ifBlank { null }).joinToString(" · ").takeIf { it.isNotEmpty() }?.let { Text(it, color = c.soft, fontSize = 20.sp, maxLines = 1) }
                     }
                     // Only today's places can be driven to from here; a trip runs through the 오늘 tab.
                     if (picked == today && e.place != null && e.categoryId != BuiltInCategory.TRIP.id) {

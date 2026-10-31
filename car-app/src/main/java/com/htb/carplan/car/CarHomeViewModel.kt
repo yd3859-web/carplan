@@ -220,6 +220,12 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .catch { _error.value = it.message; emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** The owner's own categories (출퇴근…), for their colours in the calendar tab (same colours as the phone). */
+    val categories: StateFlow<List<com.htb.carplan.shared.model.CustomCategory>> = owner
+        .flatMapLatest { u -> if (u == null) flowOf(emptyList()) else calendar.observeCustomCategories(u.uid) }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     fun eventsOn(date: LocalDate, all: List<CalendarEvent>): List<CalendarEvent> = all.filter { Repeat.occursOn(it.event, date) }
         .sortedWith(compareBy({ !it.event.allDay }, { it.event.startTime ?: "" }))
 
