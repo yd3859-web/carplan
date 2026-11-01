@@ -4,6 +4,7 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
@@ -82,4 +83,17 @@ fun BackScreen(onBack: () -> Unit, content: @Composable (back: () -> Unit) -> Un
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         ) { content(leave) }
     }
+}
+
+/**
+ * Swipe sideways to step back or forward (달 · 날짜): finger left = next, right = previous, once past 64dp. Vertical
+ * scrolling and long-press dragging underneath keep working (the gesture locks to one direction first).
+ */
+fun Modifier.sideSwipe(key: Any?, onPrev: () -> Unit, onNext: () -> Unit): Modifier = pointerInput(key) {
+    var total = 0f
+    val threshold = 64.dp.toPx()
+    detectHorizontalDragGestures(
+        onDragStart = { total = 0f },
+        onDragEnd = { if (total < -threshold) onNext() else if (total > threshold) onPrev() },
+    ) { change, dx -> total += dx; change.consume() }
 }

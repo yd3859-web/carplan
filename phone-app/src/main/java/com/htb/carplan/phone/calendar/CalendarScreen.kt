@@ -1,8 +1,6 @@
 package com.htb.carplan.phone.calendar
 
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,6 +58,7 @@ import com.htb.carplan.phone.trip.TripRef
 import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
+import com.htb.carplan.phone.ui.sideSwipe
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
 import com.htb.carplan.shared.calendar.KoreanHolidays
@@ -102,6 +101,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val categories by vm.customCategories.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     val tripStops by vm.tripStops.collectAsStateWithLifecycle()
+    val todayStops by vm.todayStops.collectAsStateWithLifecycle()
     val tripComments by vm.tripComments.collectAsStateWithLifecycle()
     val tripDays by vm.tripDays.collectAsStateWithLifecycle()
     val groups by vm.groups.collectAsStateWithLifecycle()
@@ -123,7 +123,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             // The month fills the height: week rows share the space left under the header (like the system calendar).
             Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 16.dp)) {
                 Spacer(Modifier.height(12.dp))
-                TodayCard(upcoming, car, todayStops = if (selected == java.time.LocalDate.now()) tripStops else emptyMap(), onConnectCar = { carLinkOpen = true })
+                TodayCard(upcoming, car, todayStops = todayStops, onConnectCar = { carLinkOpen = true })
                 commute?.let { sg ->
                     // 16장 Q45: the records found a routine — one tap makes it a repeating 출퇴근 event.
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -140,14 +140,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 Spacer(Modifier.height(4.dp))
                 MonthHeader(month, onPrev = { vm.showMonth(month.minusMonths(1)) }, onNext = { vm.showMonth(month.plusMonths(1)) })
                 // Swipe sideways for the next / previous month (the arrows still work); the month slides with the finger's way.
-                val swipe = Modifier.pointerInput(month) {
-                    var total = 0f
-                    val threshold = 64.dp.toPx()
-                    detectHorizontalDragGestures(
-                        onDragStart = { total = 0f },
-                        onDragEnd = { if (total < -threshold) vm.showMonth(month.plusMonths(1)) else if (total > threshold) vm.showMonth(month.minusMonths(1)) },
-                    ) { change, dx -> total += dx; change.consume() }
-                }
+                val swipe = Modifier.sideSwipe(month, onPrev = { vm.showMonth(month.minusMonths(1)) }, onNext = { vm.showMonth(month.plusMonths(1)) })
                 androidx.compose.animation.AnimatedContent(
                     targetState = month, modifier = Modifier.weight(1f).then(swipe), label = "month",
                     transitionSpec = {
@@ -169,7 +162,9 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     events = selectedEvents,
                     categories = categories,
                     onAdd = { quickAddDate = selected },
-                    modifier = Modifier.width(400.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) },
+                    // 손⑤: swipe the day itself for the day before / after (the month follows).
+                    modifier = Modifier.width(400.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) }
+                        .sideSwipe(selected, onPrev = { vm.select(selected.minusDays(1)) }, onNext = { vm.select(selected.plusDays(1)) }),
                     tripStops = tripStops,
                     tripComments = tripComments,
                     tripDays = tripDays,
@@ -186,7 +181,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 events = selectedEvents,
                 categories = categories,
                 onAdd = { daySheetOpen = false; quickAddDate = selected },
-                modifier = Modifier.fillMaxWidth().height(480.dp),
+                modifier = Modifier.fillMaxWidth().height(480.dp).sideSwipe(selected, onPrev = { vm.select(selected.minusDays(1)) }, onNext = { vm.select(selected.plusDays(1)) }),
                 tripStops = tripStops,
                 tripComments = tripComments,
                 tripDays = tripDays,

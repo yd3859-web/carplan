@@ -102,6 +102,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.NodeState
 import com.htb.carplan.phone.ui.Palette
+import com.htb.carplan.phone.ui.sideSwipe
 import com.htb.carplan.phone.ui.RailNode
 import com.htb.carplan.phone.ui.MapMarker
 import com.htb.carplan.phone.ui.SimpleMap
@@ -284,7 +285,13 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         val reorder = rememberReorderableLazyListState(listState) { from, to ->
             vm.moveLocally(from.key as String, to.key as String)
         }
-        LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+        // 손④: swipe the day sideways for the next / previous 일차 (same as the calendar's months).
+        val dayAt = dates.indexOf(date)
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
+                .sideSwipe(date, onPrev = { dates.getOrNull(dayAt - 1)?.let(vm::showDate) }, onNext = { dates.getOrNull(dayAt + 1)?.takeIf { dayAt >= 0 }?.let(vm::showDate) }),
+        ) {
             item { Spacer(Modifier.height(12.dp)) }
             // Q55: the car's 주유하기 (today only) — after its stop, or before the next place when it is "now".
             val fuel = day?.fuelNote?.takeIf { date == java.time.LocalDate.now().toString() }

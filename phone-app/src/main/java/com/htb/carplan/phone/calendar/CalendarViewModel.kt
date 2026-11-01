@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -105,6 +106,17 @@ class CalendarViewModel : ViewModel() {
     val tripStops: StateFlow<Map<String, List<Stop>>> = combine(selectedEvents, _selected) { day, date ->
         day.filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to date.toString() }
     }.flatMapLatest { trips ->
+        if (trips.isEmpty()) flowOf(emptyMap())
+        else combine(trips.map { (t, date) -> tripRepo.observeStops(t.groupId, t.event.id, date).map { t.event.id to it.filterNot { s -> s.deleted } } }) { it.toMap() }
+    }
+        .catch { _error.value = it.message }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Today's trip stops for the today card, whatever day is selected below. */
+    val todayStops: StateFlow<Map<String, List<Stop>>> = upcoming.map { all ->
+        val today = LocalDate.now()
+        MonthGrid.eventsOn(today, all).filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to today.toString() }
+    }.distinctUntilChanged().flatMapLatest { trips ->
         if (trips.isEmpty()) flowOf(emptyMap())
         else combine(trips.map { (t, date) -> tripRepo.observeStops(t.groupId, t.event.id, date).map { t.event.id to it.filterNot { s -> s.deleted } } }) { it.toMap() }
     }
