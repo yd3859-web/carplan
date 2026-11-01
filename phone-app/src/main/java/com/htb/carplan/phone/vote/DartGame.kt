@@ -74,6 +74,8 @@ import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.data.Regions
 import com.htb.carplan.shared.model.DartScope
 import kotlinx.coroutines.launch
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -101,10 +103,23 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
     LaunchedEffect(Unit) { vm.ensureRegions(context); regionsReady = true }
     var scope by remember { mutableStateOf(DartScope.NATIONAL) }
     var region by remember { mutableStateOf("서울특별시") }
-    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
-    val here = remember(scope) { if (scope == DartScope.NEAR) lastKnownLocation(context) else null }
-    val pool = remember(scope, region, here, regionsReady) {
-        Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null).ifEmpty { Regions.all }
+    // Q56: 내 위치 N km — N chosen by the user (remembered), the position fetched fresh, never a silent switch to 전국.
+    val prefs = remember { context.getSharedPreferences("dart", android.content.Context.MODE_PRIVATE) }
+    var radiusKm by remember { mutableStateOf(prefs.getFloat("radiusKm", 100f).toDouble()) }
+    var here by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var locating by remember { mutableStateOf(false) }
+    var permissionTick by remember { mutableStateOf(0) }
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissionTick++ }
+    LaunchedEffect(scope, permissionTick) {
+        if (scope != DartScope.NEAR || !hasLocationPermission(context)) return@LaunchedEffect
+        here = here ?: lastKnownLocation(context)
+        locating = true
+        com.htb.carplan.phone.trip.currentLocation(context)?.let { here = it.latitude to it.longitude }
+        locating = false
+    }
+    val noPosition = scope == DartScope.NEAR && here == null
+    val pool = remember(scope, region, here, regionsReady, radiusKm) {
+        Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, radiusKm).ifEmpty { Regions.all }
     }
     val shown = dart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
     var flying by remember { mutableStateOf(false) }
@@ -121,7 +136,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
-                        ScopeChip("내 위치 100km", scope == DartScope.NEAR) {
+                        ScopeChip("내 위치", scope == DartScope.NEAR) {
                             if (!hasLocationPermission(context)) askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                             scope = DartScope.NEAR
                         }
@@ -132,7 +147,15 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                 if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Regions.sidoNames.forEach { s -> ScopeChip(s.removeSuffix("특별자치도").removeSuffix("특별자치시").removeSuffix("광역시").removeSuffix("특별시").removeSuffix("도").ifBlank { s }, region == s) { region = s } }
                 }
-                if (scope == DartScope.NEAR && here == null) Text("위치를 아직 몰라서 전국으로 보여 줘요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(horizontal = 20.dp))
+                if (scope == DartScope.NEAR) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    listOf(10.0, 30.0, 50.0, 100.0, 200.0).forEach { km ->
+                        ScopeChip("${km.toInt()}km", radiusKm == km) { radiusKm = km; prefs.edit().putFloat("radiusKm", km.toFloat()).apply() }
+                    }
+                    Text(
+                        when { locating && here == null -> "위치 찾는 중…"; noPosition -> "위치를 못 찾았어요 · [지역]에서 시·도를 골라 주세요"; else -> "" },
+                        fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
                 HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 6.dp))
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -140,7 +163,10 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                         pool = pool,
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
-                        onLanded = { lat, lng -> vm.throwDartAt(context, scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng) },
+                        onLanded = { lat, lng ->
+                            if (noPosition) vm.message.value = "위치를 몰라서 던질 수 없어요 · [지역]에서 시·도를 골라 주세요"
+                            else vm.throwDartAt(context, scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm)
+                        },
                     )
                     // Result card rises from the bottom once the dart has stuck.
                     androidx.compose.animation.AnimatedVisibility(
@@ -156,10 +182,35 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                             Text(d.resultName.split(" ").first(), fontSize = 16.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
                             Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == me) "내가 던짐" else "${nameOf(d.thrownBy)}님이 던짐"}", fontSize = 16.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
-                            if (eventId != null) Button(
-                                onClick = { vm.addDartAsStop(d) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-                                modifier = Modifier.padding(top = 12.dp).fillMaxWidth().height(50.dp),
-                            ) { Text("이 동네를 여행 칸으로", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+                            // Q57: what is there — the place goes in as the stop, not the 동네's middle.
+                            var cat by remember(d.id, d.throwCount) { mutableStateOf<com.htb.carplan.shared.net.KakaoCategory?>(null) }
+                            var spots by remember(d.id, d.throwCount) { mutableStateOf<List<com.htb.carplan.shared.model.Place>?>(null) }
+                            val uiScope = rememberCoroutineScope()
+                            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(com.htb.carplan.shared.net.KakaoCategory.FOOD, com.htb.carplan.shared.net.KakaoCategory.CAFE, com.htb.carplan.shared.net.KakaoCategory.SIGHT).forEach { k ->
+                                    ScopeChip(k.label, cat == k) { cat = k; spots = null; uiScope.launch { spots = vm.dartSpots(d, k) } }
+                                }
+                            }
+                            if (cat != null) Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                                val list = spots
+                                when {
+                                    list == null -> Text("찾는 중…", fontSize = 15.sp, color = Palette.TextSoft)
+                                    list.isEmpty() -> Text("근처에 ${cat!!.label}이(가) 없어요", fontSize = 15.sp, color = Palette.TextSoft)
+                                    else -> list.forEach { p ->
+                                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                                                Text(p.address, fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
+                                            }
+                                            if (eventId != null) TextButton(onClick = { vm.addPlaceAsStop(p, d) }) { Text("칸으로", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                                        }
+                                    }
+                                }
+                            }
+                            if (eventId != null) OutlinedButton(
+                                onClick = { vm.addDartAsStop(d) }, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
+                                modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(48.dp),
+                            ) { Text("동네 그대로 칸으로", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                             Text("마음에 안 들면 다시 당겨서 던지세요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
                         }
                     }

@@ -212,7 +212,7 @@ private fun hasLocationPermission(context: Context) =
 
 /** One fix from the platform LocationManager (no Play Services dependency); null after 8s. */
 @SuppressLint("MissingPermission")
-private suspend fun currentLocation(context: Context): Location? = withContext(Dispatchers.Main) {
+internal suspend fun currentLocation(context: Context): Location? = withContext(Dispatchers.Main) {
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).firstOrNull { lm.isProviderEnabled(it) }
         ?: return@withContext null

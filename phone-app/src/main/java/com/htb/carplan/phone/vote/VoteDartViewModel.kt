@@ -69,12 +69,38 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     }
 
     /** 6장: the dart landed at (lat, lng) on the board → the nearest 동네 in the scope is the result. */
-    fun throwDartAt(context: Context, scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double) = act {
+    fun throwDartAt(context: Context, scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double, radiusKm: Double = 100.0) = act {
         loadRegionsOnce(context)
         val current = dart.value
         val sameRoom = current != null && current.scope == scope && current.region == region && current.eventId == eventId
-        val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region)) ?: run { message.value = "그 범위엔 동네가 없어요"; return@act }
+        val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region, radiusKm)) ?: run { message.value = "그 범위엔 동네가 없어요"; return@act }
         darts.throwDart(groupId, if (sameRoom) current!!.id else null, scope, centerLat, centerLng, region, pick, if (sameRoom) current!!.throwCount + 1 else 1, uid.value.orEmpty(), eventId, date)
+    }
+
+    /**
+     * Q57: places of one kind around the dart's 동네 — 동 3 km, 읍·면 10 km (they are wide), twice that once if empty.
+     * Kept per throw so pressing the same chip again costs nothing (API 한도).
+     */
+    private val spotCache = HashMap<String, List<Place>>()
+    suspend fun dartSpots(d: Dart, category: com.htb.carplan.shared.net.KakaoCategory): List<Place> {
+        val key = "${d.id}#${d.throwCount}#${category.code}"
+        spotCache[key]?.let { return it }
+        if (!com.htb.carplan.phone.trip.kakao.available) return emptyList()
+        val wide = d.resultName.trim().endsWith("읍") || d.resultName.trim().endsWith("면")
+        val r = if (wide) 10_000 else 3_000
+        val found = runCatching {
+            com.htb.carplan.phone.trip.kakao.searchCategory(category, d.resultLat, d.resultLng, radiusMeters = r, size = 5)
+                .ifEmpty { com.htb.carplan.phone.trip.kakao.searchCategory(category, d.resultLat, d.resultLng, radiusMeters = r * 2, size = 5) }
+        }.getOrElse { message.value = it.message; return emptyList() }
+        spotCache[key] = found
+        return found
+    }
+
+    /** A recommended place from the dart → a stop (instead of the 동네's middle). */
+    fun addPlaceAsStop(place: Place, d: Dart) = act {
+        val e = eventId ?: return@act
+        trips.addStop(groupId, e, date ?: java.time.LocalDate.now().toString(), place, null, "다트 · " + d.resultName.split(" ").last(), uid.value.orEmpty())
+        message.value = "${place.name}을(를) 칸으로 넣었어요"
     }
 
     /** The board needs the full 읍·면·동 list to frame the scope. */

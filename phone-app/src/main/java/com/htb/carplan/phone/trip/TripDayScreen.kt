@@ -222,17 +222,12 @@ fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
                 }
                 myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             }
-            // Everything else (픽업·투표·다트·내보내기) behind one menu — the header stays calm.
+            // 내보내기 behind one menu; 픽업·투표·다트 sit in their own row under the header (P-c).
             Box {
                 IconButton(onClick = { exportMenu = true }, enabled = exporting == null) { Icon(Icons.Filled.MoreVert, "더보기", tint = Palette.TextStrong) }
                 exporting?.let { Text(it, fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomCenter)) }
                 androidx.compose.material3.DropdownMenu(exportMenu, onDismissRequest = { exportMenu = false }) {
-                    if (!locked) {
-                        androidx.compose.material3.DropdownMenuItem({ Text(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") }, onClick = { exportMenu = false; pickupOpen = true })
-                        androidx.compose.material3.DropdownMenuItem({ Text("투표") }, onClick = { exportMenu = false; voteOpen = true })
-                        androidx.compose.material3.DropdownMenuItem({ Text("다트 — 동네 뽑기") }, onClick = { exportMenu = false; dartOpen = true })
-                        if (records.isNotEmpty()) androidx.compose.material3.HorizontalDivider(color = Palette.Line)
-                    }
+                    if (records.isEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보낼 기록이 아직 없어요", color = Palette.TextSoft) }, onClick = { exportMenu = false })
                     if (records.isNotEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보내기 · 이미지 1장") }, onClick = {
                         exportMenu = false
                         scope.launch { runCatching { DayExport.share(context, event?.title ?: "하루 기록", "${date}  ·  ${group?.name ?: ""}", exportItems()) } }
@@ -250,6 +245,12 @@ fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
             }
         }
 
+        // P-c: the "decide together" tools, visible instead of hidden in ⋮.
+        if (!locked) Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolChip(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") { pickupOpen = true }
+            ToolChip("투표") { voteOpen = true }
+            ToolChip("다트 · 동네 뽑기") { dartOpen = true }
+        }
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             dates.forEachIndexed { i, d -> DateTab(d, i + 1, selected = d == date) { vm.showDate(d) } }
         }
@@ -540,6 +541,14 @@ private fun StopBox(
         }
         if (!locked) IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) } else Spacer(Modifier.width(12.dp))
     }
+}
+
+@Composable
+private fun ToolChip(label: String, onClick: () -> Unit) {
+    Text(
+        label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy,
+        modifier = Modifier.clip(Corner).border(1.dp, Palette.Line, Corner).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+    )
 }
 
 /** 10장 8: what the car has done with the plan — "경로 바뀜 · 다음 도착 15:40", "운전자가 이전 경로 유지", "차에 반영 대기 중". */
