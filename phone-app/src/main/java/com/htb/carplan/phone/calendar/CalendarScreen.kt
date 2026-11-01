@@ -59,6 +59,7 @@ import com.htb.carplan.phone.ui.CenterSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.sideSwipe
+import androidx.compose.foundation.combinedClickable
 import com.htb.carplan.phone.ui.argb
 import com.htb.carplan.shared.calendar.CategoryColors
 import com.htb.carplan.shared.calendar.KoreanHolidays
@@ -149,7 +150,11 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                             (androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(com.htb.carplan.phone.ui.MOTION_MS)) { -dir * it / 3 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(com.htb.carplan.phone.ui.MOTION_MS)))
                     },
                 ) { m ->
-                    MonthGridView(m, selected, events, categories, Modifier.fillMaxSize()) { date ->
+                    MonthGridView(
+                        m, selected, events, categories, Modifier.fillMaxSize(),
+                        // 손⑨ (아이폰·갤럭시 캘린더): hold a day to add an event on it straight away.
+                        onDayLongClick = { date -> vm.select(date); quickAddDate = date },
+                    ) { date ->
                         vm.select(date)
                         if (!wide) daySheetOpen = true
                     }
@@ -229,6 +234,7 @@ private fun MonthGridView(
     events: List<CalendarEvent>,
     categories: List<CustomCategory>,
     modifier: Modifier = Modifier,
+    onDayLongClick: (LocalDate) -> Unit = {},
     onDayClick: (LocalDate) -> Unit,
 ) {
     val multiDay = events.filter { it.event.endDate.isNotEmpty() && it.event.endDate != it.event.startDate }
@@ -239,7 +245,7 @@ private fun MonthGridView(
         }
         MonthGrid.weeks(month).forEach { weekStart ->
             HorizontalDivider(color = Palette.Line)
-            WeekRow(month, weekStart, selected, multiDay, singleDay, categories, Modifier.weight(1f), onDayClick)
+            WeekRow(month, weekStart, selected, multiDay, singleDay, categories, Modifier.weight(1f), onDayLongClick, onDayClick)
         }
     }
 }
@@ -253,6 +259,7 @@ private fun WeekRow(
     singleDay: List<CalendarEvent>,
     categories: List<CustomCategory>,
     modifier: Modifier,
+    onDayLongClick: (LocalDate) -> Unit = {},
     onDayClick: (LocalDate) -> Unit,
 ) {
     val bars = MonthGrid.bars(weekStart, multiDay)
@@ -260,6 +267,7 @@ private fun WeekRow(
     val barsHeight = (BAR_HEIGHT + BAR_GAP) * lanes
     BoxWithConstraints(modifier.fillMaxWidth().heightIn(min = DATE_AREA + barsHeight + MARK_AREA + 6.dp)) {
         val colW: Dp = maxWidth / 7
+        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
         Row(Modifier.fillMaxSize()) {
             (0..6).forEach { i ->
                 val date = weekStart.plusDays(i.toLong())
@@ -271,7 +279,9 @@ private fun WeekRow(
                     hiddenBars = bars.count { it.lane >= MAX_LANES && i in it.startCol..it.endCol },
                     barsHeight = barsHeight,
                     categories = categories,
-                    modifier = Modifier.weight(1f).fillMaxHeight().clickable { onDayClick(date) },
+                    modifier = Modifier.weight(1f).fillMaxHeight().combinedClickable(
+                        onLongClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onDayLongClick(date) },
+                    ) { onDayClick(date) },
                 )
             }
         }

@@ -13,7 +13,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -89,11 +91,19 @@ fun BackScreen(onBack: () -> Unit, content: @Composable (back: () -> Unit) -> Un
  * Swipe sideways to step back or forward (달 · 날짜): finger left = next, right = previous, once past 64dp. Vertical
  * scrolling and long-press dragging underneath keep working (the gesture locks to one direction first).
  */
-fun Modifier.sideSwipe(key: Any?, onPrev: () -> Unit, onNext: () -> Unit): Modifier = pointerInput(key) {
-    var total = 0f
-    val threshold = 64.dp.toPx()
-    detectHorizontalDragGestures(
-        onDragStart = { total = 0f },
-        onDragEnd = { if (total < -threshold) onNext() else if (total > threshold) onPrev() },
-    ) { change, dx -> total += dx; change.consume() }
+@Composable
+fun Modifier.sideSwipe(key: Any?, onPrev: () -> Unit, onNext: () -> Unit): Modifier {
+    // 손⑧: a light tick when the page actually turns.
+    val haptic = LocalHapticFeedback.current
+    return pointerInput(key) {
+        var total = 0f
+        val threshold = 64.dp.toPx()
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragEnd = {
+                if (total < -threshold) { haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); onNext() }
+                else if (total > threshold) { haptic.performHapticFeedback(HapticFeedbackType.SegmentTick); onPrev() }
+            },
+        ) { change, dx -> total += dx; change.consume() }
+    }
 }

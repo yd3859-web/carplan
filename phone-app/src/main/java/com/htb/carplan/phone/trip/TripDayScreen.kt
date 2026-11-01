@@ -282,8 +282,10 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         }
 
         val listState = rememberLazyListState()
+        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
         val reorder = rememberReorderableLazyListState(listState) { from, to ->
             vm.moveLocally(from.key as String, to.key as String)
+            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentFrequentTick)
         }
         // 손④: swipe the day sideways for the next / previous 일차 (same as the calendar's months).
         val dayAt = dates.indexOf(date)
@@ -320,7 +322,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                             isLast = i == stops.lastIndex,
                             dragging = dragging,
                             locked = locked,
-                            modifier = if (locked) Modifier else Modifier.longPressDraggableHandle(onDragStopped = { vm.commitOrder() }),
+                            modifier = if (locked) Modifier else Modifier.longPressDraggableHandle(onDragStarted = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) }, onDragStopped = { vm.commitOrder() }),
                             onOpen = { if (!locked) editing = stop },
                             onRemove = { vm.remove(stop.id) },
                             onTimeTap = { if (!locked) timeFor = stop },
@@ -658,12 +660,14 @@ private fun CommentComposer(onSend: (String) -> Unit, startOpen: Boolean = false
 @Composable
 private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit, onParking: () -> Unit = {}) {
     val tv = LocalTripVm.current
+    var viewing by remember { mutableStateOf<Int?>(null) }
+    viewing?.let { com.htb.carplan.phone.ui.PhotoViewer(r.photoUrls, it) { viewing = null } }
     Column(Modifier.padding(top = 8.dp, start = 4.dp)) {
         if (r.photoUrls.isNotEmpty()) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                r.photoUrls.forEach { url ->
+                r.photoUrls.forEachIndexed { i, url ->
                     Box {
-                        AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(96.dp).clip(Corner))
+                        AsyncImage(model = url, contentDescription = "사진 크게 보기", contentScale = ContentScale.Crop, modifier = Modifier.size(96.dp).clip(Corner).clickable { viewing = i })
                         if (!locked && editable) Text("×", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.TopEnd).background(Color(0x66000000)).clickable { onRemovePhoto(url) }.padding(horizontal = 8.dp, vertical = 2.dp))
                     }
                 }

@@ -190,9 +190,13 @@ private fun DiaryBody(p: DiaryDay, recs: List<com.htb.carplan.shared.model.Recor
     if (recs.isNotEmpty()) Text(path.joinToString(" → ") + "  ·  ${path.size}곳", fontSize = 15.sp, color = Palette.ChipText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
     else Text("들른 곳 없음", fontSize = 15.sp, color = Palette.TextSoft)
     recs.firstOrNull { it.note.isNotBlank() }?.let { Text("“${it.note}”", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 6.dp)) }
-    val photos = recs.flatMap { it.photoUrls }.take(4)
-    if (photos.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        photos.forEach { url -> coil3.compose.AsyncImage(model = url, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(72.dp).clip(Corner)) }
+    val all = recs.flatMap { it.photoUrls }
+    // A photo opens big (all of the day's photos, sideways); the rest of the card opens the day.
+    var viewing by remember { mutableStateOf<Int?>(null) }
+    viewing?.let { com.htb.carplan.phone.ui.PhotoViewer(all, it) { viewing = null } }
+    if (all.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        all.take(4).forEachIndexed { i, url -> coil3.compose.AsyncImage(model = url, contentDescription = "사진 크게 보기", contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(72.dp).clip(Corner).clickable { viewing = i }) }
+        if (all.size > 4) Text("+${all.size - 4}", fontSize = 15.sp, color = Palette.TextSoft)
     }
 }
 

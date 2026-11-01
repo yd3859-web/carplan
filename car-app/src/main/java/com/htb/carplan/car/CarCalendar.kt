@@ -88,13 +88,21 @@ fun OnCarTabTapAgain(action: suspend () -> Unit) {
  * Swipe sideways for the next / previous month (폰 캘린더와 같음, the arrow buttons still work). Parked only — the
  * calendar and records tabs do not exist while driving.
  */
-fun Modifier.monthSwipe(key: Any, onPrev: () -> Unit, onNext: () -> Unit): Modifier = pointerInput(key) {
-    var total = 0f
-    val threshold = 80.dp.toPx()
-    detectHorizontalDragGestures(
-        onDragStart = { total = 0f },
-        onDragEnd = { if (total < -threshold) onNext() else if (total > threshold) onPrev() },
-    ) { change, dx -> total += dx; change.consume() }
+@Composable
+fun Modifier.monthSwipe(key: Any, onPrev: () -> Unit, onNext: () -> Unit): Modifier {
+    // Pleos: touch answers with a vibration — a tick when the month turns.
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    return pointerInput(key) {
+        var total = 0f
+        val threshold = 80.dp.toPx()
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragEnd = {
+                if (total < -threshold) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick); onNext() }
+                else if (total > threshold) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick); onPrev() }
+            },
+        ) { change, dx -> total += dx; change.consume() }
+    }
 }
 
 /**
@@ -104,6 +112,7 @@ fun Modifier.monthSwipe(key: Any, onPrev: () -> Unit, onNext: () -> Unit): Modif
  */
 @Composable
 fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifier) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val c = LocalCarColors.current
     // Same colours as the rest of the screen (Pleos light/dark): a white bar by day, the popup grey by night.
     val bar = if (c.dark) c.sheet else c.bg
@@ -128,7 +137,7 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
                 Column(
                     Modifier.width(tabW).height(100.dp)
                         .clip(RoundedCornerShape(50))
-                        .clickable { onTab(t) },
+                        .clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); onTab(t) },
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                 ) {
                     androidx.compose.material3.Icon(t.icon, contentDescription = null, tint = if (on) c.ink else c.soft, modifier = Modifier.size(42.dp))

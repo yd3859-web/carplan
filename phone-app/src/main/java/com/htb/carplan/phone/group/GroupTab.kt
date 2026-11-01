@@ -256,10 +256,12 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
                         modifier = Modifier.weight(1f).height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
                     ) { Text("초대 링크 보내기", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
                     var copied by remember(g.id) { mutableStateOf(false) }
+                    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                     OutlinedButton(
                         onClick = {
                             (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
                                 .setPrimaryClip(android.content.ClipData.newPlainText("초대 코드", g.inviteCode))
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                             copied = true
                         },
                         modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line),

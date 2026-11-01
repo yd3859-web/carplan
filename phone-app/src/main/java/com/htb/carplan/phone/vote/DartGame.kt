@@ -160,11 +160,13 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                 HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 6.dp))
 
                 Box(Modifier.weight(1f).fillMaxWidth()) {
+                    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
                     if (regionsReady) DotMapBoard(
                         pool = pool,
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
                         onLanded = { lat, lng ->
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) // the dart sticks
                             if (noPosition) vm.message.value = "위치를 몰라서 던질 수 없어요 · [지역]에서 시·도를 골라 주세요"
                             else vm.throwDartAt(context, scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm)
                         },
