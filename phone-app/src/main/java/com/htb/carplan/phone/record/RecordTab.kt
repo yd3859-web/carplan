@@ -108,10 +108,6 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
     var open by rememberSaveable { mutableStateOf<List<String>?>(null) }
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
     com.htb.carplan.phone.ui.OnTabTapAgain { if (open != null) open = null else list.animateScrollToItem(0) }
-    open?.let { (g, e, d) ->
-        TripDayScreen(TripRef(g, e, d), onBack = { open = null })
-        return
-    }
     val today = LocalDate.now()
     // A multi-day trip is one page per day (up to today); newest first.
     val pages = remember(days) {
@@ -142,6 +138,7 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
+    open?.let { (g, e, d) -> com.htb.carplan.phone.ui.BackScreen(onBack = { open = null }) { back -> TripDayScreen(TripRef(g, e, d), onBack = back) } }
 }
 
 @Composable

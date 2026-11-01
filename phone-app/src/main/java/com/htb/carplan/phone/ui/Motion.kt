@@ -1,6 +1,21 @@
 package com.htb.carplan.phone.ui
 
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -27,4 +42,44 @@ fun Enter(entry: Entry, modifier: Modifier = Modifier, key: Any? = Unit, content
         Entry.SCREEN -> fadeIn(tween(MOTION_MS)) + slideInHorizontally(tween(MOTION_MS)) { it / 12 }
     }
     AnimatedVisibility(visibleState = state, modifier = modifier, enter = enter) { content() }
+}
+
+/**
+ * 손① 뒤로 손짓 (아이폰 왼쪽 끝 밀기, 안드로이드 예측 뒤로): a full screen drawn over the one it came from. The back
+ * gesture moves it right with the finger and the screen underneath shows through; let go early and it slides back.
+ * The ← button gets the same slide ([content]'s `back`). Must be emitted last in a full-size Box parent (the tab's
+ * Box) so the screen underneath stays composed under it. Nested ones (그룹 → 여행) close the top one first.
+ */
+@Composable
+fun BackScreen(onBack: () -> Unit, content: @Composable (back: () -> Unit) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val gone = remember { Animatable(0f) } // 0 = in place, 1 = slid out to the right
+    var leaving by remember { mutableStateOf(false) }
+    val leave: () -> Unit = {
+        if (!leaving) {
+            leaving = true
+            scope.launch { gone.animateTo(1f, tween(MOTION_MS)); onBack() }
+        }
+    }
+    PredictiveBackHandler(enabled = !leaving) { progress ->
+        try {
+            progress.collect { e -> gone.snapTo(e.progress) }
+            leaving = true
+            gone.animateTo(1f, tween((MOTION_MS * (1f - gone.value)).toInt().coerceAtLeast(80)))
+            onBack()
+        } catch (e: CancellationException) {
+            scope.launch { gone.animateTo(0f, tween(MOTION_MS)) }
+            throw e
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        // The screen underneath, a little dimmed, brightening as this one moves away.
+        if (gone.value > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.16f * (1f - gone.value))))
+        Box(
+            Modifier.fillMaxSize()
+                .graphicsLayer { translationX = gone.value * size.width; shadowElevation = if (gone.value > 0f) 16.dp.toPx() else 0f }
+                // Touches stop here: the screen underneath must not get them.
+                .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
+        ) { content(leave) }
+    }
 }

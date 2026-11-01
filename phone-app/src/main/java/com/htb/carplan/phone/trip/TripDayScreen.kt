@@ -1,6 +1,5 @@
 package com.htb.carplan.phone.trip
 
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -195,8 +194,6 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         val nextAt = stops.drop(index + 1).firstNotNullOfOrNull { recordByStop[it.id]?.arrivedAt?.toDate()?.time } ?: Long.MAX_VALUE
         return unplanned.filter { u -> val t = u.arrivedAt?.toDate()?.time ?: 0L; t >= at && t < nextAt }
     }
-
-    BackHandler(onBack = onBack)
 
     val driving = day?.status == DayStatus.DRIVING
     val nextId = if (driving) stops.firstOrNull { !it.visited }?.id else null

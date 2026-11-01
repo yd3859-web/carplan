@@ -117,11 +117,6 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
         else { vm.showMonth(java.time.YearMonth.now()); vm.select(LocalDate.now()) }
     }
 
-    openTrip?.let { ref ->
-        TripDayScreen(ref, onBack = { openTrip = null })
-        return
-    }
-
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
         val wide = maxWidth >= 720.dp
         Row(Modifier.fillMaxSize()) {
@@ -218,6 +213,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             onDismiss = { quickAddDate = null },
         )
     }
+    // Over the calendar, so the back gesture shows it underneath.
+    openTrip?.let { ref -> com.htb.carplan.phone.ui.BackScreen(onBack = { openTrip = null }) { back -> TripDayScreen(ref, onBack = back) } }
 }
 
 @Composable

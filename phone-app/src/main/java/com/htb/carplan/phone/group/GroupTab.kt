@@ -1,7 +1,6 @@
 package com.htb.carplan.phone.group
 
 import android.content.Intent
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -91,17 +90,6 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
         }
     }
 
-    openTrip?.let { (g, e, d) ->
-        TripDayScreen(TripRef(g, e, d), onBack = { openTrip = null })
-        return
-    }
-    selectedId?.let { id ->
-        com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN, key = id) {
-            GroupScreen(vm, id, onBack = { vm.open(null) }, onOpenTrip = { g, e, d -> openTrip = listOf(g, e, d) })
-        }
-        return
-    }
-
     val scan = rememberLauncherForActivityResult(ScanContract()) { result -> result.contents?.let { InviteInbox.offer(it) } }
     val groupTrips by vm.groupTrips.collectAsStateWithLifecycle()
     var plus by remember { mutableStateOf(false) }
@@ -176,6 +164,15 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
     }
     if (joining) CodeDialog(title = "초대 코드로 참여", hint = "초대 코드 6자리", action = "참여", onDismiss = { joining = false }) { joining = false; InviteInbox.offerCode(it) }
     if (addingFriend) CodeDialog(title = "친구 추가", hint = "친구 코드 6자리", action = "추가", note = "내 친구 코드는 ${me?.friendCode ?: "…"} 예요. 같은 그룹에 있었던 사람은 자동으로 친구예요.", onDismiss = { addingFriend = false }) { addingFriend = false; vm.addFriendByCode(it) }
+    // Full screens over the list (그룹 → 여행), so the back gesture shows the one underneath.
+    selectedId?.let { id ->
+        com.htb.carplan.phone.ui.BackScreen(onBack = { vm.open(null) }) { back ->
+            com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN, key = id) {
+                GroupScreen(vm, id, onBack = back, onOpenTrip = { g, e, d -> openTrip = listOf(g, e, d) })
+            }
+        }
+    }
+    openTrip?.let { (g, e, d) -> com.htb.carplan.phone.ui.BackScreen(onBack = { openTrip = null }) { back -> TripDayScreen(TripRef(g, e, d), onBack = back) } }
 }
 
 /** A 6-character code in its own small sheet (join / friend). */
@@ -233,7 +230,6 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
     var renaming by remember { mutableStateOf(false) }
     var voteOpen by remember { mutableStateOf(false) }
     var dartOpen by remember { mutableStateOf(false) }
-    BackHandler(onBack = onBack)
     val g = group ?: return
     val isOwner = g.ownerUid == session?.uid
 

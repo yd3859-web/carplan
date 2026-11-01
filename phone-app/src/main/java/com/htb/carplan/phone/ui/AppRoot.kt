@@ -79,14 +79,10 @@ fun AppRoot() {
     }
     val groupVm: GroupViewModel = viewModel()
     val pushTrip by InviteInbox.openTrip.collectAsStateWithLifecycle()
-    pushTrip?.let { (g, e, d) ->
-        // 17장: the push's trip day, full screen, until the user goes back.
-        TripDayScreen(TripRef(g, e, d), onBack = { InviteInbox.clearTrip() })
-        return
-    }
     // 손② (갤럭시 기본 앱): back on another tab goes to 캘린더 first; only 캘린더 leaves the app. Screens opened inside a
-    // tab have their own BackHandler, composed later, so they still close first.
+    // tab have their own back (BackScreen), registered later, so they still close first.
     androidx.activity.compose.BackHandler(enabled = tab != Tab.CALENDAR) { tab = Tab.CALENDAR }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(Palette.Background)) {
         // Tabs slide sideways toward the one picked (the car's tab bar does the same).
         androidx.compose.animation.AnimatedContent(
@@ -110,6 +106,9 @@ fun AppRoot() {
             }
         }
         TabBar(selected = tab, onSelect = { if (it == tab) tapAgain++ else tab = it })
+    }
+    // 17장: the push's trip day over the tabs, until the user goes back.
+    pushTrip?.let { (g, e, d) -> BackScreen(onBack = { InviteInbox.clearTrip() }) { back -> TripDayScreen(TripRef(g, e, d), onBack = back) } }
     }
     // An invite (link, QR, code) can arrive on any tab (1장 4): ask, then land in the group.
     JoinDialog(groupVm) { joined -> groupVm.landAfterJoin(joined) { tab = Tab.GROUP } }
