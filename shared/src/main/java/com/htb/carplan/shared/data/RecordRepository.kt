@@ -35,7 +35,28 @@ class RecordRepository(
     suspend fun addRecord(groupId: String, eventId: String, date: String, record: Record): String {
         val ref = db.collection(FirestorePaths.records(groupId, eventId, date)).document()
         ref.set(record.copy(arrivedAt = record.arrivedAt ?: Timestamp.now())).await()
+        // Q58 "가 봄": the group has been here (recommendations list it before unknown places).
+        com.htb.carplan.shared.calendar.PlaceRank.keyOf(record.place)?.let { id ->
+            runCatching { db.document("${FirestorePaths.places(groupId)}/$id").set(mapOf("name" to record.place.name, "visited" to true), SetOptions.merge()).await() }
+        }
         return ref.id
+    }
+
+    /** Q58 [또 갈래요] on a record — on the record (count) and in the group's place memo (ranking). */
+    suspend fun setAgain(groupId: String, eventId: String, date: String, record: Record, uid: String, on: Boolean) {
+        val change = if (on) FieldValue.arrayUnion(uid) else FieldValue.arrayRemove(uid)
+        db.document("${FirestorePaths.records(groupId, eventId, date)}/${record.id}").update("againBy", change).await()
+        com.htb.carplan.shared.calendar.PlaceRank.keyOf(record.place)?.let { id ->
+            db.document("${FirestorePaths.places(groupId)}/$id").set(mapOf("name" to record.place.name, "againBy" to change, "visited" to true), SetOptions.merge()).await()
+        }
+    }
+
+    /** Q58: every place memo of these groups, merged by Kakao id (one read per group, at most a few dozen docs). */
+    suspend fun placeMemos(groupIds: List<String>): Map<String, com.htb.carplan.shared.model.PlaceMemo> {
+        val all = groupIds.flatMap { gid -> runCatching { db.collection(FirestorePaths.places(gid)).get().await().toObjects(com.htb.carplan.shared.model.PlaceMemo::class.java) }.getOrDefault(emptyList()) }
+        return all.groupBy { it.kakaoId }.mapValues { (id, list) ->
+            com.htb.carplan.shared.model.PlaceMemo(id, list.first().name, list.flatMap { it.againBy }.distinct(), list.any { it.visited })
+        }
     }
 
     /** An unplanned record made within [withinMs] at most [meters] from (lat, lng) — the same parking, not a new one. */

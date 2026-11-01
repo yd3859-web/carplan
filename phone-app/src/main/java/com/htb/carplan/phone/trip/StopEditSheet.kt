@@ -104,9 +104,10 @@ fun StopEditSheet(
                 shape = Corner,
                 colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
             ) { Text(if (existing == null) "칸 추가" else "저장", fontSize = 18.sp, fontWeight = FontWeight.SemiBold) }
-            if (onVote != null && existing != null && place != null) {
+            // 묶음 4: found a place but not sure → put it to a vote instead of straight into the day.
+            if (onVote != null && place != null) {
                 TextButton(onClick = { onVote(place!!) }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                    Text("이 장소로 투표 열기", color = Palette.TextSoft, fontSize = 17.sp)
+                    Text(if (existing == null) "칸 대신 투표에 올리기" else "이 장소로 투표 열기", color = Palette.TextSoft, fontSize = 17.sp)
                 }
             }
         }

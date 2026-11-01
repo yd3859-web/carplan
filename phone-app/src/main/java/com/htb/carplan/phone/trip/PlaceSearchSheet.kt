@@ -14,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.border
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,6 +80,8 @@ interface PlaceSource {
     suspend fun recommend(category: KakaoCategory, near: Pair<Double, Double>?): Result<List<Place>>
     /** A place of the plan that searches lean on; null = use the phone's location. */
     fun anchor(): Place?
+    /** Q58: what my groups think of places (또 갈래요 · 가 봄) — results are ordered and labelled by it. */
+    suspend fun memos(): Map<String, com.htb.carplan.shared.model.PlaceMemo> = emptyMap()
 }
 
 /** No itinerary yet: search plainly, recommend around the phone. */
@@ -106,6 +110,8 @@ fun PlaceSearchSheet(
     var message by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val hasKey = vm.kakaoAvailable
+    var memos by remember { mutableStateOf<Map<String, com.htb.carplan.shared.model.PlaceMemo>>(emptyMap()) }
+    LaunchedEffect(Unit) { memos = runCatching { vm.memos() }.getOrDefault(emptyMap()) }
 
     fun runSearch() {
         activeCategory = null
@@ -183,7 +189,9 @@ fun PlaceSearchSheet(
             if (loading) Text("찾는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
 
             LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
-                items(results, key = { it.kakaoId ?: it.name + it.lat }) { p -> PlaceRow(p) { onPick(p) } }
+                items(com.htb.carplan.shared.calendar.PlaceRank.rank(results, memos), key = { it.kakaoId ?: it.name + it.lat }) { p ->
+                    PlaceRow(p, com.htb.carplan.shared.calendar.PlaceRank.badge(p, memos)) { onPick(p) }
+                }
             }
 
             if (query.isNotBlank()) {
@@ -196,11 +204,15 @@ fun PlaceSearchSheet(
 }
 
 @Composable
-private fun PlaceRow(p: Place, onClick: () -> Unit) {
+private fun PlaceRow(p: Place, badge: String? = null, onClick: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
     ) {
-        Text(p.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(p.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f, fill = false))
+            // Q58: my groups' memory of this place, small and quiet.
+            badge?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 8.dp).border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
+        }
         if (p.address.isNotBlank()) Text(p.address, fontSize = 15.sp, color = Palette.TextSoft)
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))
     }

@@ -251,6 +251,19 @@ data class Record(
     val parkedLat: Double? = null,
     val parkedLng: Double? = null,
     val parkingNote: String = "",
+    /** Q58 [또 갈래요]: who pressed it (each member once). */
+    val againBy: List<String> = emptyList(),
+)
+
+/**
+ * .../groups/{gid}/places/{kakaoId} — what this group thinks of one place (Q58): who wants to go again, and whether
+ * the car has stopped there. Recommendations list these first (또 갈래요 → 가 봄 → nearest).
+ */
+data class PlaceMemo(
+    @DocumentId val kakaoId: String = "",
+    val name: String = "",
+    val againBy: List<String> = emptyList(),
+    val visited: Boolean = false,
 )
 
 /**

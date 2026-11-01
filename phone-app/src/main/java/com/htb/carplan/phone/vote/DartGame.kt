@@ -123,6 +123,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
     }
     val shown = dart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
     var flying by remember { mutableStateOf(false) }
+    var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(Palette.Background).systemBarsPadding()) {
@@ -200,8 +201,10 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Column(Modifier.weight(1f)) {
                                                 Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-                                                Text(p.address, fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
+                                                Text(listOfNotNull(memoBadge(vm, p), p.address).joinToString("  ·  "), fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
                                             }
+                                            // 묶음 4: not sure → put it to a vote with the others.
+                                            TextButton(onClick = { voteSeed = p }) { Text("투표", color = Palette.TextSoft, fontSize = 16.sp) }
                                             if (eventId != null) TextButton(onClick = { vm.addPlaceAsStop(p, d) }) { Text("칸으로", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
                                         }
                                     }
@@ -218,7 +221,16 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                 }
             }
         }
+        voteSeed?.let { seed -> VoteSheet(groupId, eventId, date, nameOf = nameOf, onPickPlace = { }, onDismiss = { voteSeed = null }, seed = seed) }
     }
+}
+
+/** Q58 label for a recommended place ("또 갈래요 2" / "가 봄"), from the memos the VM already read. */
+@Composable
+private fun memoBadge(vm: VoteDartViewModel, p: com.htb.carplan.shared.model.Place): String? {
+    var memos by remember { mutableStateOf<Map<String, com.htb.carplan.shared.model.PlaceMemo>>(emptyMap()) }
+    LaunchedEffect(Unit) { memos = vm.memos() }
+    return com.htb.carplan.shared.calendar.PlaceRank.badge(p, memos)
 }
 
 @Composable

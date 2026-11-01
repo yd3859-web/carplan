@@ -23,6 +23,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -126,12 +127,20 @@ private val NODE = 26.dp
  * stops on a dotted rail, and a "+" node at the end. The same rail is what the car fills in later
  * (visited nodes grey, the next one blue). Everything saves immediately.
  */
+/** The day's VM for small leaf rows (또 갈래요) without passing it through every row. */
+private val LocalTripVm = androidx.compose.runtime.staticCompositionLocalOf<TripDayViewModel?> { null }
+
 @Composable
 fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
+    var ref0 by remember(start) { mutableStateOf(start) }
+    val vm0: TripDayViewModel = viewModel(key = ref0.groupId + ref0.eventId, factory = tripVmFactory(ref0))
+    androidx.compose.runtime.CompositionLocalProvider(LocalTripVm provides vm0) { TripDayBody(ref0, vm0, onRefChange = { ref0 = it }, onBack = onBack) }
+}
+
+@Composable
+private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRef) -> Unit, onBack: () -> Unit) {
     // The first invite moves the event to its own group (A안); the screen follows it there.
-    var ref by remember(start) { mutableStateOf(start) }
-    val vm: TripDayViewModel = viewModel(key = ref.groupId + ref.eventId, factory = tripVmFactory(ref))
-    LaunchedEffect(vm) { vm.movedTo.collect { gid -> if (gid != null) ref = ref.copy(groupId = gid, date = vm.date.value) } }
+    LaunchedEffect(vm) { vm.movedTo.collect { gid -> if (gid != null) onRefChange(ref.copy(groupId = gid, date = vm.date.value)) } }
     var inviteOpen by rememberSaveable { mutableStateOf(false) }
     val event by vm.event.collectAsStateWithLifecycle()
     val dates by vm.dates.collectAsStateWithLifecycle()
@@ -372,7 +381,8 @@ fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
     }
 
     if (adding) {
-        StopEditSheet(vm, existing = null, onSave = { p, t, m -> vm.addStop(p, t, m); adding = false }, onDismiss = { adding = false })
+        StopEditSheet(vm, existing = null, onSave = { p, t, m -> vm.addStop(p, t, m); adding = false }, onDismiss = { adding = false },
+            onVote = { p -> voteSeed = p; adding = false; voteOpen = true })
     }
     editing?.let { stop ->
         StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null },
@@ -611,6 +621,7 @@ private fun CommentComposer(onSend: (String) -> Unit, startOpen: Boolean = false
 /** Photos + 한 줄 under a stop the car reached (14장). */
 @Composable
 private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit, onParking: () -> Unit = {}) {
+    val tv = LocalTripVm.current
     Column(Modifier.padding(top = 8.dp, start = 4.dp)) {
         if (r.photoUrls.isNotEmpty()) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -629,6 +640,18 @@ private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, on
                 TextButton(onClick = onNote) { Text(if (r.note.isBlank()) "한 줄" else "한 줄 고치기", fontSize = 15.sp, color = Palette.Navy) }
             }
             r.leftAt?.let { Text("떠남 ${hhmm(it)}", fontSize = 14.sp, color = Palette.TextSoft) }
+        }
+        // Q58 [또 갈래요]: each member once; places pressed here come first in recommendations.
+        if (tv != null) {
+            val me = tv.uid.collectAsStateWithLifecycle().value
+            val mine = me != null && me in r.againBy
+            val bg by animateColorAsState(if (mine) Palette.Navy else Palette.Background, tween(200), label = "again")
+            Text(
+                if (r.againBy.isEmpty()) "또 갈래요" else "또 갈래요 ${r.againBy.size}",
+                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (mine) Color.White else Palette.Navy,
+                modifier = Modifier.padding(top = 4.dp).clip(Corner).background(bg).border(1.dp, if (mine) Palette.Navy else Palette.Line, Corner)
+                    .clickable(enabled = !locked) { tv.toggleAgain(r) }.padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
         // ★3: the car knows where it parked; a phone adds the spot ("B2 C-14") so the way back is easy.
         if (r.parkedLat != null && r.parkedLng != null && r.leftAt == null) {

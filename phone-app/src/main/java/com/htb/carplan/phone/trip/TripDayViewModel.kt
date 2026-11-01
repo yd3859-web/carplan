@@ -383,6 +383,12 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         kakao.searchCategory(category, lat, lng)
     }
 
+    override suspend fun memos(): Map<String, com.htb.carplan.shared.model.PlaceMemo> =
+        recordsRepo.placeMemos(myGroups.first { it.isNotEmpty() }.map { it.id })
+
+    /** Q58 [또 갈래요] on a record: press again to take it back. */
+    fun toggleAgain(r: Record) = write { val me = me(); recordsRepo.setAgain(groupId, eventId, _date.value, r, me, me !in r.againBy) }
+
     /** The last stop that has real coordinates (to bias searches and recommendations). */
     override fun anchor(): Place? = stops.value.lastOrNull { it.place.hasCoords() }?.place
 

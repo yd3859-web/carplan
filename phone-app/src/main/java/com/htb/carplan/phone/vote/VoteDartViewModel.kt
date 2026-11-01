@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 /** 5장 투표 + 6장 다트 for one group (and, optionally, the trip day they belong to). */
 class VoteDartViewModel(private val groupId: String, private val eventId: String?, private val date: String?) : ViewModel() {
@@ -92,9 +93,18 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
             com.htb.carplan.phone.trip.kakao.searchCategory(category, d.resultLat, d.resultLng, radiusMeters = r, size = 5)
                 .ifEmpty { com.htb.carplan.phone.trip.kakao.searchCategory(category, d.resultLat, d.resultLng, radiusMeters = r * 2, size = 5) }
         }.getOrElse { message.value = it.message; return emptyList() }
-        spotCache[key] = found
-        return found
+        val ranked = com.htb.carplan.shared.calendar.PlaceRank.rank(found, memos())
+        spotCache[key] = ranked
+        return ranked
     }
+
+    /** Q58: my groups' 또 갈래요 · 가 봄, read once per window. */
+    private var memoCache: Map<String, com.htb.carplan.shared.model.PlaceMemo>? = null
+    suspend fun memos(): Map<String, com.htb.carplan.shared.model.PlaceMemo> = memoCache ?: runCatching {
+        val me = uid.value ?: return emptyMap()
+        val ids = com.htb.carplan.shared.data.CalendarRepository().observeGroups(me).first().map { it.id }
+        com.htb.carplan.shared.data.RecordRepository().placeMemos(ids)
+    }.getOrDefault(emptyMap()).also { memoCache = it }
 
     /** A recommended place from the dart → a stop (instead of the 동네's middle). */
     fun addPlaceAsStop(place: Place, d: Dart) = act {
