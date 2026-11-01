@@ -12,6 +12,7 @@ import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.model.User
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,6 +96,8 @@ class GroupViewModel : ViewModel() {
         }
         viewModelScope.launch { myGroups.collect { gs -> gs.flatMap { it.memberIds }.distinct().forEach(::loadName) } }
         viewModelScope.launch { friends.collect { it.forEach(::loadName) } }
+        // Once per app run: old one-event groups (before 초대 = 일정) leave the 묶음 list.
+        viewModelScope.launch { myGroups.first { it.isNotEmpty() }.filter { it.isCircle }.forEach { runCatching { groups.markOldEventGroup(it) } } }
     }
 
     fun nameOf(uid: String): String = when {
@@ -111,6 +114,16 @@ class GroupViewModel : ViewModel() {
     }
 
     fun open(groupId: String?) { _selectedId.value = groupId }
+
+    /** After joining: an event's own group (초대 = 일정) opens that event's timeline; a 묶음 opens its screen. */
+    fun landAfterJoin(groupId: String, openGroup: () -> Unit) {
+        viewModelScope.launch {
+            val g = runCatching { groups.observeGroup(groupId).first() }.getOrNull()
+            val e = g?.forEvent?.let { eid -> runCatching { calendar.observeEvent(groupId, eid).first() }.getOrNull() }
+            if (g?.forEvent != null && e != null) InviteInbox.showTrip(groupId, g.forEvent!!, e.startDate.ifBlank { java.time.LocalDate.now().toString() })
+            else { _selectedId.value = groupId; openGroup() }
+        }
+    }
 
     fun createGroup(name: String, onCreated: (String) -> Unit = {}) = act {
         val s = _session.value ?: return@act

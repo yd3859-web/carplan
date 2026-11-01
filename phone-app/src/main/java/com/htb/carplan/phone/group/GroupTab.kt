@@ -60,7 +60,7 @@ import com.htb.carplan.phone.vote.VoteSheet
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.data.CalendarEvent
-import com.htb.carplan.shared.data.CalendarRepository
+import com.htb.carplan.shared.data.GroupRepository
 import com.htb.carplan.shared.data.InviteLinks
 import com.htb.carplan.shared.model.BuiltInCategory
 import com.htb.carplan.shared.model.Group
@@ -101,22 +101,24 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("그룹", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            // One [+] for everything that is not "open a group": make · join by code · scan the car QR · add a friend.
+            Text("같이 탈 사람", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+            // One [+]: add a friend · scan the car QR · join by code · a new 묶음 (자주 타는 사람).
             Box {
                 IconButton(onClick = { plus = true }, modifier = Modifier.background(Palette.Navy, Corner)) { Icon(Icons.Filled.Add, "추가", tint = androidx.compose.ui.graphics.Color.White) }
                 DropdownMenu(plus, onDismissRequest = { plus = false }) {
-                    DropdownMenuItem({ Text("새 그룹 만들기") }, onClick = { plus = false; creating = true })
-                    DropdownMenuItem({ Text("초대 코드로 참여") }, onClick = { plus = false; joining = true })
-                    DropdownMenuItem({ Text("차 QR 찍기") }, onClick = { plus = false; scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt("차 화면의 QR을 비춰 주세요")) })
-                    HorizontalDivider(color = Palette.Line)
                     DropdownMenuItem({ Text("친구 추가 (코드)") }, onClick = { plus = false; addingFriend = true })
+                    DropdownMenuItem({ Text("QR 찍기 (차·친구)") }, onClick = { plus = false; scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt("차 화면이나 친구의 QR을 비춰 주세요")) })
+                    DropdownMenuItem({ Text("초대 코드로 참여") }, onClick = { plus = false; joining = true })
+                    HorizontalDivider(color = Palette.Line)
+                    DropdownMenuItem({ Text("자주 타는 사람 묶음 만들기") }, onClick = { plus = false; creating = true })
                 }
             }
         }
         message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
-        val shared = groups.filterNot { it.solo }
+        // 초대 = 일정 (정원 2026-10-31): each event invites its own people; this tab keeps the people — 묶음 and friends.
+        val shared = groups.filter { it.isCircle }
         LazyColumn(Modifier.weight(1f).padding(top = 10.dp)) {
+            item { SectionTitle("자주 타는 사람") }
             items(shared, key = { it.id }) { g ->
                 val t = groupTrips[g.id]
                 val tripLine = t?.let { ce ->
@@ -132,20 +134,33 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
                 GroupRow(g, who, tripLine) { vm.open(g.id) }
             }
             item {
-                if (shared.isEmpty()) Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("아직 그룹이 없어요", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-                    Text("오른쪽 위 [+]에서 만들거나 초대 코드로 들어와요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+                if (shared.isEmpty()) Text(
+                    "출퇴근 카풀·가족처럼 자주 같이 타는 사람을 묶어 두면, 일정에서 한 번에 초대해요. 오른쪽 위 [+]",
+                    fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(vertical = 6.dp),
+                )
+                SectionTitle("친구 ${friends.size}명")
+                if (friends.isEmpty()) Text("친구 코드를 주고받거나, 일정에 초대받으면 친구가 돼요", fontSize = 15.sp, color = Palette.TextSoft)
+            }
+            items(friends, key = { "f-$it" }) { uid ->
+                Text(vm.nameOf(uid), fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp))
+                HorizontalDivider(color = Palette.Line)
+            }
+            item {
+                val context = LocalContext.current
+                Row(Modifier.padding(top = 18.dp, bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("내 친구 코드  ${me?.friendCode ?: "…"}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                    me?.friendCode?.let { fc ->
+                        TextButton(onClick = {
+                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "carplan 친구 코드 $fc — ${InviteLinks.url(fc)}")
+                            context.startActivity(Intent.createChooser(send, "친구 코드 보내기"))
+                        }) { Text("보내기", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                    }
                 }
-                groups.firstOrNull { it.solo }?.let { solo ->
-                    Spacer(Modifier.height(16.dp))
-                    GroupRow(solo, "혼자 쓰는 일정 · 차량 관리", null) { vm.open(solo.id) }
-                }
-                Text("내 친구 코드  ${me?.friendCode ?: "…"}  ·  친구 ${friends.size}명", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 22.dp, bottom = 24.dp))
             }
         }
     }
 
-    if (creating) NameDialog(title = "새 그룹", hint = "예: 대학 동기, 우리 가족", confirm = "만들기", onDismiss = { creating = false }) { name ->
+    if (creating) NameDialog(title = "자주 타는 사람 묶음", hint = "예: 출근 카풀, 우리 가족", confirm = "만들기", onDismiss = { creating = false }) { name ->
         creating = false
         vm.createGroup(name) { vm.open(it) }
     }
@@ -285,7 +300,6 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
 
     if (newTrip) {
         // 3장 flow with this group fixed: title + dates, then straight into the rail.
-        val calendar = remember { CalendarRepository() }
         QuickAddSheet(
             initialDate = LocalDate.now(),
             categories = emptyList(),
@@ -294,8 +308,9 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             onSave = { e, _ ->
                 newTrip = false
                 scope.launch {
-                    runCatching { calendar.addEvent(g.id, e.copy(createdBy = session?.uid.orEmpty())) }
-                        .onSuccess { onOpenTrip(g.id, it, e.startDate) }
+                    // 초대 = 일정: the trip gets its own group with this 묶음's people (it does not live in the 묶음).
+                    runCatching { GroupRepository().addEventWith(g, e.copy(createdBy = session?.uid.orEmpty()), session?.uid.orEmpty()) }
+                        .onSuccess { (gid, eid) -> onOpenTrip(gid, eid, e.startDate) }
                 }
             },
             onDismiss = { newTrip = false },

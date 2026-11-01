@@ -101,8 +101,16 @@ data class Group(
     /** 6-character code for joining by code, link or QR (4장·7장). */
     val inviteCode: String = "",
     val solo: Boolean = false,
+    /**
+     * 초대 = 일정 (정원 2026-10-31): set when this group is one event's own group (made by the first invite).
+     * A shared group without it is a "자주 타는 사람" 묶음 (카풀·가족) — picked to invite its people at once.
+     */
+    val forEvent: String? = null,
     @ServerTimestamp val createdAt: Timestamp? = null,
-)
+) {
+    /** 자주 타는 사람 묶음: shared, and not one event's own group. */
+    val isCircle: Boolean get() = !solo && forEvent == null
+}
 
 enum class MaintenanceItem(val label: String) {
     FUEL("주유"),

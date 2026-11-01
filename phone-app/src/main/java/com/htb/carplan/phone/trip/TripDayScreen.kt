@@ -127,8 +127,12 @@ private val NODE = 26.dp
  * (visited nodes grey, the next one blue). Everything saves immediately.
  */
 @Composable
-fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
+fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
+    // The first invite moves the event to its own group (A안); the screen follows it there.
+    var ref by remember(start) { mutableStateOf(start) }
     val vm: TripDayViewModel = viewModel(key = ref.groupId + ref.eventId, factory = tripVmFactory(ref))
+    LaunchedEffect(vm) { vm.movedTo.collect { gid -> if (gid != null) ref = ref.copy(groupId = gid, date = vm.date.value) } }
+    var inviteOpen by rememberSaveable { mutableStateOf(false) }
     val event by vm.event.collectAsStateWithLifecycle()
     val dates by vm.dates.collectAsStateWithLifecycle()
     val date by vm.date.collectAsStateWithLifecycle()
@@ -190,11 +194,13 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
             Column(Modifier.weight(1f)) {
                 Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                // 4장에서 그룹 고르기가 생기면 여기 그룹 이름이 들어간다.
-                Text(
-                    listOfNotNull(group?.name ?: "그룹", "모두가 편집", dayLine(day)).joinToString(" · "),
-                    fontSize = 15.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft,
-                )
+                // Who is coming (초대 = 일정): tap to invite friends, a 묶음, or someone new.
+                val members = group?.takeUnless { it.solo }?.memberIds.orEmpty()
+                val who = if (members.size <= 1) "나만" else (listOfNotNull(me) + members.filter { it != me }).take(3).joinToString(" · ") { vm.nameOf(it) } + if (members.size > 3) " 외 ${members.size - 3}명" else ""
+                Row(Modifier.clip(Corner).clickable { inviteOpen = true }, verticalAlignment = Alignment.CenterVertically) {
+                    Text(listOfNotNull(who, dayLine(day)).joinToString(" · "), fontSize = 15.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft)
+                    Text("  같이 갈 사람", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
+                }
             }
             if (busy) Text("저장 중", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
             // 14장 내보내기: 이미지 1장(Q39) 또는 짧은 영상(사진 슬라이드 + 장소·시간 자막)
@@ -372,6 +378,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
             onVote = { p -> voteSeed = p; editing = null; voteOpen = true })
     }
     if (pickupOpen) PickupSheet(vm, onDismiss = { pickupOpen = false })
+    if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null }, seed = voteSeed)
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
     placePicker?.let { cb -> PlaceSearchSheet(vm = vm, onPick = { cb(it); placePicker = null }, onDismiss = { placePicker = null }) }

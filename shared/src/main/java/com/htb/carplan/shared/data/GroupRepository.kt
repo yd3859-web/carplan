@@ -27,20 +27,21 @@ class GroupRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
 
     /**
      * 초대 = 일정 단위 (정원 2026-10-31, A안): there is no "make a group first". The first invite to an event that
-     * still lives in the owner's solo group gives that event its own group (named after it) and moves it there with
-     * everything under it — days, stops, pickups, comments, records and their comments. The old copy is only marked
-     * deleted. An event already in a shared group stays where it is. Returns the group to invite into.
+     * is not yet in its own group (it lives in the solo group, or in a 묶음 from before) gives it one — named after
+     * it, with the people who could already see it — and moves it there with everything under it: days, stops,
+     * pickups, comments, records and their comments. The old copy is only marked deleted. Returns the group to
+     * invite into (the same one when the event already has its own).
      * Record photos stay at their old Storage path (only the owner can open them); rare, since people are usually
      * invited before the trip.
      */
     suspend fun shareEvent(groupId: String, eventId: String): String {
         val group = db.document(FirestorePaths.group(groupId)).get().await().toObject(Group::class.java) ?: return groupId
-        if (!group.solo) return groupId
+        if (group.forEvent == eventId) return groupId
         val from = db.document(FirestorePaths.event(groupId, eventId))
         val event = from.get().await()
         val data = event.data ?: return groupId
         val title = (data["title"] as? String)?.ifBlank { null } ?: "같이 가는 일정"
-        val newGroup = createGroup(title, group.ownerUid)
+        val newGroup = createGroup(title, group.ownerUid, members = group.memberIds, forEvent = eventId)
         val to = db.document(FirestorePaths.event(newGroup, eventId))
         val writes = ArrayList<Pair<com.google.firebase.firestore.DocumentReference, Map<String, Any?>>>()
         writes += to to data
@@ -62,11 +63,41 @@ class GroupRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
         return newGroup
     }
 
-    /** Creates a shared group owned by [ownerUid]; returns its id. */
-    suspend fun createGroup(name: String, ownerUid: String): String {
+    /** Creates a shared group owned by [ownerUid] (a 묶음, or with [forEvent] one event's own group); returns its id. */
+    suspend fun createGroup(name: String, ownerUid: String, members: List<String> = listOf(ownerUid), forEvent: String? = null): String {
         val ref = db.collection(FirestorePaths.GROUPS).document()
-        ref.set(Group(name = name.trim(), memberIds = listOf(ownerUid), ownerUid = ownerUid, inviteCode = Codes.new())).await()
+        ref.set(Group(name = name.trim(), memberIds = (listOf(ownerUid) + members).distinct(), ownerUid = ownerUid, inviteCode = Codes.new(), forEvent = forEvent)).await()
         return ref.id
+    }
+
+    /**
+     * A new event "with 가족": it gets its own group holding the 묶음's people — the event never lives in the 묶음,
+     * so inviting one more person later does not open the whole 묶음 to them. Returns (groupId, eventId).
+     */
+    suspend fun addEventWith(circle: Group, event: com.htb.carplan.shared.model.Event, ownerUid: String): Pair<String, String> {
+        val ref = db.collection(FirestorePaths.GROUPS).document()
+        val eventRef = db.collection(FirestorePaths.events(ref.id)).document()
+        // Group first (the event write is checked against its members), then the event, then the link.
+        ref.set(Group(name = event.title.trim().ifBlank { circle.name }, memberIds = (listOf(ownerUid) + circle.memberIds).distinct(), ownerUid = ownerUid, inviteCode = Codes.new(), forEvent = eventRef.id)).await()
+        eventRef.set(event).await()
+        return ref.id to eventRef.id
+    }
+
+    /**
+     * Groups made for one event before [Group.forEvent] existed (2026-10-31) look like 묶음s. One that holds exactly
+     * one event with the group's own name is that event's group: mark it so it leaves the 묶음 list.
+     */
+    suspend fun markOldEventGroup(g: Group) {
+        if (!g.isCircle) return
+        val events = db.collection(FirestorePaths.events(g.id)).get().await().documents
+        val only = events.singleOrNull() ?: return
+        if (only.getString("title")?.trim() == g.name.trim()) db.document(FirestorePaths.group(g.id)).update("forEvent", only.id).await()
+    }
+
+    /** Several people at once (a 묶음 picked in [같이 갈 사람]). */
+    suspend fun inviteAll(groupId: String, uids: List<String>) {
+        if (uids.isEmpty()) return
+        db.document(FirestorePaths.group(groupId)).update("memberIds", FieldValue.arrayUnion(*uids.toTypedArray())).await()
     }
 
     /** The group behind an invite code, or null. */

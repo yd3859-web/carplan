@@ -26,4 +26,7 @@ object InviteInbox {
     }
 
     fun clearTrip() { _openTrip.value = null }
+
+    /** Straight to a trip day (after joining an event's own group by its QR·link). */
+    fun showTrip(groupId: String, eventId: String, date: String) { _openTrip.value = listOf(groupId, eventId, date) }
 }

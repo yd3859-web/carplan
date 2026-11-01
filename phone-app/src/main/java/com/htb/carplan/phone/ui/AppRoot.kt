@@ -50,7 +50,7 @@ import com.htb.carplan.phone.login.LoginViewModel
 /** 하단 바 (2장): 캘린더 · 그룹 · 기록 · 차량 · 설정. */
 enum class Tab(val label: String, val icon: ImageVector) {
     CALENDAR("캘린더", Icons.Filled.DateRange),
-    GROUP("그룹", Icons.Filled.Person),
+    GROUP("같이 탈 사람", Icons.Filled.Person),
     RECORD("기록", Icons.Filled.Edit),
     CAR("차량", Icons.Filled.Build),
     SETTINGS("설정", Icons.Filled.Settings),
@@ -86,7 +86,7 @@ fun AppRoot() {
         TabBar(selected = tab, onSelect = { tab = it })
     }
     // An invite (link, QR, code) can arrive on any tab (1장 4): ask, then land in the group.
-    JoinDialog(groupVm) { joined -> groupVm.open(joined); tab = Tab.GROUP }
+    JoinDialog(groupVm) { joined -> groupVm.landAfterJoin(joined) { tab = Tab.GROUP } }
 }
 
 /** Flat system-style bar: hairline on top, icon + label, selected in black. */

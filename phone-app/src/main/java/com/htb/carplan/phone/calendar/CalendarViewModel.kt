@@ -188,17 +188,15 @@ class CalendarViewModel : ViewModel() {
         val s = _session.value ?: return
         val gid = groupId ?: s.soloGroupId
         if (event.categoryId == BuiltInCategory.TRIP.id) _lastGroupId.value = gid
+        // 초대 = 일정: "with 가족" makes the event its own group with 가족's people; it never lives in the 묶음.
+        val circle = groups.value.firstOrNull { it.id == gid && it.isCircle }
         viewModelScope.launch {
-            runCatching { calendar.addEvent(gid, event.copy(createdBy = s.uid)) }
-                .onSuccess { onAdded(gid, it) }
+            runCatching {
+                if (circle != null) GroupRepository().addEventWith(circle, event.copy(createdBy = s.uid), s.uid)
+                else gid to calendar.addEvent(gid, event.copy(createdBy = s.uid))
+            }
+                .onSuccess { (g, eid) -> onAdded(g, eid) }
                 .onFailure { _error.value = it.message }
-        }
-    }
-
-    fun createGroup(name: String, onCreated: (String) -> Unit) {
-        val s = _session.value ?: return
-        viewModelScope.launch {
-            runCatching { GroupRepository().createGroup(name, s.uid) }.onSuccess(onCreated).onFailure { _error.value = it.message }
         }
     }
 

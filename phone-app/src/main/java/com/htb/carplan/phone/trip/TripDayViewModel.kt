@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -103,6 +104,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val groups = GroupRepository()
+    private val cars = com.htb.carplan.shared.data.CarRepository()
     private val recordsRepo = RecordRepository()
     private val pickupsRepo = PickupRepository()
 
@@ -174,6 +176,53 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         recordsRepo.addRecord(groupId, eventId, _date.value, Record(place = Place(name = name.trim()), unplanned = true, createdBy = me()))
     }
 
+    // ---------- 같이 갈 사람 (초대 = 일정, 친구 = 한 번, 그룹 = 자주 타는 사람 묶음 — 정원 2026-10-31) ----------
+
+    private val myGroups: StateFlow<List<Group>> = uid.filterNotNull()
+        .flatMapLatest { calendar.observeGroups(it) }
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Friends (Q10): added once by code·QR, or met in any shared group. One tap invites them. */
+    val friends: StateFlow<List<String>> = uid.filterNotNull()
+        .flatMapLatest { me -> groups.observeFriends(me).catch { emit(emptyList()) }.combine(myGroups) { fs, gs -> (gs.filterNot { it.solo }.flatMap { it.memberIds } + fs.map { it.uid }).distinct().filterNot { it == me } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 자주 타는 사람 묶음 (카풀·가족): picking one invites all its people at once. */
+    val circles: StateFlow<List<Group>> = myGroups.map { gs -> gs.filter { it.isCircle }.sortedBy { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Set when the first invite moved this event to its own group — the screen follows it there. */
+    private val _movedTo = MutableStateFlow<String?>(null)
+    val movedTo: StateFlow<String?> = _movedTo.asStateFlow()
+
+    /** The event's own group, made on the first invite (it moves with its days, stops and records). */
+    private suspend fun ownGroup(): String {
+        val gid = groups.shareEvent(groupId, eventId)
+        if (gid != groupId) {
+            // 7장: a car already following this event follows it to the new place.
+            event.value?.carId?.let { carId ->
+                runCatching { if (calendar.observeCar(carId).first()?.activeEventId == eventId) cars.setActiveTrip(carId, gid, eventId) }
+            }
+            _movedTo.value = gid
+        }
+        return gid
+    }
+
+    fun invite(uids: List<String>) = write { groups.inviteAll(ownGroup(), uids) }
+
+    /** Someone new by their friend code: they become a friend (next time one tap) and join this event. */
+    fun inviteByFriendCode(code: String) = write {
+        val friend = groups.addFriendByCode(code, me()) ?: error("그 친구 코드를 찾지 못했어요")
+        groups.inviteAll(ownGroup(), listOf(friend))
+    }
+
+    /** The QR and the link carry the event group's invite code. */
+    fun inviteCode(onReady: (String) -> Unit) = write {
+        val gid = ownGroup()
+        groups.observeGroup(gid).first { it != null }?.inviteCode?.let(onReady)
+    }
+
     /** My car id (users/{uid}.carId) — enables "오늘 이 차로 가요" (7장 2). */
     val myCarId: StateFlow<String?> = uid.filterNotNull()
         .flatMapLatest { calendar.observeUser(it) }
@@ -235,6 +284,8 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         viewModelScope.launch { stops.collect { refreshLegs(it) } }
         viewModelScope.launch { remoteStops.collect { list -> list.mapNotNull { it.updatedBy }.distinct().forEach(::loadName) } }
         viewModelScope.launch { remoteComments.collect { list -> list.map { it.uid }.distinct().forEach(::loadName) } }
+        viewModelScope.launch { myGroups.collect { gs -> gs.filterNot { it.solo }.flatMap { it.memberIds }.distinct().forEach(::loadName) } }
+        viewModelScope.launch { friends.collect { it.forEach(::loadName) } }
     }
 
     fun showDate(d: String) {

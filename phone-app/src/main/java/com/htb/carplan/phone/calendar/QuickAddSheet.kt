@@ -107,10 +107,9 @@ fun QuickAddSheet(
     onDismiss: () -> Unit,
     /** 4장: "새 여행" from a group screen fixes the category to 여행 and hides the category and group chips. */
     fixedCategoryId: String? = null,
-    /** 4장: groups to pick from for a trip; empty hides the chip. */
+    /** 같이 갈 사람 for a trip: the solo group and the 묶음s (자주 타는 사람); empty hides the chip. */
     groups: List<Group> = emptyList(),
     defaultGroupId: String? = null,
-    onCreateGroup: (String, (String) -> Unit) -> Unit = { _, _ -> },
 ) {
     var title by remember { mutableStateOf("") }
     var start by remember { mutableStateOf(initialDate) }
@@ -126,7 +125,6 @@ fun QuickAddSheet(
 
     var groupId by remember { mutableStateOf(defaultGroupId) }
     var groupMenu by remember { mutableStateOf(false) }
-    var newGroup by remember { mutableStateOf(false) }
     val titleFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { titleFocus.requestFocus() } // the cursor is in the title the moment the dialog opens
     var dateMenu by remember { mutableStateOf(false) }
@@ -211,14 +209,15 @@ fun QuickAddSheet(
                 if (!isTrip) Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
                 if (fixedCategoryId == null) CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
                 if (isTrip && fixedCategoryId == null && groups.isNotEmpty()) Box {
+                    // 같이 갈 사람: 나만 or a 묶음 (자주 타는 사람). Single friends are invited on the next screen.
                     val g = groups.firstOrNull { it.id == groupId }
-                    Chip(Icons.Filled.Person, g?.name ?: "그룹", active = g != null && !g.solo) { groupMenu = true }
+                    Chip(Icons.Filled.Person, if (g == null || g.solo) "나만" else "${g.name}와", active = g != null && !g.solo) { groupMenu = true }
                     DropdownMenu(groupMenu, onDismissRequest = { groupMenu = false }) {
                         groups.forEach { gr ->
-                            DropdownMenuItem({ Text(gr.name + if (gr.solo) " (혼자)" else "  · ${gr.memberIds.size}명", fontWeight = if (gr.id == groupId) FontWeight.Bold else FontWeight.Normal) }, onClick = { groupMenu = false; groupId = gr.id })
+                            DropdownMenuItem({ Text(if (gr.solo) "나만" else "${gr.name}  · ${gr.memberIds.size}명", fontWeight = if (gr.id == groupId) FontWeight.Bold else FontWeight.Normal) }, onClick = { groupMenu = false; groupId = gr.id })
                         }
                         HorizontalDivider()
-                        DropdownMenuItem({ Text("새 그룹 만들기") }, onClick = { groupMenu = false; newGroup = true })
+                        DropdownMenuItem({ Text("친구는 다음 화면 [같이 갈 사람]에서", color = Palette.TextSoft) }, onClick = { groupMenu = false })
                     }
                 }
             }
@@ -281,18 +280,6 @@ fun QuickAddSheet(
             text = { TimeInput(state) },
             confirmButton = { TextButton(onClick = { time = "%02d:%02d".format(state.hour, state.minute); timePicker = false }) { Text("확인") } },
             dismissButton = { TextButton(onClick = { timePicker = false }) { Text("취소") } },
-        )
-    }
-
-    if (newGroup) {
-        var name by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { newGroup = false },
-            shape = Corner, containerColor = Palette.Background,
-            title = { Text("새 그룹") },
-            text = { TextField(name, { name = it }, placeholder = { Text("예: 대학 동기, 우리 가족") }, singleLine = true) },
-            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { newGroup = false; onCreateGroup(name) { groupId = it } }) { Text("만들기") } },
-            dismissButton = { TextButton(onClick = { newGroup = false }) { Text("취소") } },
         )
     }
 

@@ -178,9 +178,9 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             initialDate = date,
             categories = categories,
             onAddCategory = vm::addCategory,
-            groups = groups,
-            defaultGroupId = lastGroupId ?: groups.firstOrNull { it.solo }?.id,
-            onCreateGroup = vm::createGroup,
+            // [같이 갈 사람]: 나만, or one 묶음 (자주 타는 사람). Event-only groups are not picked here.
+            groups = groups.filter { it.solo || it.isCircle },
+            defaultGroupId = groups.firstOrNull { it.solo }?.id,
             onSave = { e, gid ->
                 quickAddDate = null
                 vm.addEvent(e, gid) { g, eid ->
