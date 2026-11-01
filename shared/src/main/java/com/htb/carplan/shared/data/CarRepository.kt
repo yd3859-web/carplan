@@ -35,6 +35,14 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
         return car.id
     }
 
+    /** The host lets the car go (another phone becomes its host with the 6 digits, which the car shows again). */
+    suspend fun unlink(carId: String, ownerUid: String) {
+        db.runBatch { batch ->
+            batch.update(db.document(FirestorePaths.car(carId)), "ownerUid", null)
+            batch.update(db.document(FirestorePaths.user(ownerUid)), "carId", com.google.firebase.firestore.FieldValue.delete())
+        }.await()
+    }
+
     suspend fun updateState(carId: String, state: CarState) {
         db.document(FirestorePaths.car(carId)).update(
             mapOf(

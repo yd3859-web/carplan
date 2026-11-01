@@ -96,6 +96,17 @@ class CarTabViewModel : ViewModel() {
         }
     }
 
+    /** Hand the car to another phone: it shows its 6 digits again. Only the host can (18장 rule). */
+    fun unlink() {
+        val me = _session.value?.uid ?: return
+        val c = car.value ?: return
+        viewModelScope.launch {
+            runCatching { cars.unlink(c.id, me) }
+                .onSuccess { message.value = "차 연결을 끊었어요. 차 화면에 6자리가 다시 떠요" }
+                .onFailure { message.value = it.message }
+        }
+    }
+
     fun log(item: MaintenanceItem, date: LocalDate, odometerKm: Double?, amountWon: Long?, liters: Double?, memo: String) {
         val s = _session.value ?: return
         val c = car.value
@@ -153,6 +164,20 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                 BigStat("주행가능", s.rangeKm?.takeIf { it > 0 }?.let { "${it.toInt()}" } ?: "—", "km")
                 BigStat("주행거리", s.odometerKm?.let { "%,d".format(it.toLong()) } ?: "—", "km")
                 BigStat("이번 달 주유비", "%,d".format(monthFuel), "원")
+            }
+            var confirmUnlink by remember { mutableStateOf(false) }
+            if (car!!.ownerUid == vm.session.collectAsStateWithLifecycle().value?.uid) {
+                androidx.compose.material3.TextButton(onClick = { confirmUnlink = true }, modifier = Modifier.padding(bottom = 6.dp)) { Text("이 차 연결 끊기", color = Palette.TextSoft, fontSize = 15.sp) }
+            }
+            if (confirmUnlink) com.htb.carplan.phone.ui.CenterSheet(onDismiss = { confirmUnlink = false }) {
+                Column {
+                    Text("차 연결을 끊을까요?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+                    Text("차 화면에 6자리가 다시 떠요. 다른 폰(또는 이 폰)에서 그 코드를 넣으면 그 폰이 호스트가 돼요. 일정·기록은 그대로예요.", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
+                        androidx.compose.material3.TextButton(onClick = { confirmUnlink = false }) { Text("취소", color = Palette.TextSoft, fontSize = 17.sp) }
+                        Button(onClick = { confirmUnlink = false; vm.unlink() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("연결 끊기", fontSize = 17.sp) }
+                    }
+                }
             }
         }
         HorizontalDivider(color = Palette.Line)
