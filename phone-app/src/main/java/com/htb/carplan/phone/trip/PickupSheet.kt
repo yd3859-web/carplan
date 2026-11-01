@@ -85,10 +85,13 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             }
             val center = carPos ?: mine?.place?.takeIf { it.hasCoords() }?.let { it.lat to it.lng } ?: markers.firstOrNull()?.let { it.lat to it.lng }
             if (center != null) SimpleMap(center.first, center.second, zoom = 13, markers = markers, path = path)
-            else Text("좌표가 있는 장소를 고르면 지도가 떠요 (카카오 키 없이는 이름만 저장됨)", fontSize = 15.sp, color = Palette.TextSoft)
-            // 11장 4: time and distance left — the phone's own route when it has one, else the car's ETA.
-            val etaText = routeLeg?.let { "차가 약 ${(it.seconds / 60).coerceAtLeast(1)}분 뒤 도착 · ${"%.1f".format(it.meters / 1000.0)} km" }
-                ?: mine?.etaSeconds?.takeIf { carPos != null && mine.status == PickupStatus.WAITING }?.let { "차가 약 ${(it / 60).coerceAtLeast(1)}분 뒤 도착" }
+            else Text("태울 곳을 고르면 지도가 떠요", fontSize = 15.sp, color = Palette.TextSoft)
+            // 11장 4: time left = the car's own ETA (the same number the car shows, every 30 s); the phone's route only fills
+            // in the distance, and the time when the car has none yet (P4).
+            val carEta = mine?.etaSeconds?.takeIf { carPos != null && mine.status == PickupStatus.WAITING }
+            val etaText = (carEta ?: routeLeg?.seconds?.toLong())?.let { sec ->
+                "차가 약 ${(sec / 60).coerceAtLeast(1)}분 뒤 도착" + (routeLeg?.let { " · ${"%.1f".format(it.meters / 1000.0)} km" } ?: "")
+            }
             etaText?.let { Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 6.dp)) }
 
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {

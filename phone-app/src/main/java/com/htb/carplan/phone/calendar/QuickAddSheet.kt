@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -76,6 +77,7 @@ import com.htb.carplan.shared.model.CustomCategory
 import com.htb.carplan.shared.model.Event
 import com.htb.carplan.shared.model.Group
 import com.htb.carplan.shared.model.Place
+import com.htb.carplan.shared.calendar.RouteMath.hasCoords
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -119,7 +121,8 @@ fun QuickAddSheet(
     var memo by remember { mutableStateOf<String?>(null) }
     val checklist = remember { mutableStateListOf<String>() }
     var categoryId by remember { mutableStateOf(fixedCategoryId ?: BuiltInCategory.OTHER.id) }
-    var place by remember { mutableStateOf<String?>(null) }
+    var place by remember { mutableStateOf<Place?>(null) }
+    var pickingPlace by remember { mutableStateOf(false) }
 
     var groupId by remember { mutableStateOf(defaultGroupId) }
     var groupMenu by remember { mutableStateOf(false) }
@@ -149,7 +152,7 @@ fun QuickAddSheet(
                 endDate = end.toString(),
                 allDay = time == null,
                 startTime = time,
-                place = place?.takeIf { it.isNotBlank() }?.let { Place(name = it.trim()) },
+                place = place,
                 repeat = repeat.rule(start),
                 reminderMinutes = reminder,
                 memo = memo.orEmpty().trim(),
@@ -183,7 +186,7 @@ fun QuickAddSheet(
             }
 
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!isTrip) Chip(Icons.Filled.Place, place?.takeIf { it.isNotBlank() } ?: "장소", active = place != null) { if (place == null) place = "" }
+                if (!isTrip) Chip(Icons.Filled.Place, place?.name ?: "장소", active = place != null) { pickingPlace = true }
                 Box {
                     Chip(Icons.Filled.DateRange, dateLabel(start, end, if (isTrip) null else time, if (isTrip) Repeat.NONE else repeat), active = true) { if (isTrip) rangePicker = true else dateMenu = true }
                     DropdownMenu(dateMenu, onDismissRequest = { dateMenu = false }) {
@@ -228,14 +231,24 @@ fun QuickAddSheet(
                 SmallField(m, { memo = it }, "메모", onRemove = { memo = null })
             }
             place?.let { p ->
-                // TODO(3장): Kakao Local keyword search once the Kakao key is issued.
-                SmallField(p, { place = it }, "장소 이름 (카카오 검색은 키 받으면 연결)", onRemove = { place = null })
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp).clip(Corner).clickable { pickingPlace = true }.padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                        Text(p.address.ifBlank { if (p.hasCoords()) "" else "이름만 · 갈 때 내비가 찾아요" }, fontSize = 15.sp, color = Palette.TextSoft)
+                    }
+                    IconButton(onClick = { place = null }) { Icon(Icons.Filled.Close, "지우기", tint = Palette.TextSoft) }
+                }
             }
             checklist.forEachIndexed { i, item ->
                 SmallField(item, { checklist[i] = it }, "체크리스트 항목", onRemove = { checklist.removeAt(i) })
             }
         }
     }
+
+    if (pickingPlace) com.htb.carplan.phone.trip.PlaceSearchSheet(
+        vm = com.htb.carplan.phone.trip.FreePlaces, initialQuery = place?.name.orEmpty(),
+        onPick = { place = it; pickingPlace = false }, onDismiss = { pickingPlace = false },
+    )
 
     if (rangePicker) {
         val state = rememberDateRangePickerState(

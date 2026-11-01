@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,7 +65,9 @@ fun SimpleMap(centerLat: Double, centerLng: Double, zoom: Int = 14, markers: Lis
             AsyncImage(
                 model = tileRequest(zoom, Math.floorMod(x, n.toInt()), y),
                 contentDescription = null, contentScale = ContentScale.FillBounds,
-                modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset((ox + (dx + 1) * tilePx).toInt(), (oy + (dy + 1) * tilePx).toInt()) }.size(tile),
+                // Unbounded: a map lower than one tile would otherwise squash every tile and leave gaps between rows.
+                modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset((ox + (dx + 1) * tilePx).toInt(), (oy + (dy + 1) * tilePx).toInt()) }
+                    .wrapContentSize(Alignment.TopStart, unbounded = true).size(tile),
             )
         }
         // 11장 4: the road the car will drive (Kakao Mobility geometry), in the one accent colour.

@@ -234,9 +234,18 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
                         },
                         modifier = Modifier.weight(1f).height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
                     ) { Text("초대 링크 보내기", fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
-                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line)) {
-                        Text("코드  ${g.inviteCode}", color = Palette.TextStrong, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    var copied by remember(g.id) { mutableStateOf(false) }
+                    OutlinedButton(
+                        onClick = {
+                            (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                                .setPrimaryClip(android.content.ClipData.newPlainText("초대 코드", g.inviteCode))
+                            copied = true
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp), shape = Corner, border = BorderStroke(1.dp, Palette.Line),
+                    ) {
+                        Text(if (copied) "복사했어요" else "코드  ${g.inviteCode}", color = Palette.TextStrong, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                     }
+                    if (copied) LaunchedEffect(Unit) { kotlinx.coroutines.delay(2000); copied = false }
                 }
                 Text("차 안에서는 차 화면의 QR로 들어와요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
                 val invitable = friends.filterNot { it in g.memberIds }

@@ -62,6 +62,11 @@ class RecordRepository(
     }
 
     /** Q36: fix a wrong place name (keeps the record's own coordinates when the new place has none). */
+    /** ★3: the spot written on a phone ("B2 C-14") next to where the car parked. */
+    suspend fun setParkingNote(groupId: String, eventId: String, date: String, recordId: String, note: String) {
+        db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("parkingNote", note.trim()).await()
+    }
+
     suspend fun setPlace(groupId: String, eventId: String, date: String, recordId: String, place: Place) {
         db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("place", place).await()
     }

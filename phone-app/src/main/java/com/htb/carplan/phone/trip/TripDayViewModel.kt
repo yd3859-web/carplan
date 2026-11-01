@@ -53,7 +53,7 @@ val kakao: KakaoApi by lazy { KakaoApi(BuildConfig.KAKAO_REST_KEY) }
  * Order edits are applied locally first (drag feels instant) and then written back.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class TripDayViewModel(private val groupId: String, private val eventId: String, initialDate: String) : ViewModel() {
+class TripDayViewModel(private val groupId: String, private val eventId: String, initialDate: String) : ViewModel(), PlaceSource {
     private val sessions = SessionRepository()
     private val calendar = CalendarRepository()
     private val trips = TripRepository()
@@ -159,6 +159,8 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     fun removePhoto(recordId: String, url: String) = write { recordsRepo.removePhoto(groupId, eventId, _date.value, recordId, url) }
 
     fun setNote(recordId: String, note: String) = write { recordsRepo.setNote(groupId, eventId, _date.value, recordId, note) }
+
+    fun setParkingNote(recordId: String, note: String) = write { recordsRepo.setParkingNote(groupId, eventId, _date.value, recordId, note) }
 
     /** Q36: fix a wrong place name on an unplanned record. */
     fun setRecordPlace(recordId: String, place: Place) = write {
@@ -319,19 +321,19 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
 
     // ---------- place search (Kakao, or typed name without a key) ----------
 
-    val kakaoAvailable: Boolean get() = kakao.available
+    override val kakaoAvailable: Boolean get() = kakao.available
 
-    suspend fun search(query: String): Result<List<Place>> =
+    override suspend fun search(query: String): Result<List<Place>> =
         runCatching { kakao.searchKeyword(query, near = anchor()?.let { it.lat to it.lng }) }
 
-    /** Places of [category] around [near] (phone location) or, failing that, the last stop with coordinates. */
-    suspend fun recommend(category: KakaoCategory, near: Pair<Double, Double>?): Result<List<Place>> = runCatching {
-        val (lat, lng) = near ?: anchor()?.let { it.lat to it.lng } ?: throw IllegalStateException("기준 위치가 없어요. 좌표가 있는 장소를 먼저 넣거나 위치 권한을 켜 주세요")
+    /** Places of [category] around the day's stops first (a trip far from home is planned from home), else [near] (the phone). */
+    override suspend fun recommend(category: KakaoCategory, near: Pair<Double, Double>?): Result<List<Place>> = runCatching {
+        val (lat, lng) = anchor()?.let { it.lat to it.lng } ?: near ?: throw IllegalStateException("기준 위치가 없어요. 좌표가 있는 장소를 먼저 넣거나 위치 권한을 켜 주세요")
         kakao.searchCategory(category, lat, lng)
     }
 
     /** The last stop that has real coordinates (to bias searches and recommendations). */
-    fun anchor(): Place? = stops.value.lastOrNull { it.place.hasCoords() }?.place
+    override fun anchor(): Place? = stops.value.lastOrNull { it.place.hasCoords() }?.place
 
     // ---------- legs ----------
 

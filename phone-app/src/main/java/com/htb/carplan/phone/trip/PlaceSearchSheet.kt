@@ -71,9 +71,29 @@ private val RECOMMEND = listOf(KakaoCategory.CAFE, KakaoCategory.FOOD, KakaoCate
  * the place can be replaced by a real search later.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+/** What the place sheet searches with: a trip day (biased to its stops) or nothing around it (빠른 일정 입력). */
+interface PlaceSource {
+    val kakaoAvailable: Boolean
+    suspend fun search(query: String): Result<List<Place>>
+    suspend fun recommend(category: KakaoCategory, near: Pair<Double, Double>?): Result<List<Place>>
+    /** A place of the plan that searches lean on; null = use the phone's location. */
+    fun anchor(): Place?
+}
+
+/** No itinerary yet: search plainly, recommend around the phone. */
+object FreePlaces : PlaceSource {
+    override val kakaoAvailable: Boolean get() = kakao.available
+    override suspend fun search(query: String): Result<List<Place>> = runCatching { kakao.searchKeyword(query, near = null) }
+    override suspend fun recommend(category: KakaoCategory, near: Pair<Double, Double>?): Result<List<Place>> = runCatching {
+        val (lat, lng) = near ?: throw IllegalStateException("위치를 켜면 근처를 찾아 드려요")
+        kakao.searchCategory(category, lat, lng)
+    }
+    override fun anchor(): Place? = null
+}
+
 @Composable
 fun PlaceSearchSheet(
-    vm: TripDayViewModel,
+    vm: PlaceSource,
     initialQuery: String = "",
     onPick: (Place) -> Unit,
     onDismiss: () -> Unit,
@@ -124,7 +144,7 @@ fun PlaceSearchSheet(
             TextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text(if (hasKey) "장소 검색 (카카오)" else "장소 이름 (카카오 키 없음 → 이름만 저장)", fontSize = 17.sp) },
+                placeholder = { Text(if (hasKey) "장소 이름으로 찾기" else "장소 이름", fontSize = 17.sp) },
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -140,7 +160,7 @@ fun PlaceSearchSheet(
                         selected = activeCategory == c,
                         onClick = {
                             if (!hasKey) {
-                                message = "근처 추천은 카카오 키를 local.properties에 넣으면 돼요"
+                                message = "지금은 근처 추천을 쓸 수 없어요"
                             } else if (hasLocationPermission(context) || vm.anchor() != null) {
                                 runRecommend(c)
                             } else {
@@ -155,7 +175,7 @@ fun PlaceSearchSheet(
             }
             if (!hasKey) {
                 Text(
-                    "카카오 REST 키가 없어서 검색이 꺼져 있어요. 이름을 쓰고 아래 버튼을 누르면 이름만 저장돼요(좌표는 나중에 검색으로 채움).",
+                    "지금은 장소 찾기가 안 돼요. 이름을 쓰고 아래 버튼을 누르면 이름만 저장되고, 갈 때 내비가 찾아 줘요.",
                     fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp),
                 )
             }

@@ -103,6 +103,8 @@ import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.NodeState
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.phone.ui.RailNode
+import com.htb.carplan.phone.ui.MapMarker
+import com.htb.carplan.phone.ui.SimpleMap
 import com.htb.carplan.phone.ui.railLine
 import com.htb.carplan.phone.ui.speechBubble
 import com.htb.carplan.shared.calendar.RouteMath.hasCoords
@@ -152,6 +154,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     var photoFor by remember { mutableStateOf<String?>(null) }
     var noteFor by remember { mutableStateOf<Record?>(null) }
     var placeFor by remember { mutableStateOf<Record?>(null) }
+    var parkingFor by remember { mutableStateOf<Record?>(null) }
     var manualRecord by remember { mutableStateOf(false) }
     var voteOpen by remember { mutableStateOf(false) }
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
@@ -299,6 +302,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                             onAddPhoto = { r -> photoFor = r.id; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onRemovePhoto = { r, url -> vm.removePhoto(r.id, url) },
                             onNote = { r -> noteFor = r },
+                            onParking = { r -> parkingFor = r },
                         )
                     }
                 }
@@ -307,7 +311,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                         record = u, comments = comments[u.id].orEmpty(), nameOf = vm::nameOf, locked = locked,
                         onAddPhoto = { photoFor = u.id; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                         onRemovePhoto = { url -> vm.removePhoto(u.id, url) },
-                        onNote = { noteFor = u }, onPlace = { placeFor = u },
+                        onNote = { noteFor = u }, onPlace = { placeFor = u }, onParking = { parkingFor = u },
                         onSendComment = { vm.addComment(u.id, it) },
                     )
                 }
@@ -317,7 +321,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
                     record = u, comments = comments[u.id].orEmpty(), nameOf = vm::nameOf, locked = locked,
                     onAddPhoto = { photoFor = u.id; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     onRemovePhoto = { url -> vm.removePhoto(u.id, url) },
-                    onNote = { noteFor = u }, onPlace = { placeFor = u },
+                    onNote = { noteFor = u }, onPlace = { placeFor = u }, onParking = { parkingFor = u },
                     onSendComment = { vm.addComment(u.id, it) },
                 )
             }
@@ -374,6 +378,7 @@ fun TripDayScreen(ref: TripRef, onBack: () -> Unit) {
     noteFor?.let { r ->
         NoteDialog(initial = r.note, onSave = { vm.setNote(r.id, it); noteFor = null }, onDismiss = { noteFor = null })
     }
+    parkingFor?.let { r -> ParkingDialog(r, locked, onSave = { vm.setParkingNote(r.id, it); parkingFor = null }, onDismiss = { parkingFor = null }) }
     if (manualRecord) {
         NoteDialog(title = "기록 칸 직접 추가", hint = "어디였어요? (장소 이름)", initial = "", onSave = { vm.addManualRecord(it); manualRecord = false }, onDismiss = { manualRecord = false })
     }
@@ -430,6 +435,7 @@ private fun TimelineStop(
     onAddPhoto: (Record) -> Unit = {},
     onRemovePhoto: (Record, String) -> Unit = { _, _ -> },
     onNote: (Record) -> Unit = {},
+    onParking: (Record) -> Unit = {},
 ) {
     val belowFill by animateFloatAsState(if (railBelowPassed) 1f else 0f, tween(450), label = "railFill")
     // Collapsed: the box, photos, the latest comment and one ghost bubble. Open: every comment, the composer, photo/note buttons.
@@ -444,7 +450,7 @@ private fun TimelineStop(
         )
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
             StopBox(stop, state, estimate, editedBy, dragging, locked, { open = !open }, onRemove, onTimeTap, record)
-            record?.let { r -> RecordStrip(r, locked, editable = open, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }) }
+            record?.let { r -> RecordStrip(r, locked, editable = open, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }, onParking = { onParking(r) }) }
             val shownComments = if (open) comments else comments.takeLast(1)
             shownComments.forEach { c -> Bubble(c, nameOf) }
             if (!open) {
@@ -508,6 +514,8 @@ private fun StopBox(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stop.place.name, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = if (visited) Palette.TextSoft else Palette.TextStrong, modifier = Modifier.weight(1f, fill = false))
                 if (next) Text("  다음", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.Teal)
+                // The car passed over it on purpose (건너뛰기): done for the route, but not "다녀옴".
+                if (stop.skipped) Text("  건너뜀", fontSize = 15.sp, color = Palette.TextSoft)
             }
             val sub = listOfNotNull(
                 stop.place.address.takeIf { it.isNotBlank() },
@@ -527,12 +535,12 @@ private fun StopBox(
     }
 }
 
-/** 10장 8: what the car has done with the plan — "경로 바뀜 · 다음 도착 15:40", "운전자가 보류함", "차에 반영 대기 중". */
+/** 10장 8: what the car has done with the plan — "경로 바뀜 · 다음 도착 15:40", "운전자가 이전 경로 유지", "차에 반영 대기 중". */
 private fun dayLine(day: com.htb.carplan.shared.model.TripDay?): String? = when (day?.status) {
     null, DayStatus.READY -> "바로 저장"
     DayStatus.DONE -> "다 다녀옴"
     DayStatus.DRIVING -> when {
-        day.holdByDriver -> "운전자가 보류함"
+        day.holdByDriver -> "운전자가 이전 경로 유지"
         day.routeSyncedVersion >= day.version -> "차에 반영됨" + (day.etaNext?.let { " · 다음 도착 $it" } ?: "")
         else -> "차에 반영 대기 중"
     }
@@ -586,7 +594,7 @@ private fun CommentComposer(onSend: (String) -> Unit, startOpen: Boolean = false
 
 /** Photos + 한 줄 under a stop the car reached (14장). */
 @Composable
-private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit) {
+private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit, onParking: () -> Unit = {}) {
     Column(Modifier.padding(top = 8.dp, start = 4.dp)) {
         if (r.photoUrls.isNotEmpty()) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -606,6 +614,37 @@ private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, on
             }
             r.leftAt?.let { Text("떠남 ${hhmm(it)}", fontSize = 14.sp, color = Palette.TextSoft) }
         }
+        // ★3: the car knows where it parked; a phone adds the spot ("B2 C-14") so the way back is easy.
+        if (r.parkedLat != null && r.parkedLng != null && r.leftAt == null) {
+            Row(Modifier.clip(Corner).clickable(onClick = onParking).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("주차", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp))
+                Text(
+                    r.parkingNote.ifBlank { if (locked) "지도에서 보기" else "자리 적기 · 지도" },
+                    fontSize = 16.sp, color = if (r.parkingNote.isBlank()) Palette.Navy else Palette.TextStrong, modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+/** ★3: where the car is parked — a small map and the spot written by a member ("B2 C-14"). */
+@Composable
+private fun ParkingDialog(r: Record, locked: Boolean, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(r.parkingNote) }
+    CenterSheet(onDismiss = onDismiss) {
+        Column {
+            Text("주차 위치", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text(r.place.name.ifBlank { "이름 없는 곳" }, fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
+            SimpleMap(r.parkedLat!!, r.parkedLng!!, zoom = 16, markers = listOf(MapMarker(r.parkedLat!!, r.parkedLng!!, "차", MapMarker.Kind.CAR)), height = 220.dp)
+            if (!locked) TextField(
+                text, { text = it }, placeholder = { Text("자리 (예: B2 C-14)", fontSize = 17.sp) }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) else if (r.parkingNote.isNotBlank()) Text(r.parkingNote, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 12.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text(if (locked) "닫기" else "취소", color = Palette.TextSoft, fontSize = 17.sp) }
+                if (!locked) Button(onClick = { onSave(text) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장", fontSize = 17.sp) }
+            }
+        }
     }
 }
 
@@ -614,6 +653,7 @@ private fun RecordStrip(r: Record, locked: Boolean, editable: Boolean = true, on
 private fun UnplannedRow(
     record: Record, comments: List<Comment>, nameOf: (String?) -> String, locked: Boolean,
     onAddPhoto: () -> Unit, onRemovePhoto: (String) -> Unit, onNote: () -> Unit, onPlace: () -> Unit, onSendComment: (String) -> Unit,
+    onParking: () -> Unit = {},
 ) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(Modifier.width(RAIL_W).fillMaxHeight().railLine(NODE / 2 + 2.dp, drawAbove = true, abovePassed = true, belowFill = 1f), contentAlignment = Alignment.TopCenter) {
@@ -634,7 +674,7 @@ private fun UnplannedRow(
                 }
             }
             var open by rememberSaveable(record.id) { mutableStateOf(false) }
-            RecordStrip(record, locked, editable = open, onAddPhoto = onAddPhoto, onRemovePhoto = onRemovePhoto, onNote = onNote)
+            RecordStrip(record, locked, editable = open, onAddPhoto = onAddPhoto, onRemovePhoto = onRemovePhoto, onNote = onNote, onParking = onParking)
             (if (open) comments else comments.takeLast(1)).forEach { c -> Bubble(c, nameOf) }
             if (!open) {
                 if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
