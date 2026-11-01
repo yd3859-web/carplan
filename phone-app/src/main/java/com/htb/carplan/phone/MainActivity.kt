@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
         }
         InviteInbox.offer(intent?.dataString)
         InviteInbox.offerTrip(intent?.dataString)
+        com.htb.carplan.phone.push.TripLive.start(this)
         setContent {
             CarplanTheme { AppRoot() }
         }

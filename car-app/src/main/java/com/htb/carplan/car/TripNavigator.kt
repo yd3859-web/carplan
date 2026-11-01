@@ -711,6 +711,10 @@ class TripNavigator(
                 val st = pickedStation?.also { pickedStation = null }
                 val memo = st?.let { "${it.name} · ${"%,d".format(it.price)}원/L" }.orEmpty()
                 maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, memo = memo, byUid = owner, auto = true, intervals = car.intervals)
+                // 묶음 6: the same stop is one record — the 주유 shows on the record of where the car is parked.
+                parkedRecord?.let { (g, e, r) ->
+                    runCatching { records.setNoteIfBlank(g, e, parkedDate, r, (if (carState.isEv == true) "충전함" else "주유함") + (st?.let { " · ${it.name} ${"%,d".format(it.price)}원/L" } ?: "")) }
+                }
                 _notice.value = (if (carState.isEv == true) "충전" else "주유") + " 기록 남김 — 금액은 폰 차량 탭에서"
             }.onFailure { _error.value = it.message }
         }

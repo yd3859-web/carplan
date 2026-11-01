@@ -88,6 +88,12 @@ class RecordRepository(
         db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("parkingNote", note.trim()).await()
     }
 
+    /** 묶음 6: the 주유 done at this stop goes on its record too — unless someone already wrote a line there. */
+    suspend fun setNoteIfBlank(groupId: String, eventId: String, date: String, recordId: String, note: String) {
+        val ref = db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId")
+        if (ref.get().await().getString("note").isNullOrBlank()) ref.update("note", note.trim()).await()
+    }
+
     suspend fun setPlace(groupId: String, eventId: String, date: String, recordId: String, place: Place) {
         db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("place", place).await()
     }
