@@ -1,5 +1,8 @@
 package com.htb.carplan.phone.calendar
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -136,9 +139,27 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 error?.let { Text("오류: $it", color = Palette.Sunday, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp)) }
                 Spacer(Modifier.height(4.dp))
                 MonthHeader(month, onPrev = { vm.showMonth(month.minusMonths(1)) }, onNext = { vm.showMonth(month.plusMonths(1)) })
-                MonthGridView(month, selected, events, categories, Modifier.weight(1f)) { date ->
-                    vm.select(date)
-                    if (!wide) daySheetOpen = true
+                // Swipe sideways for the next / previous month (the arrows still work); the month slides with the finger's way.
+                val swipe = Modifier.pointerInput(month) {
+                    var total = 0f
+                    val threshold = 64.dp.toPx()
+                    detectHorizontalDragGestures(
+                        onDragStart = { total = 0f },
+                        onDragEnd = { if (total < -threshold) vm.showMonth(month.plusMonths(1)) else if (total > threshold) vm.showMonth(month.minusMonths(1)) },
+                    ) { change, dx -> total += dx; change.consume() }
+                }
+                androidx.compose.animation.AnimatedContent(
+                    targetState = month, modifier = Modifier.weight(1f).then(swipe), label = "month",
+                    transitionSpec = {
+                        val dir = if (targetState > initialState) 1 else -1
+                        (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(com.htb.carplan.phone.ui.MOTION_MS)) { dir * it / 3 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(com.htb.carplan.phone.ui.MOTION_MS))) togetherWith
+                            (androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(com.htb.carplan.phone.ui.MOTION_MS)) { -dir * it / 3 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(com.htb.carplan.phone.ui.MOTION_MS)))
+                    },
+                ) { m ->
+                    MonthGridView(m, selected, events, categories, Modifier.fillMaxSize()) { date ->
+                        vm.select(date)
+                        if (!wide) daySheetOpen = true
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
             }

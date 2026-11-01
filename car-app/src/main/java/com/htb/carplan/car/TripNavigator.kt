@@ -690,7 +690,12 @@ class TripNavigator(
     private fun askFuel(ev: Boolean, fuel: Double, range: Double?, remainingKm: Double?) {
         val what = if (ev) "충전소" else "주유소"
         // A range of 0 means the car does not report one (the emulator): fall back to the percent wording.
-        val why = if (remainingKm != null && range != null && range > 0 && _guiding.value) "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요" else "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
+        val why = when {
+            remainingKm != null && range != null && range > 0 && _guiding.value -> "남은 길 ${remainingKm.toInt()}km인데 ${range.toInt()}km밖에 못 가요"
+            // Plenty of % but little range (an old battery, the cold, a test value): say what is actually short.
+            range != null && range > 0 && fuel > fuelAlertPercent -> "${range.toInt()}km밖에 못 가요"
+            else -> "${if (ev) "배터리" else "연료"}가 ${fuel.toInt()}%예요"
+        }
         // Not a question (차 화면 원칙): say it once, leave one button; passengers can look on their phones.
         val message = "$why. ${what}${ga(what)} 필요해요."
         show(NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")) { askJob = scope.launch { voice.say(message) } }
