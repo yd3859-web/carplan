@@ -146,6 +146,11 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
     }
 
     /** 12장: the car is ~5 minutes from [stopId] → passengers get "주차장 찾아봐 주세요" (Functions watch this field). */
+    /** Q55: the car's fuel plan for the day, shown on the phones' rail (null clears it). */
+    suspend fun setFuelNote(groupId: String, eventId: String, date: String, note: com.htb.carplan.shared.model.FuelNote?) {
+        db.document(FirestorePaths.day(groupId, eventId, date)).set(mapOf("fuelNote" to note), SetOptions.merge()).await()
+    }
+
     suspend fun setParkingHint(groupId: String, eventId: String, date: String, stopId: String?) {
         db.document(FirestorePaths.day(groupId, eventId, date))
             .set(mapOf("parkingHintStopId" to stopId, "updatedAt" to FieldValue.serverTimestamp()), SetOptions.merge()).await()

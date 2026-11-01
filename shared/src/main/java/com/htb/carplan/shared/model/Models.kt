@@ -193,7 +193,24 @@ data class TripDay(
     val pickupSharing: Boolean = false,
     /** 12장: the stop the car is about 5 minutes from; Functions push "주차장 찾아봐 주세요" to the passengers once per stop. */
     val parkingHintStopId: String? = null,
+    /** Q55: where the car plans to fill up today, for the phones' rail (written by the car; null = not needed). */
+    val fuelNote: FuelNote? = null,
     @ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+/** Q55 주유하기 on the rail: after which stop (null = before the next place), and the station once one is picked. */
+data class FuelNote(
+    val afterStopId: String? = null,
+    /** Null = the tank runs short here but no station is picked yet (the car offers [최저가 주유소 찾기]). */
+    val stationName: String? = null,
+    val priceWon: Int? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    /** Fuel % expected when the car gets there. */
+    val percentThen: Int? = null,
+    val ev: Boolean = false,
+    /** The station is in the navigation route. */
+    val chosen: Boolean = false,
 )
 
 /** .../days/{date}/stops/{id} — one slot of the day: place + time + memo. */

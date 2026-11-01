@@ -390,6 +390,24 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 7장: someone joined the group on screen (QR / link / code) → the car says who, so the driver need not look. */
     private var lastMembers: Set<String>? = null
+    /** Q55: the fuel plan the car shows (주유하기 slot / picked station) goes to the day too, so phones see it on their rail. */
+    private val fuelNoteWritten = HashMap<Triple<String, String, String>, com.htb.carplan.shared.model.FuelNote?>()
+    init {
+        viewModelScope.launch {
+            combine(trip, fuelSuggestion, fuelNeed) { t, s, n ->
+                t ?: return@combine null
+                val note = s?.takeIf { it.eventId == t.eventId }?.let {
+                    com.htb.carplan.shared.model.FuelNote(it.afterStopId, it.station.name, it.station.price.takeIf { p -> p > 0 }, it.station.place.lat, it.station.place.lng, it.percentThen, n?.ev == true, it.chosen)
+                } ?: n?.takeIf { it.eventId == t.eventId }?.let { com.htb.carplan.shared.model.FuelNote(it.afterStopId, percentThen = it.percentThen, ev = it.ev) }
+                Triple(t.groupId, t.eventId, t.date) to note
+            }.filterNotNull().distinctUntilChanged().collect { (k, note) ->
+                if (k.third == java.time.LocalDate.now().toString() && note != fuelNoteWritten[k]) {
+                    runCatching { TripRepository().setFuelNote(k.first, k.second, k.third, note) }.onSuccess { fuelNoteWritten[k] = note }
+                }
+            }
+        }
+    }
+
     init {
         viewModelScope.launch {
             qrGroup.collect { g ->

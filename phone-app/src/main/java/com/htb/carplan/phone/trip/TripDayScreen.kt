@@ -286,7 +286,11 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         }
         LazyColumn(state = listState, modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
             item { Spacer(Modifier.height(12.dp)) }
+            // Q55: the car's 주유하기 (today only) — after its stop, or before the next place when it is "now".
+            val fuel = day?.fuelNote?.takeIf { date == java.time.LocalDate.now().toString() }
+            val fuelBefore = fuel?.takeIf { it.afterStopId == null || stops.none { s -> s.id == it.afterStopId } }?.let { stops.firstOrNull { !it.visited }?.id }
             itemsIndexed(stops, key = { _, s -> s.id }) { i, stop ->
+                if (fuel != null && stop.id == fuelBefore) FuelRow(fuel)
                 ReorderableItem(reorder, key = stop.id) { dragging ->
                     val state = when {
                         stop.visited -> NodeState.VISITED
@@ -331,6 +335,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                         onSendComment = { vm.addComment(u.id, it) },
                     )
                 }
+                if (fuel != null && fuel.afterStopId == stop.id) FuelRow(fuel)
             }
             if (stops.isEmpty()) items(unplanned, key = { "u-" + it.id }) { u ->
                 UnplannedRow(
@@ -550,6 +555,30 @@ private fun StopBox(
             }
         }
         if (!locked) IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "빼기", tint = Palette.TextSoft) } else Spacer(Modifier.width(12.dp))
+    }
+}
+
+/** Q55 on the rail: where the car plans to fill up (the car decides and routes; the phone only shows it). */
+@Composable
+private fun FuelRow(f: com.htb.carplan.shared.model.FuelNote) {
+    val what = if (f.ev) "충전하기" else "주유하기"
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Box(Modifier.width(RAIL_W).fillMaxHeight().railLine(NODE / 2 + 2.dp, drawAbove = true, abovePassed = false, belowFill = 0f), contentAlignment = Alignment.TopCenter) {
+            Text("연료", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp).background(Palette.Background).border(1.dp, Palette.Line, Corner).padding(horizontal = 4.dp, vertical = 1.dp))
+        }
+        Column(Modifier.weight(1f).padding(top = 4.dp, bottom = 12.dp)) {
+            Text(
+                listOfNotNull(what, f.stationName, f.priceWon?.let { "%,d원".format(it) }).joinToString("  ·  "),
+                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong,
+            )
+            Text(
+                listOfNotNull(
+                    f.percentThen?.let { "그때 약 $it%" },
+                    when { f.chosen -> "차 경로에 넣음"; f.stationName != null -> "차에서 고르면 경로에 들어가요"; else -> "여기쯤 연료가 모자라요 · 차에서 최저가를 찾아요" },
+                ).joinToString("  ·  "),
+                fontSize = 15.sp, color = Palette.TextSoft,
+            )
+        }
     }
 }
 
