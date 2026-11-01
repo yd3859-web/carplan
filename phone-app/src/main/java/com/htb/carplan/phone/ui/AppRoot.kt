@@ -24,6 +24,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -60,6 +62,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 fun AppRoot() {
     var tab by rememberSaveable { mutableStateOf(Tab.CALENDAR) }
+    var tapAgain by remember { mutableIntStateOf(0) }
     val loginVm: LoginViewModel = viewModel()
     val showLogin by loginVm.show.collectAsStateWithLifecycle()
     if (showLogin) {
@@ -81,6 +84,9 @@ fun AppRoot() {
         TripDayScreen(TripRef(g, e, d), onBack = { InviteInbox.clearTrip() })
         return
     }
+    // 손② (갤럭시 기본 앱): back on another tab goes to 캘린더 first; only 캘린더 leaves the app. Screens opened inside a
+    // tab have their own BackHandler, composed later, so they still close first.
+    androidx.activity.compose.BackHandler(enabled = tab != Tab.CALENDAR) { tab = Tab.CALENDAR }
     Column(Modifier.fillMaxSize().background(Palette.Background)) {
         // Tabs slide sideways toward the one picked (the car's tab bar does the same).
         androidx.compose.animation.AnimatedContent(
@@ -92,6 +98,7 @@ fun AppRoot() {
             },
         ) { t ->
             Box(Modifier.fillMaxSize()) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalTabTapAgain provides tapAgain) {
                 when (t) {
                     Tab.CALENDAR -> CalendarScreen()
                     Tab.GROUP -> GroupTab(groupVm)
@@ -99,9 +106,10 @@ fun AppRoot() {
                     Tab.CAR -> CarTab()
                     Tab.SETTINGS -> SettingsTab()
                 }
+                }
             }
         }
-        TabBar(selected = tab, onSelect = { tab = it })
+        TabBar(selected = tab, onSelect = { if (it == tab) tapAgain++ else tab = it })
     }
     // An invite (link, QR, code) can arrive on any tab (1장 4): ask, then land in the group.
     JoinDialog(groupVm) { joined -> groupVm.landAfterJoin(joined) { tab = Tab.GROUP } }

@@ -127,7 +127,9 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
             }
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+    val scroll = rememberScrollState()
+    com.htb.carplan.phone.ui.OnTabTapAgain { scroll.animateScrollTo(0) }
+    Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(scroll).padding(horizontal = 20.dp)) {
         Text("설정", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 18.dp, bottom = 12.dp))
         message?.let { Text(it, color = Palette.Sunday, fontSize = 15.sp) }
 

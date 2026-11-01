@@ -91,6 +91,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val month by vm.month.collectAsStateWithLifecycle()
     val selected by vm.selected.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
+    val selectedEvents by vm.selectedEvents.collectAsStateWithLifecycle()
     val upcoming by vm.upcoming.collectAsStateWithLifecycle()
     // 2장 [알림] 칩: keep the phone's local reminders in step with the upcoming events.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -111,6 +112,10 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     if (carLinkOpen) com.htb.carplan.phone.ui.CarLinkSheet(onDismiss = { carLinkOpen = false })
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
     var openTrip by rememberSaveable(stateSaver = TripRefSaver) { mutableStateOf<TripRef?>(null) }
+    com.htb.carplan.phone.ui.OnTabTapAgain {
+        if (openTrip != null) openTrip = null
+        else { vm.showMonth(java.time.YearMonth.now()); vm.select(LocalDate.now()) }
+    }
 
     openTrip?.let { ref ->
         TripDayScreen(ref, onBack = { openTrip = null })
@@ -166,7 +171,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             if (wide) {
                 DayRoutePanel(
                     date = selected,
-                    events = MonthGrid.eventsOn(selected, events),
+                    events = selectedEvents,
                     categories = categories,
                     onAdd = { quickAddDate = selected },
                     modifier = Modifier.width(400.dp).fillMaxHeight().drawBehind { drawLine(Palette.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) },
@@ -183,7 +188,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
         CenterSheet(onDismiss = { daySheetOpen = false }) {
             DayRoutePanel(
                 date = selected,
-                events = MonthGrid.eventsOn(selected, events),
+                events = selectedEvents,
                 categories = categories,
                 onAdd = { daySheetOpen = false; quickAddDate = selected },
                 modifier = Modifier.fillMaxWidth().height(480.dp),

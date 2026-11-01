@@ -82,6 +82,14 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
     var code by remember { mutableStateOf("") }
     var friendCode by remember { mutableStateOf("") }
     var openTrip by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    com.htb.carplan.phone.ui.OnTabTapAgain {
+        when {
+            openTrip != null -> openTrip = null
+            selectedId != null -> vm.open(null)
+            else -> list.animateScrollToItem(0)
+        }
+    }
 
     openTrip?.let { (g, e, d) ->
         TripDayScreen(TripRef(g, e, d), onBack = { openTrip = null })
@@ -119,7 +127,7 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
         message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
         // 초대 = 일정 (정원 2026-10-31): each event invites its own people; this tab keeps the people — 묶음 and friends.
         val shared = groups.filter { it.isCircle }
-        LazyColumn(Modifier.weight(1f).padding(top = 10.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(top = 10.dp), state = list) {
             item { SectionTitle("자주 타는 사람") }
             items(shared, key = { it.id }) { g ->
                 val t = groupTrips[g.id]

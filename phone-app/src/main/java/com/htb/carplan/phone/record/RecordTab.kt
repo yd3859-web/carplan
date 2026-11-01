@@ -106,6 +106,8 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
     val days by vm.days.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var open by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    com.htb.carplan.phone.ui.OnTabTapAgain { if (open != null) open = null else list.animateScrollToItem(0) }
     open?.let { (g, e, d) ->
         TripDayScreen(TripRef(g, e, d), onBack = { open = null })
         return
@@ -127,7 +129,7 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
             Text("날마다 한 장씩 — 차를 세운 곳, 사진, 한 줄", fontSize = 15.sp, color = Palette.TextSoft)
             message?.let { Text(it, color = Palette.Sunday, fontSize = 15.sp) }
         }
-        LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp), state = list) {
             // Today first, as a big page you can always write on.
             item {
                 TodayPage(today, todayPages, vm) { ref -> open = ref }

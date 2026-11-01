@@ -75,6 +75,16 @@ class CalendarViewModel : ViewModel() {
         .combine(GoogleCalendar.events) { ours, google -> ours + google }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /**
+     * The selected day's events, on their own: browsing to another month (swipe, arrows) must not empty 그날 동선 or
+     * the today card's stops while the selected day stays where it was.
+     */
+    val selectedEvents: StateFlow<List<CalendarEvent>> = combine(groupIds, _selected) { ids, d -> ids to d }
+        .flatMapLatest { (ids, d) -> calendar.observeEvents(ids, d.toString(), d.toString()).map { MonthGrid.eventsOn(d, it) } }
+        .catch { _error.value = it.message }
+        .combine(GoogleCalendar.events) { ours, google -> ours + MonthGrid.eventsOn(_selected.value, google) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /** Today and the next 60 days, independent of the month being browsed (오늘 카드). */
     val upcoming: StateFlow<List<CalendarEvent>> = groupIds
         .flatMapLatest { ids ->
@@ -92,8 +102,8 @@ class CalendarViewModel : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Stops of every trip on the selected day, keyed by event id (shown in 그날 동선). */
-    val tripStops: StateFlow<Map<String, List<Stop>>> = combine(events, _selected) { all, date ->
-        MonthGrid.eventsOn(date, all).filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to date.toString() }
+    val tripStops: StateFlow<Map<String, List<Stop>>> = combine(selectedEvents, _selected) { day, date ->
+        day.filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to date.toString() }
     }.flatMapLatest { trips ->
         if (trips.isEmpty()) flowOf(emptyMap())
         else combine(trips.map { (t, date) -> tripRepo.observeStops(t.groupId, t.event.id, date).map { t.event.id to it.filterNot { s -> s.deleted } } }) { it.toMap() }
@@ -101,8 +111,8 @@ class CalendarViewModel : ViewModel() {
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    private val selectedTrips = combine(events, _selected) { all, date ->
-        MonthGrid.eventsOn(date, all).filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to date.toString() }
+    private val selectedTrips = combine(selectedEvents, _selected) { day, date ->
+        day.filter { it.event.categoryId == BuiltInCategory.TRIP.id }.map { it to date.toString() }
     }
 
     /** Latest comments under each trip's stops (그날 동선 shows the newest one per stop). */

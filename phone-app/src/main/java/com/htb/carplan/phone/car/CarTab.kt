@@ -137,6 +137,8 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
     val car by vm.car.collectAsStateWithLifecycle()
     val events by vm.events.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    com.htb.carplan.phone.ui.OnTabTapAgain { list.animateScrollToItem(0) }
     var code by remember { mutableStateOf("") }
     var logging by remember { mutableStateOf<MaintenanceItem?>(null) }
     var intervalFor by remember { mutableStateOf<MaintenanceItem?>(null) }
@@ -185,7 +187,7 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
             Text("차량 관리", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             Text("항목을 누르면 기록·주기", fontSize = 15.sp, color = Palette.TextSoft)
         }
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f), state = list) {
             items(MaintenanceItem.entries, key = { it.name }) { item ->
                 val last = records.firstOrNull { it.maintenance?.item == item }
                 val due = dues[item]
