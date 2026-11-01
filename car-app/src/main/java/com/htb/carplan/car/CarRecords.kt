@@ -76,6 +76,7 @@ fun RowScope.CarRecords(vm: CarHomeViewModel) {
     // Opens on the newest day with records (not an empty today).
     var picked by remember { mutableStateOf<LocalDate?>(null) }
     val shown = picked ?: days.firstOrNull()?.date ?: LocalDate.now()
+    OnCarTabTapAgain { picked = null; month = days.firstOrNull()?.date?.let { java.time.YearMonth.from(it) } ?: java.time.YearMonth.now() }
     androidx.compose.runtime.LaunchedEffect(days.firstOrNull()?.date) { if (picked == null) days.firstOrNull()?.date?.let { month = java.time.YearMonth.from(it) } }
     val cal: @Composable (Modifier) -> Unit = { m -> RecordMonth(vm::coverOf, month, { month = it }, byDate, shown, { picked = it }, m) }
     val line: @Composable (Modifier) -> Unit = { m ->
@@ -144,7 +145,8 @@ private fun RecordMonth(coverOf: suspend (RecordDay) -> String?, month: java.tim
     val c = LocalCarColors.current
     val compact = LocalCompact.current
     val today = LocalDate.now()
-    Column(modifier) {
+    // No months after this one (nothing recorded yet), same as the › button.
+    Column(modifier.monthSwipe(month, onPrev = { onMonth(month.minusMonths(1)) }, onNext = { if (month < java.time.YearMonth.from(today)) onMonth(month.plusMonths(1)) })) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = { onMonth(month.minusMonths(1)) }, shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.heightIn(min = 76.dp).width(96.dp)) { Text("‹", color = c.ink, fontSize = 28.sp) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {

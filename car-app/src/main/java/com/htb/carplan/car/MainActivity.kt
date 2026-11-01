@@ -215,6 +215,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         val nextComment by vm.nextComment.collectAsStateWithLifecycle()
         // 주차 중엔 폰 앱처럼 (정원 2026-10-31): a tab bar at the bottom (넷플릭스 하단 바 참고). Driving: only 오늘, no bar.
         var tab by remember { mutableStateOf(CarTab.TODAY) }
+        var tapAgain by remember { androidx.compose.runtime.mutableIntStateOf(0) }
         LaunchedEffect(restricted) { if (restricted) tab = CarTab.TODAY }
         Column(Modifier.fillMaxSize()) {
         // Tabs slide sideways in the bar's direction (정원 2026-10-31). Parked only: driving has no tabs, so no motion.
@@ -226,6 +227,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                 (androidx.compose.animation.slideInHorizontally(spec) { w -> dir * w } togetherWith androidx.compose.animation.slideOutHorizontally(spec) { w -> -dir * w })
             },
         ) { shown ->
+        androidx.compose.runtime.CompositionLocalProvider(LocalCarTabTapAgain provides tapAgain) {
         Row(Modifier.fillMaxSize()) {
         if (shown == CarTab.CALENDAR) CarCalendar(vm, onAdd = { d -> addDate = d; adding = true }, onGoTo = { e -> vm.goTo(e); tab = CarTab.TODAY })
         else if (shown == CarTab.PEOPLE) CarPeople(vm)
@@ -264,8 +266,9 @@ private fun CarHome(vm: CarHomeViewModel) {
         }
         }
         }
+        }
         if (!restricted) Box(Modifier.fillMaxWidth().padding(bottom = 14.dp, top = 4.dp), contentAlignment = Alignment.Center) {
-            CarTabBar(tab, onTab = { tab = it })
+            CarTabBar(tab, onTab = { if (it == tab) tapAgain++ else tab = it })
         }
         }
     }

@@ -54,6 +54,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -67,6 +69,33 @@ enum class CarTab(val label: String, val icon: androidx.compose.ui.graphics.vect
 }
 
 private val Corner = RoundedCornerShape(4.dp)
+
+/** Counts taps on the tab that is already showing (CarTabBar). */
+val LocalCarTabTapAgain = androidx.compose.runtime.compositionLocalOf { 0 }
+
+/**
+ * Tapping the tab you are on brings it back to its start (폰 손③과 같음): the calendar to today, the records to the
+ * newest day. Taps counted before this tab showed are not replayed.
+ */
+@Composable
+fun OnCarTabTapAgain(action: suspend () -> Unit) {
+    val n = LocalCarTabTapAgain.current
+    val start = remember { n }
+    androidx.compose.runtime.LaunchedEffect(n) { if (n != start) action() }
+}
+
+/**
+ * Swipe sideways for the next / previous month (폰 캘린더와 같음, the arrow buttons still work). Parked only — the
+ * calendar and records tabs do not exist while driving.
+ */
+fun Modifier.monthSwipe(key: Any, onPrev: () -> Unit, onNext: () -> Unit): Modifier = pointerInput(key) {
+    var total = 0f
+    val threshold = 80.dp.toPx()
+    detectHorizontalDragGestures(
+        onDragStart = { total = 0f },
+        onDragEnd = { if (total < -threshold) onNext() else if (total > threshold) onPrev() },
+    ) { change, dx -> total += dx; change.consume() }
+}
 
 /**
  * The tab bar (정원 2026-10-31, 넷플릭스 하단 바 참고): one rounded bar floating at the bottom centre,
@@ -122,6 +151,7 @@ fun RowScope.CarCalendar(vm: CarHomeViewModel, onAdd: (LocalDate) -> Unit, onGoT
     val month by vm.calMonth.collectAsStateWithLifecycle()
     val today = LocalDate.now()
     var picked by remember { mutableStateOf(today) }
+    OnCarTabTapAgain { vm.calMonth.value = java.time.YearMonth.now(); picked = today }
     // Paging months moves the chosen day along (else the right side would show a day from another month, half-loaded).
     androidx.compose.runtime.LaunchedEffect(month) {
         if (java.time.YearMonth.from(picked) != month) picked = if (java.time.YearMonth.from(today) == month) today else month.atDay(1)
@@ -177,7 +207,9 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
         HorizontalDivider(color = c.line, modifier = Modifier.padding(top = 8.dp))
         val motion = LocalMotion.current
         androidx.compose.animation.AnimatedContent(
-            targetState = month, modifier = Modifier.weight(1f), label = "month",
+            targetState = month,
+            modifier = Modifier.weight(1f).monthSwipe(month, onPrev = { vm.calMonth.value = month.minusMonths(1) }, onNext = { vm.calMonth.value = month.plusMonths(1) }),
+            label = "month",
             transitionSpec = {
                 val dir = if (targetState > initialState) 1 else -1
                 if (!motion) (androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None)
