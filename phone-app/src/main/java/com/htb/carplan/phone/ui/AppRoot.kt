@@ -66,6 +66,13 @@ fun AppRoot() {
         LoginGate(loginVm)
         return
     }
+    // P-g: once, after the gate — name, how it works, the car's 6 digits.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var onboarding by rememberSaveable { mutableStateOf(Onboarding.needed(context)) }
+    if (onboarding) {
+        OnboardingScreen(onDone = { onboarding = false })
+        return
+    }
     val groupVm: GroupViewModel = viewModel()
     val pushTrip by InviteInbox.openTrip.collectAsStateWithLifecycle()
     pushTrip?.let { (g, e, d) ->

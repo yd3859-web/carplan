@@ -133,7 +133,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("내 정보")
         SettingRow("이름", me?.name ?: "…", action = "바꾸기") { renaming = true }
-        SettingRow("내 친구 코드", me?.friendCode ?: "…", hint = "친구가 그룹 탭에서 이 코드로 나를 추가해요")
+        SettingRow("내 친구 코드", me?.friendCode ?: "…", hint = "친구가 [같이 탈 사람] 탭에서 이 코드로 나를 추가해요")
 
         Section("알림")
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -144,7 +144,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
             Switch(reminders, onCheckedChange = { on -> reminders = on; Reminders.setEnabled(context, on, upcoming) },
                 colors = SwitchDefaults.colors(checkedTrackColor = Palette.Navy, checkedThumbColor = Palette.Background))
         }
-        Text("그룹 알림(칸 뺌·투표·도착·픽업)은 서버에서 보내요. 폰의 알림 권한이 꺼져 있으면 시스템 설정에서 켜 주세요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
+        Text("같이 가는 사람 알림(칸 뺌·투표·도착·픽업)은 서버에서 보내요. 차가 가는 중엔 동승자 폰에 \"차가 가는 중\" 알림이 떠 있어요. 폰의 알림 권한이 꺼져 있으면 시스템 설정에서 켜 주세요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
 
         Section("캘린더")
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -159,11 +159,13 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("차")
         val c = car
-        if (c == null) Text("아직 연결된 차가 없어요. 차량 탭에서 차 화면의 6자리 코드를 넣으면 연결돼요.", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(vertical = 8.dp))
+        var linking by remember { mutableStateOf(false) }
+        if (linking) com.htb.carplan.phone.ui.CarLinkSheet(onDismiss = { linking = false })
+        if (c == null) SettingRow("연결된 차", "없음", hint = "내 차라면 차 화면에 뜬 6자리를 넣어요", action = "연결") { linking = true }
         else {
             SettingRow("연결된 차", if (c.ownerUid == session?.uid) "내 차 (차주)" else "다른 사람 차")
             Text("주유·충전 알림 기준", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 8.dp))
-            Text("연료(배터리)가 이 아래로 내려가면 차가 \"주유소 들를까요?\" 하고 물어요. 안내 중엔 남은 경로 + 30km 기준이 먼저.", fontSize = 15.sp, color = Palette.TextSoft)
+            Text("연료(배터리)가 이 아래이거나 오늘 일정에 모자라면 차와 폰의 하루 일정에 \"주유하기\" 칸이 생겨요. 모자라는지는 남은 길 + 30km로 계산해요.", fontSize = 15.sp, color = Palette.TextSoft)
             Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(10, 15, 20, 30).forEach { p ->
                     val on = c.fuelAlertPercent == p
@@ -215,7 +217,7 @@ private fun RenameSheet(current: String, onDone: (String) -> Unit, onDismiss: ()
     CenterSheet(onDismiss = onDismiss) {
         Column {
             Text("이름 바꾸기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            Text("그룹 멤버와 차 화면에 이렇게 보여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
+            Text("같이 가는 사람과 차 화면에 이렇게 보여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
             OutlinedTextField(name, { name = it.take(20) }, singleLine = true, shape = Corner, modifier = Modifier.fillMaxWidth())
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft) }

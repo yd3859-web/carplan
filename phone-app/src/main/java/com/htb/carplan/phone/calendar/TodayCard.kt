@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +24,7 @@ import java.time.temporal.ChronoUnit
 
 /** 오늘: where the car goes next, how the car is, and the next car-care item. A flat header, not a box. */
 @Composable
-fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Modifier, todayStops: Map<String, List<com.htb.carplan.shared.model.Stop>> = emptyMap()) {
+fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Modifier, todayStops: Map<String, List<com.htb.carplan.shared.model.Stop>> = emptyMap(), onConnectCar: (() -> Unit)? = null) {
     val today = LocalDate.now()
     // A trip today: its next unvisited stop is "다음". Otherwise the next event with a place.
     val tripNext = todayStops.entries.firstNotNullOfOrNull { (eid, stops) ->
@@ -48,7 +49,11 @@ fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Mod
         } else {
             Text("오늘은 차로 갈 일정이 없어요", color = Palette.TextStrong, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
         }
-        Text(
+        // P-g: no car yet → the line itself is the way in (the 6 digits), not a trip to the 차량 tab.
+        if (car == null && onConnectCar != null) Text(
+            "차 연결하기 · 차 화면의 6자리", color = Palette.Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable(onClick = onConnectCar).padding(vertical = 4.dp),
+        ) else Text(
             listOfNotNull(carLine(car), care?.let { careLine(it, today) }).joinToString("    ·    "),
             color = Palette.ChipText, fontSize = 16.sp,
         )

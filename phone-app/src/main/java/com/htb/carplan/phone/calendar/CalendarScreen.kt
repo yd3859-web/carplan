@@ -105,6 +105,8 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val lastGroupId by vm.lastGroupId.collectAsStateWithLifecycle()
     val commute by vm.commuteSuggestion.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
+    var carLinkOpen by remember { mutableStateOf(false) }
+    if (carLinkOpen) com.htb.carplan.phone.ui.CarLinkSheet(onDismiss = { carLinkOpen = false })
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
     var openTrip by rememberSaveable(stateSaver = TripRefSaver) { mutableStateOf<TripRef?>(null) }
 
@@ -119,7 +121,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             // The month fills the height: week rows share the space left under the header (like the system calendar).
             Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 16.dp)) {
                 Spacer(Modifier.height(12.dp))
-                TodayCard(upcoming, car, todayStops = if (selected == java.time.LocalDate.now()) tripStops else emptyMap())
+                TodayCard(upcoming, car, todayStops = if (selected == java.time.LocalDate.now()) tripStops else emptyMap(), onConnectCar = { carLinkOpen = true })
                 commute?.let { sg ->
                     // 16장 Q45: the records found a routine — one tap makes it a repeating 출퇴근 event.
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
