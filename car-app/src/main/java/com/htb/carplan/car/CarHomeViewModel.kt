@@ -254,8 +254,9 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         // 16장 Q46: within ±60 min of a registered commute, offer it (the trip question wins when there is a trip).
         viewModelScope.launch {
             week.collect { all ->
-                val c = Commute.candidate(all.map { it.event }, LocalDate.now(), LocalTime.now()) ?: return@collect
-                navigator.offerCommute(c)
+                val c = Commute.candidate(all.map { it.event }, LocalDate.now(), LocalTime.now())
+                // The commute was deleted (or moved) while its question was up: the question goes too.
+                if (c == null) navigator.withdrawCommute() else navigator.offerCommute(c)
             }
         }
         viewModelScope.launch {
@@ -563,6 +564,16 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                 trips.addStop(u.soloGroupId, eventId, today, Place(name = "서현역", lat = 37.3850, lng = 127.1235), "14:00", "", u.uid)
                 trips.addStop(u.soloGroupId, eventId, today, Place(name = "중앙공원", lat = 37.3726, lng = 127.1302), "15:00", "", u.uid)
             }.onFailure { _error.value = it.message }
+        }
+    }
+
+    /** 시연 메뉴 [시험 여행 지우기]: today's 시험 여행 and 시험 여행 2 go (soft delete, like any trip), so the user's own trips are what the car shows again. */
+    fun removeTestTrips() {
+        val tests = navigator.tripsToday.value.filter { it.event.title == "시험 여행" || it.event.title == "시험 여행 2" }
+        if (tests.isEmpty()) { navigator.notify("지울 시험 여행이 없어요"); return }
+        viewModelScope.launch {
+            runCatching { tests.forEach { calendar.setEventDeleted(it.groupId, it.event.id, true) } }
+                .onSuccess { navigator.notify("시험 여행을 지웠어요") }.onFailure { _error.value = it.message }
         }
     }
 

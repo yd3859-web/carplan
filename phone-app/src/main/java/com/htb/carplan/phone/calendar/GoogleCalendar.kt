@@ -32,12 +32,14 @@ object GoogleCalendar {
     val status: StateFlow<String?> = _status.asStateFlow()
     private var token: String? = null
     private var tokenAt = 0L
+    /** Every grid loaded so far, so a day picked in one month keeps its Google events after swiping to another. */
+    private val loaded = mutableMapOf<Pair<LocalDate, LocalDate>, List<CalendarEvent>>()
 
     fun enabled(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)
 
     fun setEnabled(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("enabled", on).apply()
-        if (!on) { _events.value = emptyList(); token = null; _status.value = null }
+        if (!on) { loaded.clear(); _events.value = emptyList(); token = null; _status.value = null }
     }
 
     /** Needs the user's consent: launch this and call [finishAuthorization] with the result. */
@@ -60,12 +62,13 @@ object GoogleCalendar {
 
     private fun remember(t: String): String { token = t; tokenAt = System.currentTimeMillis(); return t }
 
-    /** Load [from]..[to] into [events] (the calendar's visible grid). Quiet when consent is still missing. */
+    /** Load [from]..[to] (the calendar's visible grid) and add it to [events]. Quiet when consent is still missing. */
     suspend fun refresh(context: Context, from: LocalDate, to: LocalDate) {
         if (!enabled(context)) return
         runCatching {
             val t = authorize(context)
-            _events.value = api.events(t, from, to).map { CalendarEvent(GROUP_ID, it) }
+            loaded[from to to] = api.events(t, from, to).map { CalendarEvent(GROUP_ID, it) }
+            _events.value = loaded.values.flatten().distinctBy { it.event.id }
             _status.value = null
         }.onFailure { e ->
             _status.value = when (e) {

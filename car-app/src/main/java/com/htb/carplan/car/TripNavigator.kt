@@ -637,6 +637,12 @@ class TripNavigator(
         }
     }
 
+    /** No commute is due any more (deleted on the phone or in the 시연 메뉴): take its question down. */
+    fun withdrawCommute() {
+        commuteEvent = null
+        if (_prompt.value?.reason == PromptReason.COMMUTE) { askJob?.cancel(); closePrompt() }
+    }
+
     private fun listening(listening: Boolean, heard: String?) { _prompt.update { it?.copy(listening = listening, heard = heard ?: it.heard) } }
     private fun answer(a: VoicePrompt.Answer) = when (a) {
         VoicePrompt.Answer.YES -> go()

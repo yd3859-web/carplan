@@ -414,7 +414,10 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     // ③ 주차 중엔 차에서도 칸을 고친다 (정원 2026-10-31).
                     if (!restricted) Box(Modifier.padding(start = 12.dp)) { CarCloseButton(onClick = onEdit, label = "칸 편집") }
                 }
-                if (!moving) fuelLine(trip, vm.vehicle.collectAsStateWithLifecycle().value, vm.fuelUsage.collectAsStateWithLifecycle().value)?.let {
+                // Every place done but another event still ahead today: the right panel moves on to it, so the
+                // finished trip says so here (the half view does the same in its header).
+                if (trip.stops.isNotEmpty() && trip.next == null) Text("오늘 일정 끝 · ${doneLine(trip)}", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+                else if (!moving) fuelLine(trip, vm.vehicle.collectAsStateWithLifecycle().value, vm.fuelUsage.collectAsStateWithLifecycle().value)?.let {
                     Text(it, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 6.dp))
                 }
                 Spacer(Modifier.height(18.dp))
@@ -1134,6 +1137,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                     TextButton(onClick = { vm.removeTestCommute(); onDismiss() }) { Text("시험 출근 지우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeSecondTestTrip(); onDismiss() }) { Text("두 번째 여행", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.removeTestTrips(); onDismiss() }) { Text("시험 여행 지우기", fontSize = 20.sp, color = Ink) }
                 }
                 // Two months of made-up use (friends, groups, past trips with records and photos); pressed again it adds missing photos.
                 FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
