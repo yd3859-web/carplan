@@ -134,7 +134,10 @@ private val LocalTripVm = androidx.compose.runtime.staticCompositionLocalOf<Trip
 fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
     var ref0 by remember(start) { mutableStateOf(start) }
     val vm0: TripDayViewModel = viewModel(key = ref0.groupId + ref0.eventId, factory = tripVmFactory(ref0))
-    androidx.compose.runtime.CompositionLocalProvider(LocalTripVm provides vm0) { TripDayBody(ref0, vm0, onRefChange = { ref0 = it }, onBack = onBack) }
+    // A full screen slides in from the right (same as the car).
+    com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalTripVm provides vm0) { TripDayBody(ref0, vm0, onRefChange = { ref0 = it }, onBack = onBack) }
+    }
 }
 
 @Composable

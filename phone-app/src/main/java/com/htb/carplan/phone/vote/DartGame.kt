@@ -126,7 +126,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(Modifier.fillMaxSize().background(Palette.Background).systemBarsPadding()) {
+        com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN) { Box(Modifier.fillMaxSize().background(Palette.Background).systemBarsPadding()) {
             Column(Modifier.fillMaxSize()) {
                 // Top bar: back · title · scope
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -220,7 +220,7 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                     message?.let { Text(it, color = Palette.Teal, fontSize = 16.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
                 }
             }
-        }
+        } }
         voteSeed?.let { seed -> VoteSheet(groupId, eventId, date, nameOf = nameOf, onPickPlace = { }, onDismiss = { voteSeed = null }, seed = seed) }
     }
 }

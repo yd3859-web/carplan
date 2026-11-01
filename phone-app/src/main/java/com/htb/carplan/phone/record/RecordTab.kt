@@ -130,7 +130,7 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
         LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp)) {
             // Today first, as a big page you can always write on.
             item {
-                TodayPage(today, todayPages.firstOrNull { !it.isLog } ?: todayPages.firstOrNull(), vm) { ref -> open = ref }
+                TodayPage(today, todayPages, vm) { ref -> open = ref }
             }
             val past = pages.filter { it.date != today.toString() }
             if (past.isNotEmpty()) item { Text("지난 날", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 24.dp, bottom = 6.dp)) }
@@ -143,8 +143,12 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
 }
 
 @Composable
-private fun TodayPage(today: LocalDate, page: DiaryDay?, vm: RecordTabViewModel, onOpen: (List<String>) -> Unit) {
-    val recs = page?.let { rememberRecords(it, vm) }.orEmpty()
+private fun TodayPage(today: LocalDate, pages: List<DiaryDay>, vm: RecordTabViewModel, onOpen: (List<String>) -> Unit) {
+    // Several things today (two trips, 일상): the page that already has records leads, else the first trip.
+    val loaded by produceState<List<Pair<DiaryDay, List<com.htb.carplan.shared.model.Record>>>>(emptyList(), pages) { value = pages.map { it to vm.summary(it) } }
+    val chosen = loaded.firstOrNull { it.second.isNotEmpty() } ?: loaded.firstOrNull { !it.first.isLog } ?: loaded.firstOrNull()
+    val page = chosen?.first ?: pages.firstOrNull { !it.isLog } ?: pages.firstOrNull()
+    val recs = chosen?.second.orEmpty()
     Column(Modifier.fillMaxWidth().padding(top = 14.dp).border(1.dp, Palette.SheetEdge, Corner).padding(18.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text("${today.dayOfMonth}", fontSize = 40.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
@@ -182,8 +186,9 @@ private fun DiaryCard(p: DiaryDay, vm: RecordTabViewModel, onClick: () -> Unit) 
 @Composable
 private fun DiaryBody(p: DiaryDay, recs: List<com.htb.carplan.shared.model.Record>) {
     Text(if (p.isLog) "일상" else p.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-    val path = recs.map { it.place.name.ifBlank { "이름 없는 곳" } }.fold(listOf<String>()) { acc, n -> if (acc.lastOrNull() == n) acc else acc + n }
-    if (recs.isNotEmpty()) Text(path.joinToString(" → ") + "  ·  ${path.size}곳", fontSize = 15.sp, color = Palette.ChipText, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
+    // Each place once, in the order first reached (a day driven twice, or a test day, must not repeat the list).
+    val path = recs.map { it.place.name.ifBlank { "이름 없는 곳" } }.distinct()
+    if (recs.isNotEmpty()) Text(path.joinToString(" → ") + "  ·  ${path.size}곳", fontSize = 15.sp, color = Palette.ChipText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
     else Text("들른 곳 없음", fontSize = 15.sp, color = Palette.TextSoft)
     recs.firstOrNull { it.note.isNotBlank() }?.let { Text("“${it.note}”", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 6.dp)) }
     val photos = recs.flatMap { it.photoUrls }.take(4)

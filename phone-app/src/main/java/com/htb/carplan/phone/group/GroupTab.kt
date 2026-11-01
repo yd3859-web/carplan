@@ -88,7 +88,9 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
         return
     }
     selectedId?.let { id ->
-        GroupScreen(vm, id, onBack = { vm.open(null) }, onOpenTrip = { g, e, d -> openTrip = listOf(g, e, d) })
+        com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN, key = id) {
+            GroupScreen(vm, id, onBack = { vm.open(null) }, onOpenTrip = { g, e, d -> openTrip = listOf(g, e, d) })
+        }
         return
     }
 
@@ -232,7 +234,7 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
             Column(Modifier.weight(1f).clickable(enabled = isOwner) { renaming = true }) {
                 Text(g.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                Text("${g.memberIds.size}명 · 그룹장 ${vm.nameOf(g.ownerUid)}" + if (isOwner) " · 이름 바꾸려면 누르기" else "", fontSize = 15.sp, color = Palette.TextSoft)
+                Text("${g.memberIds.size}명 · 만든 사람 ${vm.nameOf(g.ownerUid)}" + if (isOwner) " · 이름 바꾸려면 누르기" else "", fontSize = 15.sp, color = Palette.TextSoft)
             }
             TextButton(onClick = { vm.leave(g.id); onBack() }) { Text("나가기", color = Palette.TextSoft) }
         }
@@ -244,7 +246,7 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
                     Button(
                         onClick = {
                             val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-                                .putExtra(Intent.EXTRA_TEXT, "${g.name} 그룹에 들어와요 — ${InviteLinks.url(g.inviteCode)} (코드 ${g.inviteCode})")
+                                .putExtra(Intent.EXTRA_TEXT, "${g.name}에 들어와요 — ${InviteLinks.url(g.inviteCode)} (코드 ${g.inviteCode})")
                             context.startActivity(Intent.createChooser(send, "초대 링크 보내기"))
                         },
                         modifier = Modifier.weight(1f).height(50.dp), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
@@ -278,7 +280,7 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             }
             items(g.memberIds, key = { it }) { uid ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(vm.nameOf(uid) + if (uid == g.ownerUid) "  · 그룹장" else "", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                    Text(vm.nameOf(uid) + if (uid == g.ownerUid) "  · 만든 사람" else "", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
                     if (isOwner && uid != g.ownerUid) TextButton(onClick = { vm.removeMember(g.id, uid) }) { Text("내보내기", color = Palette.TextSoft) }
                 }
                 HorizontalDivider(color = Palette.Line)
@@ -318,7 +320,7 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
     }
     if (voteOpen) VoteSheet(g.id, null, null, nameOf = vm::nameOf, onPickPlace = { }, onDismiss = { voteOpen = false })
     if (dartOpen) DartSheet(g.id, null, null, nameOf = vm::nameOf, onDismiss = { dartOpen = false })
-    if (renaming) NameDialog(title = "그룹 이름", hint = g.name, confirm = "저장", onDismiss = { renaming = false }) { renaming = false; vm.rename(g.id, it) }
+    if (renaming) NameDialog(title = "묶음 이름", hint = g.name, confirm = "저장", onDismiss = { renaming = false }) { renaming = false; vm.rename(g.id, it) }
 }
 
 @Composable

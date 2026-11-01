@@ -26,16 +26,19 @@ import androidx.compose.ui.window.DialogProperties
 fun CenterSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-            Box(
+            val maxH = maxHeight
+            val maxW = when { maxWidth >= 1200.dp -> 980.dp; maxWidth >= 720.dp -> 720.dp; else -> maxWidth }
+            // Grows in slightly instead of popping (same as the car's windows).
+            Enter(Entry.SHEET) { Box(
                 Modifier
-                    .widthIn(max = when { maxWidth >= 1200.dp -> 980.dp; maxWidth >= 720.dp -> 720.dp; else -> maxWidth })
-                    .heightIn(max = maxHeight)
+                    .widthIn(max = maxW)
+                    .heightIn(max = maxH)
                     .shadow(24.dp, Corner)
                     .clip(Corner)
                     .background(Palette.Sheet)
                     .border(1.dp, Palette.SheetEdge, Corner)
                     .padding(horizontal = 32.dp, vertical = 28.dp),
-            ) { content() }
+            ) { content() } }
         }
     }
 }

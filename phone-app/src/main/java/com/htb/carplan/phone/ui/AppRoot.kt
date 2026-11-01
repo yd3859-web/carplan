@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -81,13 +82,23 @@ fun AppRoot() {
         return
     }
     Column(Modifier.fillMaxSize().background(Palette.Background)) {
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (tab) {
-                Tab.CALENDAR -> CalendarScreen()
-                Tab.GROUP -> GroupTab(groupVm)
-                Tab.RECORD -> RecordTab()
-                Tab.CAR -> CarTab()
-                Tab.SETTINGS -> SettingsTab()
+        // Tabs slide sideways toward the one picked (the car's tab bar does the same).
+        androidx.compose.animation.AnimatedContent(
+            targetState = tab, modifier = Modifier.weight(1f).fillMaxWidth(), label = "tab",
+            transitionSpec = {
+                val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(MOTION_MS)) { dir * it / 8 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MOTION_MS))) togetherWith
+                    (androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(MOTION_MS)) { -dir * it / 8 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MOTION_MS)))
+            },
+        ) { t ->
+            Box(Modifier.fillMaxSize()) {
+                when (t) {
+                    Tab.CALENDAR -> CalendarScreen()
+                    Tab.GROUP -> GroupTab(groupVm)
+                    Tab.RECORD -> RecordTab()
+                    Tab.CAR -> CarTab()
+                    Tab.SETTINGS -> SettingsTab()
+                }
             }
         }
         TabBar(selected = tab, onSelect = { tab = it })
