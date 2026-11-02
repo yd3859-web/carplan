@@ -187,8 +187,21 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
             Text("차량 관리", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             Text("항목을 누르면 기록·주기", fontSize = 15.sp, color = Palette.TextSoft)
         }
+        // What the car itself warns about now (오일·브레이크액·워셔액 부족, 공기압): first, in the warning colour.
+        val st = car?.state
+        val warnings = st?.warnings.orEmpty().mapNotNull { runCatching { MaintenanceItem.valueOf(it) }.getOrNull() }
+        warnings.forEach { w ->
+            Text("차 알림 · " + MaintenanceRules.warningText(w), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.Sunday, modifier = Modifier.padding(bottom = 6.dp))
+        }
+        st?.tireKpa?.takeIf { it.size == 4 }?.let { t ->
+            Text("공기압  앞 ${t["FL"]?.toInt()} · ${t["FR"]?.toInt()}  뒤 ${t["RL"]?.toInt()} · ${t["RR"]?.toInt()} kPa", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 6.dp))
+        }
         LazyColumn(Modifier.weight(1f), state = list) {
-            items(MaintenanceItem.entries, key = { it.name }) { item ->
+            // Soonest first; an EV hides engine parts; washer fluid only when the car says it is low.
+            val shown = MaintenanceItem.entries.filter { item ->
+                !(item.engineOnly && st?.isEv == true) && (item != MaintenanceItem.WASHER_FLUID || item in warnings) && item != MaintenanceItem.FUEL
+            }.sortedBy { dues[it]?.startDate ?: "9999" }
+            items(listOf(MaintenanceItem.FUEL) + shown, key = { it.name }) { item ->
                 val last = records.firstOrNull { it.maintenance?.item == item }
                 val due = dues[item]
                 val dueDays = due?.let { ChronoUnit.DAYS.between(today, LocalDate.parse(it.startDate)) }
@@ -208,6 +221,8 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                             else -> "다음 ${due.startDate} · ${dueDays}일 남음" + (due.maintenance?.dueKm?.let { " · ${"%,d".format(it.toLong())}km" } ?: "")
                         }
                         if (dueText.isNotEmpty() && dueDays == null) Text(dueText, fontSize = 15.sp, color = Palette.TextSoft)
+                        // No record yet: why this interval (현대 취급설명서 기준 추천).
+                        if (last == null) MaintenanceRules.NOTES[item]?.let { Text("추천 · $it", fontSize = 14.sp, color = Palette.TextSoft) }
                     }
                     // Right side: how soon, in one word — the thing you actually want to know.
                     when {
@@ -245,6 +260,8 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                     Text("주기  " + (listOfNotNull(cur.km?.let { "${"%,d".format(it)}km" }, cur.days?.let { "${it}일" }).joinToString(" 또는 ").ifEmpty { "없음" }), fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.weight(1f))
                     TextButton(onClick = { showRecords = null; intervalFor = item }) { Text("주기 바꾸기", color = Palette.Navy, fontSize = 15.sp) }
                 }
+                MaintenanceRules.NOTES[item]?.let { Text("추천 이유 · $it", fontSize = 15.sp, color = Palette.TextSoft) }
+                if (item != MaintenanceItem.FUEL && item != MaintenanceItem.INSURANCE) Text("기록하면 다음 예정일이 캘린더에 들어가고, 그날 아침 9시에 알려 줘요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
                 Button(
                     onClick = { showRecords = null; logging = item }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp).height(52.dp), shape = Corner,
                     colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),

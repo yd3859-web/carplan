@@ -129,9 +129,26 @@ class VehicleMonitor(private val context: Context) {
                     handler.postDelayed(this, 2_000)
                 }
             }, 2_000)
+            // 15장 (2026-11-02): the car's own warnings → 차량 관리 (oil / brake fluid levels, washer fluid, tire pressure).
+            fun oil(item: String) = object : ai.pleos.playground.vehicle.listener.OilLevelStateListener {
+                override fun onOilLevelUpdated(state: ai.pleos.playground.vehicle.constant.control.OilLevelState?) {
+                    Log.i(TAG, "$item level $state")
+                    setWarning(item, state == ai.pleos.playground.vehicle.constant.control.OilLevelState.LOW || state == ai.pleos.playground.vehicle.constant.control.OilLevelState.CRITICALLY_LOW)
+                }
+                override fun onFailed(e: Exception) { Log.w(TAG, "$item level: ${e.message}") }
+            }
+            runCatching { v.getSafety().registerEngineOilLevelState(oil("ENGINE_OIL")) }.onFailure { Log.w(TAG, "engine oil unavailable", it) }
+            runCatching { v.getSafety().registerBrakeFluidLevelState(oil("BRAKE_FLUID")) }.onFailure { Log.w(TAG, "brake fluid unavailable", it) }
+            runCatching {
+                v.getSafety().registerLowWasherFluidWaringState(object : ai.pleos.playground.vehicle.listener.LowWasherFluidWaringListener {
+                    override fun onLowWasherFluidWaringUpdated(low: Boolean?) { Log.i(TAG, "washer low $low"); setWarning("WASHER_FLUID", low == true) }
+                    override fun onFailed(e: Exception) { Log.w(TAG, "washer: ${e.message}") }
+                })
+            }.onFailure { Log.w(TAG, "washer unavailable", it) }
+            pollTires(v)
             // 15장: odometer has no listener → poll once a minute (Virtual Console: /vehicle/odometer).
             pollOdometer(v)
-            handler.postDelayed(object : Runnable { override fun run() { vehicle?.let(::pollOdometer); handler.postDelayed(this, 60_000) } }, 60_000)
+            handler.postDelayed(object : Runnable { override fun run() { vehicle?.let { pollOdometer(it); pollTires(it) }; handler.postDelayed(this, 60_000) } }, 60_000)
         }
     }
 
@@ -151,6 +168,36 @@ class VehicleMonitor(private val context: Context) {
     }
 
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun setWarning(item: String, on: Boolean) = _state.update { s ->
+        val w = if (on) (s.warnings + item).distinct() else s.warnings - item
+        if (w == s.warnings) s else s.copy(warnings = w)
+    }
+
+    /** Tire pressure per wheel (kPa) and the car's own "low" threshold: below it on any wheel = TIRE_PRESSURE warning. */
+    private fun pollTires(v: Vehicle) {
+        if (tiresUnsupported) return
+        val wheels = mapOf(
+            "FL" to ai.pleos.playground.vehicle.constant.area.WheelValue.LEFT_FRONT, "FR" to ai.pleos.playground.vehicle.constant.area.WheelValue.RIGHT_FRONT,
+            "RL" to ai.pleos.playground.vehicle.constant.area.WheelValue.LEFT_REAR, "RR" to ai.pleos.playground.vehicle.constant.area.WheelValue.RIGHT_REAR,
+        )
+        wheels.forEach { (key, w) ->
+            val area = ai.pleos.playground.vehicle.api.model.area.WheelArea(w)
+            runCatching {
+                v.getTire().getTirePressure(area, { kpa ->
+                    kpa ?: return@getTirePressure
+                    _state.update { it.copy(tireKpa = it.tireKpa + (key to kpa.toDouble())) }
+                    v.getTire().getLowTirePressure(area, { low ->
+                        lowWheels[key] = low != null && low > 0 && kpa < low
+                        setWarning("TIRE_PRESSURE", lowWheels.values.any { it })
+                    }, { })
+                }, { e -> if (!tiresUnsupported) Log.w(TAG, "tire pressure not available: ${e.message}"); tiresUnsupported = true })
+            }.onFailure { Log.w(TAG, "tire unavailable", it) }
+        }
+    }
+    private val lowWheels = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    /** The emulator has no TIRE_PRESSURE property: stop asking every minute after the first refusal. */
+    @Volatile private var tiresUnsupported = false
 
     /** Odometer and range have no listener: both are read now and then once a minute (range used to be read only at start). */
     private fun pollOdometer(v: Vehicle) {

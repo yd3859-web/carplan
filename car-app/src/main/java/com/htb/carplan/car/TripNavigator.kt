@@ -218,6 +218,32 @@ class TripNavigator(
     private var fuelPlan: GasStation? = null
     /** Q55 on screen: what the day takes in fuel, and (when short) the station to stop at. */
     private val _fuelUsage = MutableStateFlow<FuelUsage?>(null)
+    /** Car warnings already turned into a calendar entry (until the car clears them). */
+    private val warned = HashSet<String>()
+
+    /**
+     * 15장 (2026-11-02): the car itself says 엔진오일·브레이크액·워셔액 부족 / 공기압 낮음 → the owner's 차량 관리 item
+     * moves to today on the calendar (the phone rings at 9:00 / now) and the car says it once.
+     */
+    private fun onCarWarnings(items: List<String>) {
+        warned += items
+        scope.launch {
+            runCatching {
+                val car = carId.value?.let { calendar.observeCar(it).first() } ?: return@launch
+                val owner = car.ownerUid ?: return@launch
+                val user = groups.user(owner) ?: return@launch
+                val texts = items.mapNotNull { name -> runCatching { MaintenanceItem.valueOf(name) }.getOrNull() }.map { item ->
+                    val text = com.htb.carplan.shared.calendar.MaintenanceRules.warningText(item)
+                    maintenance.warnNow(user.soloGroupId, car.id, item, text, owner)
+                    text
+                }
+                if (texts.isEmpty()) return@launch
+                _notice.value = texts.joinToString(" · ") + " · 캘린더 오늘에 넣었어요"
+                voice.say(texts.joinToString(". ") + ". 캘린더에 넣어 둘게요.")
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     /** Battery/tank size from the car (L or kWh); set by TripSyncService. Declared before init (collectors read it). */
     var tankSize: (Boolean) -> Double? = { null }
     val fuelUsage: StateFlow<FuelUsage?> = _fuelUsage.asStateFlow()
@@ -693,8 +719,11 @@ class TripNavigator(
     }
 
     fun onCarState(state: CarState) {
+        val newWarnings = state.warnings - carState.warnings.toSet() - warned
         carState = state
         updateLiveLoop()
+        if (newWarnings.isNotEmpty()) onCarWarnings(newWarnings)
+        warned.retainAll(state.warnings.toSet()) // cleared → may warn again later
         val fuel = state.fuelPercent ?: return
         // A station question that is still open when the tank is clearly fuller is stale: drop it (the fill-up question follows).
         _prompt.value?.let { p -> if (p.reason == PromptReason.FUEL && fuel >= (fuelAskedPercent ?: 0.0) + 5) { askJob?.cancel(); closePrompt() } }

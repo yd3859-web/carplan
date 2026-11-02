@@ -344,18 +344,34 @@ fun RowScope.CarVehicle(vm: CarHomeViewModel) {
             Text("차량 관리", color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             Text("금액·주기는 폰 차량 탭에서", color = c.soft, fontSize = 20.sp)
         }
+        // What the car itself warns about now (Pleos Safety/Tire), first and in the warning colour.
+        val warnings = v.warnings.mapNotNull { runCatching { MaintenanceItem.valueOf(it) }.getOrNull() }
+        warnings.forEach { w ->
+            Text("차 알림 · " + MaintenanceRules.warningText(w), color = c.warn, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (v.tireKpa.size == 4) Text(
+            "공기압  앞 " + "${v.tireKpa["FL"]?.toInt()} · ${v.tireKpa["FR"]?.toInt()}  뒤 ${v.tireKpa["RL"]?.toInt()} · ${v.tireKpa["RR"]?.toInt()} kPa",
+            color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp),
+        )
         LazyColumn(Modifier.weight(1f)) {
-            items(MaintenanceItem.entries.filter { it != MaintenanceItem.INSURANCE || dues[it] != null }, key = { it.name }) { item ->
+            // Due soonest first; an EV hides engine parts; washer fluid only when the car says it is low.
+            val shown = MaintenanceItem.entries.filter { item ->
+                (item != MaintenanceItem.INSURANCE || dues[item] != null) && !(item.engineOnly && v.isEv == true) &&
+                    (item != MaintenanceItem.WASHER_FLUID || item in warnings) && item != MaintenanceItem.FUEL
+            }.sortedBy { dues[it]?.startDate ?: "9999" }
+            items(listOf(MaintenanceItem.FUEL) + shown, key = { it.name }) { item ->
                 val last = records.firstOrNull { it.maintenance?.item == item }
                 val due = dues[item]
                 val dueDays = due?.let { ChronoUnit.DAYS.between(today, LocalDate.parse(it.startDate)) }
                 Row(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(item.label, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
-                        Text(last?.let { "마지막 ${it.startDate.substring(5).replace('-', '/')}" + (it.maintenance?.odometerKm?.let { km -> " · ${"%,d".format(km.toLong())}km" } ?: "") } ?: "기록 없음", color = c.soft, fontSize = 20.sp)
+                        Text(last?.let { "마지막 ${it.startDate.substring(5).replace('-', '/')}" + (it.maintenance?.odometerKm?.let { km -> " · ${"%,d".format(km.toLong())}km" } ?: "") }
+                            ?: MaintenanceRules.NOTES[item]?.let { "추천 · $it" } ?: "기록 없음", color = c.soft, fontSize = 20.sp, maxLines = 2)
                     }
                     // How soon, in a word: only overdue / today in the warning colour (one accent rule).
                     val (soon, warn) = when {
+                        item.name in v.warnings -> "지금" to true
                         dueDays == null -> MaintenanceRules.interval(item, car?.intervals.orEmpty()).let { i -> listOfNotNull(i.km?.let { "${"%,d".format(it)}km" }, i.days?.let { "${it}일" }).joinToString("·").let { if (it.isEmpty()) "—" else "주기 $it" } } to false
                         dueDays < 0 -> "${-dueDays}일 지남" to true
                         dueDays == 0L -> "오늘" to true

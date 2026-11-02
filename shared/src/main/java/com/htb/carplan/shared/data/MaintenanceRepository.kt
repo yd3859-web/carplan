@@ -60,12 +60,32 @@ class MaintenanceRepository(private val db: FirebaseFirestore = FirebaseFirestor
     }
 
     private suspend fun writeDue(soloGroupId: String, carId: String, item: MaintenanceItem, lastDate: LocalDate, lastKm: Double?, intervals: Map<String, Map<String, Long>>, kmPerDay: Double, byUid: String) {
-        val due = MaintenanceRules.nextDue(item, lastDate, lastKm, MaintenanceRules.interval(item, intervals), kmPerDay) ?: return
-        val d = due.date ?: return
+        val due = MaintenanceRules.nextDue(item, lastDate, lastKm, MaintenanceRules.interval(item, intervals), kmPerDay)
+        // No interval (워셔액): done = the car's warning entry on the calendar goes away.
+        val d = due?.date ?: run {
+            runCatching { db.document(FirestorePaths.event(soloGroupId, FirestorePaths.dueEventId(item.name))).update("deleted", true).await() }
+            return
+        }
         db.document(FirestorePaths.event(soloGroupId, FirestorePaths.dueEventId(item.name))).set(
             Event(
                 categoryId = BuiltInCategory.CAR.id, title = "${item.label} 예정", startDate = d.toString(), endDate = d.toString(), allDay = true,
                 createdBy = byUid, maintenance = Maintenance(item = item, carId = carId, auto = true, dueKm = due.dueKm),
+                reminderMinutes = 0, // the phone rings at 9:00 on the day (Reminders); Functions push a week before
+            ),
+            SetOptions.merge(),
+        ).await()
+    }
+
+    /**
+     * The car itself warned (엔진오일·브레이크액·워셔액 부족, 공기압 낮음): the item's due event moves to today with that
+     * text, so it is on the calendar and the phone rings. Written once per warning; a record later moves it on again.
+     */
+    suspend fun warnNow(soloGroupId: String, carId: String, item: MaintenanceItem, text: String, byUid: String) {
+        val today = LocalDate.now().toString()
+        db.document(FirestorePaths.event(soloGroupId, FirestorePaths.dueEventId(item.name))).set(
+            Event(
+                categoryId = BuiltInCategory.CAR.id, title = text, startDate = today, endDate = today, allDay = true, createdBy = byUid,
+                memo = "차가 알려 줬어요", maintenance = Maintenance(item = item, carId = carId, auto = true), reminderMinutes = 0,
             ),
             SetOptions.merge(),
         ).await()

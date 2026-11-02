@@ -71,6 +71,13 @@ data class CarState(
     val isEv: Boolean? = null,
     /** Odometer reading in km (15장), when the car exposes it. */
     val odometerKm: Double? = null,
+    /**
+     * What the car itself warns about right now (Pleos Safety/Tire, 2026-11-02): [MaintenanceItem] names
+     * ENGINE_OIL · BRAKE_FLUID · WASHER_FLUID · TIRE_PRESSURE. Empty = nothing.
+     */
+    val warnings: List<String> = emptyList(),
+    /** Tire pressure per wheel in kPa ("FL","FR","RL","RR"), when the car reports it. */
+    val tireKpa: Map<String, Double> = emptyMap(),
     @ServerTimestamp val updatedAt: Timestamp? = null,
 )
 
@@ -112,14 +119,24 @@ data class Group(
     val isCircle: Boolean get() = !solo && forEvent == null
 }
 
-enum class MaintenanceItem(val label: String) {
+/** [engineOnly] = a fuel car's part (an EV hides it). New items go at the end (Firestore stores the name). */
+enum class MaintenanceItem(val label: String, val engineOnly: Boolean = false) {
     FUEL("주유"),
     INSPECTION("차량 점검"),
     TIRE_PRESSURE("공기압"),
-    ENGINE_OIL("엔진오일"),
+    ENGINE_OIL("엔진오일", engineOnly = true),
     TIRE_CHANGE("타이어 교체"),
     CAR_WASH("세차"),
     INSURANCE("보험 갱신"),
+    // 2026-11-02: 소모품 교체 주기 (현대 취급설명서 기준, MaintenanceRules.NOTES)
+    TIRE_ROTATION("타이어 위치 교환"),
+    BRAKE_FLUID("브레이크액"),
+    CABIN_FILTER("에어컨 필터"),
+    AIR_FILTER("에어클리너", engineOnly = true),
+    WIPER("와이퍼"),
+    COOLANT("냉각수"),
+    BATTERY_12V("12V 배터리 점검"),
+    WASHER_FLUID("워셔액"),
 }
 
 /**
