@@ -95,6 +95,8 @@ data class NaviLive(
     val turnText: String? = null,
     val remainMeters: Int? = null,
     val remainSeconds: Int? = null,
+    /** Seconds to the next planned stop — later than [remainSeconds] when a station or pickup is in front. */
+    val stopSeconds: Int? = null,
     val nextName: String? = null,
     val lat: Double? = null,
     val lng: Double? = null,
@@ -297,7 +299,7 @@ class TripNavigator(
 
     /** Route picked inside carplan (주유소·주차장·맛집 list): the navigation takes it, carplan comes back on top. */
     private fun routeQuietly(places: List<Place>) {
-        _live.update { it.copy(remainMeters = null, remainSeconds = null, nextName = places.firstOrNull()?.name) } // not the last drive's numbers
+        _live.update { it.copy(remainMeters = null, remainSeconds = null, stopSeconds = null, nextName = places.firstOrNull()?.name) } // not the last drive's numbers
         router.route(places)
         lastRouteSentAt = System.currentTimeMillis()
         scope.launch { repeat(2) { delay(1_500); bringToFront() } }
@@ -382,8 +384,12 @@ class TripNavigator(
                 if (simActive) return
                 // The nearest point we are driving to: the first waypoint while any remain, else the destination.
                 val next = info.waypoints.firstOrNull() ?: info.destination
-                _live.update { it.copy(remainMeters = next.distance, remainSeconds = next.duration, nextName = next.name) }
-                publishEta(next.duration)
+                // The rail's arrival time is for the next planned stop: with a station or pickup in front, that is a
+                // later point of the same route (the navigation lists waypoints in our order, then the destination).
+                val stopAt = inNavi.indexOfFirst { it.kind == NaviEntry.Kind.STOP }
+                val toStop = (info.waypoints + info.destination).getOrNull(stopAt)?.duration?.takeIf { it > 0 }
+                _live.update { it.copy(remainMeters = next.distance, remainSeconds = next.duration, stopSeconds = toStop, nextName = next.name) }
+                toStop?.let { publishEta(it, force = etaAfterStart).also { etaAfterStart = false } }
             }
             override fun onRouteCancelled() {
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
@@ -688,6 +694,8 @@ class TripNavigator(
             else -> fuel <= fuelAlertPercent || (range != null && range > 0 && range < LOW_RANGE_KM * fuelAlertPercent / LOW_FUEL_PERCENT)
         }
         if (!need) return
+        // A station is already on the way (picked from the list): no "주유소가 필요해요" on top of it.
+        if (inNavi.any { it.kind == NaviEntry.Kind.STATION } || _fuelSuggestion.value?.chosen == true) return
         if (fuelPlanVersion == t?.version) return // Q55: this plan version was already looked at (a station found, or enough fuel)
         fuelAskedPercent?.let { asked -> if (fuel > asked - 10) return } // Q33
         if (!_guiding.value && fuelAskedToday == today && fuelAskedPercent != null && fuel > fuelAskedPercent!! - 10) return
@@ -785,14 +793,8 @@ class TripNavigator(
         _prompt.value?.takeIf { it.reason == PromptReason.FUEL }?.let { askJob?.cancel(); closePrompt() }
         waiting.removeAll { it.first.reason == PromptReason.FUEL }
         scope.launch {
-            val legs = ArrayList<FuelPlan.Leg>()
-            var from = lastLocation?.let { Place(name = "차", lat = it.first, lng = it.second) } ?: stops.first().place
-            for (s in stops) {
-                if (from.lat == s.place.lat && from.lng == s.place.lng) { from = s.place; continue }
-                val m = runCatching { kakao.directions(from, s.place).meters.toDouble() }.getOrElse { RouteMath.metersBetween(from.lat, from.lng, s.place.lat, s.place.lng) * 1.3 }
-                legs += FuelPlan.Leg(from, s, m)
-                from = s.place
-            }
+            // Straight line ×1.3 per leg (Kakao only for place recommendations; the 30 km reserve covers the error).
+            val legs = straightLegs(t)
             val ev = carState.isEv == true
             // Always: what the day takes (정원 2026-10-31) — a line on the screen, no voice when it is enough.
             val short = FuelPlan.shortfall(legs, reach, ROUTE_MARGIN_KM * 1000)
@@ -943,12 +945,12 @@ class TripNavigator(
     /** The simulated car moved: same effect as a navigation location + driving-info update. */
     fun simMove(lat: Double, lng: Double, remainMeters: Int, remainSeconds: Int, nextName: String) {
         lastLocation = lat to lng
-        _live.update { it.copy(lat = lat, lng = lng, remainMeters = remainMeters, remainSeconds = remainSeconds, nextName = nextName) }
+        _live.update { it.copy(lat = lat, lng = lng, remainMeters = remainMeters, remainSeconds = remainSeconds, stopSeconds = null, nextName = nextName) }
         publishEta(remainSeconds)
     }
 
     /** Parked: the leg is over, so no "0 m · 1분" left on screen. */
-    fun simParked() = _live.update { it.copy(remainMeters = null, remainSeconds = null) }
+    fun simParked() = _live.update { it.copy(remainMeters = null, remainSeconds = null, stopSeconds = null) }
 
     /** "응" to the start question, if that is what is on screen (not a fuel or change question). */
     fun simAnswerStart() {
@@ -1196,8 +1198,8 @@ class TripNavigator(
         for (p in permutations(waiting)) {
             var cost = 0
             var prev = here
-            for (x in p) { cost += legSeconds(prev, x.place); prev = x.place }
-            if (goal != null) cost += legSeconds(prev, goal)
+            for (x in p) { cost += guessSeconds(prev, x.place); prev = x.place }
+            if (goal != null) cost += guessSeconds(prev, goal)
             if (cost < bestCost) { bestCost = cost; best = p }
         }
         return best
@@ -1206,7 +1208,10 @@ class TripNavigator(
     private fun <T> permutations(list: List<T>): List<List<T>> =
         if (list.size <= 1) listOf(list) else list.indices.flatMap { i -> permutations(list.filterIndexed { j, _ -> j != i }).map { listOf(list[i]) + it } }
 
-    /** Kakao driving time, cached; straight-line estimate when there is no key or no network. */
+    /** Pickup order compares many legs: a straight-line guess is enough (no Kakao call per permutation). */
+    private fun guessSeconds(a: Place, b: Place): Int = RouteMath.estimateSeconds(RouteMath.metersBetween(a.lat, a.lng, b.lat, b.lng))
+
+    /** "지금 출발하면 n시 n분 도착" — Kakao driving time, one call per question, cached; straight-line estimate without a key. */
     private suspend fun legSeconds(a: Place, b: Place): Int {
         val key = "%.4f,%.4f>%.4f,%.4f".format(a.lat, a.lng, b.lat, b.lng)
         legCache[key]?.let { return it }
@@ -1220,21 +1225,20 @@ class TripNavigator(
      * show "약 n분", Functions push "곧 도착" under 3 min) or to the next stop (≤ 5 min → parkingHintStopId → 12장
      * "주차장 찾아봐 주세요" push to the passengers).
      * The time comes from the navigation's own driving info (the nearest point it is driving to — the pickup when one
-     * is in front); Kakao Mobility is only the fallback, at most every [KAKAO_ETA_MIN_MS], to keep the API quota.
+     * is in front); no Kakao call (현대 내비 값만).
      */
     private fun startEtaLoop() {
         etaJob?.cancel()
         etaJob = scope.launch {
-            var kakaoAt = 0L
             while (true) {
                 router.requestCurrentLocation()
                 delay(2_000)
                 val t = trip.value
                 val here = lastLocation
                 if (t != null && here != null && !simActive) {
-                    val from = Place(name = "차", lat = here.first, lng = here.second)
-                    suspend fun etaTo(place: Place): Int? = _live.value.remainSeconds
-                        ?: if (System.currentTimeMillis() - kakaoAt >= KAKAO_ETA_MIN_MS) { kakaoAt = System.currentTimeMillis(); runCatching { kakao.directions(from, place).seconds }.getOrNull() } else null
+                    // The navigation's own remaining time — only to the point it is driving to first (a station picked in
+                    // front is not the next stop), and none until its first driving info arrives.
+                    fun etaTo(place: Place): Int? = _live.value.remainSeconds?.takeIf { it > 0 && inNavi.firstOrNull()?.place == place }
                     val pickup = inNavi.firstOrNull()?.takeIf { it.kind == NaviEntry.Kind.PICKUP }?.let { e -> t.pickups.firstOrNull { it.uid == e.id && it.status == PickupStatus.WAITING && it.place.hasCoords() } }
                     if (pickup != null) {
                         val eta = etaTo(pickup.place)
@@ -1286,8 +1290,11 @@ class TripNavigator(
     /** The navigation computed a route: publish when it expects to reach the next stop (10장 7·8). */
     private fun onRouteStarted(durationSeconds: Int) {
         Log.i(TAG, "route started, next in ${durationSeconds}s")
-        publishEta(durationSeconds, force = true)
+        // The start's duration is to the first point: the next stop only when nothing (station, pickup) is in front.
+        if (inNavi.firstOrNull()?.kind == NaviEntry.Kind.STOP) publishEta(durationSeconds, force = true) else etaAfterStart = true
     }
+    /** The first driving info after a route start with a station/pickup in front carries the stop's real time. */
+    @Volatile private var etaAfterStart = false
 
     private var etaPublishedAt = 0L
     private var etaPublished: String? = null
@@ -1314,7 +1321,7 @@ class TripNavigator(
         if (place.hasCoords()) { router.route(listOf(place)); if (!simActive) router.openNavigation() } else router.search(place.name)
         lastRouteSentAt = System.currentTimeMillis()
         inNavi = listOf(NaviEntry(NaviEntry.Kind.EVENT, eventId, place))
-        _live.update { it.copy(remainMeters = null, remainSeconds = null, nextName = place.name) } // not the last drive's numbers
+        _live.update { it.copy(remainMeters = null, remainSeconds = null, stopSeconds = null, nextName = place.name) } // not the last drive's numbers
         _guiding.value = true
         _notice.value = "$title · ${place.name} 안내"
     }
@@ -1408,7 +1415,6 @@ class TripNavigator(
         /** How long a stop the navigation reported reaching waits for its record (P + door). */
         private const val REACHED_VALID_MS = 30 * 60_000L
         /** Kakao Mobility fallback for the ETA when the navigation gives no driving info: at most this often. */
-        private const val KAKAO_ETA_MIN_MS = 5 * 60_000L
         private val START_REASONS = setOf(PromptReason.APP_START, PromptReason.GEAR_D, PromptReason.MANUAL, PromptReason.PICKUP)
         /** How long the command buttons stay after [말하기] did not understand. */
         private const val VOICE_CHOICES_MS = 10_000L

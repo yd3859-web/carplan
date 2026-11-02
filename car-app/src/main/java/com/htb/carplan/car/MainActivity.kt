@@ -549,7 +549,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
 private fun drivenTimes(trip: TodayTrip, live: NaviLive, guiding: Boolean): Map<String, String> {
     if (!guiding) return emptyMap()
     // The navigation's live time first; between updates, the arrival it last announced (days/{date}.etaNext).
-    val eta = live.remainSeconds?.let { java.time.LocalTime.now().plusSeconds(it.toLong()) }
+    val eta = (live.stopSeconds ?: live.remainSeconds)?.let { java.time.LocalTime.now().plusSeconds(it.toLong()) }
         ?: trip.day?.etaNext?.let { runCatching { java.time.LocalTime.parse(it) }.getOrNull() } ?: return emptyMap()
     return com.htb.carplan.shared.calendar.Schedule.asDriven(trip.stops, trip.next?.id, eta)
 }
