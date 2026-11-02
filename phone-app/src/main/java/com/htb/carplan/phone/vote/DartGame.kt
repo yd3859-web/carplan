@@ -332,7 +332,11 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         )
         fun toGeo(p: Offset) = (camLat.value - (p.y - boardH / 2) / camK.value).toDouble() to (camLng.value + (p.x - w / 2) / (camK.value * COS_LAT)).toDouble()
 
-        val launchAt = Offset(w / 2, h - with(density) { 44.dp.toPx() })
+        // The whole dart stands above the bottom edge (it used to hang off-screen, so the pull was invisible).
+        val launchAt = Offset(w / 2, h - with(density) { 200.dp.toPx() })
+        // How far the dart is drawn back: follows the finger, up to a slingshot's reach.
+        val maxBack = with(density) { 60.dp.toPx() }
+        fun backOf(p: Offset): Offset { val d = p.getDistance(); return if (d == 0f) p else p / d * min(d * 0.6f, maxBack) }
         var pull by remember { mutableStateOf<Offset?>(null) }
         val fly = remember { Animatable(0f) }
         val wobble = remember { Animatable(0f) }
@@ -343,9 +347,9 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         var flying by remember { mutableStateOf(false) }
         val cs = rememberCoroutineScope()
 
-        suspend fun throwTo(target: Offset, ms: Int) {
+        suspend fun throwTo(target: Offset, ms: Int, from: Offset = launchAt) {
             flying = true; onFlying(true)
-            flightFrom = launchAt; flightTo = target; stuck = null
+            flightFrom = from; flightTo = target; stuck = null
             fly.snapTo(0f); wobble.snapTo(0f); impact.snapTo(0f)
             fly.animateTo(1f, tween(ms, easing = FastOutLinearInEasing))
             stuck = toGeo(target)
@@ -457,7 +461,8 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                                 (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
                             )
-                            throwTo(target, 560)
+                            // Released from where it was drawn back: the dart snaps forward out of the band.
+                            throwTo(target, 560, from = launchAt + backOf(p))
                             val (lat, lng) = toGeo(target)
                             onLanded(lat, lng)
                         }
@@ -479,11 +484,31 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
             }
             val t = fly.value; val target = flightTo
             when {
-                p != null -> drawDart(launchAt + p * 0.35f, atan2(-p.y, -p.x), 1.5f)
+                p != null -> {
+                    val power = min(1f, p.getDistance() / (size.height * 0.40f))
+                    // Slingshot: two bands from either side of the launch spot to the dart's tail, tighter as it is drawn.
+                    val b = backOf(p)
+                    val tremble = if (power > 0.85f) Offset(sin(System.nanoTime() / 2e7).toFloat(), 0f) * 2.dp.toPx() else Offset.Zero
+                    val at = launchAt + b + tremble
+                    val heading = atan2(-p.y, -p.x)
+                    val tail = at - Offset(kotlin.math.cos(heading), sin(heading)) * 60.dp.toPx() * (1.5f + 0.2f * power) / 1.5f
+                    val side = 46.dp.toPx()
+                    listOf(launchAt + Offset(-side, 0f), launchAt + Offset(side, 0f)).forEach { a ->
+                        drawLine(Palette.Navy.copy(alpha = 0.35f + 0.5f * power), a, tail, (3f - 1.5f * power).dp.toPx(), StrokeCap.Round)
+                        drawCircle(Palette.Navy, 5.dp.toPx(), a)
+                    }
+                    drawDart(at, heading, 1.5f + 0.2f * power)
+                }
                 flying && target != null -> {
                     val ground = flightFrom + (target - flightFrom) * t
                     drawOval(Color(0x33000000), ground - Offset(10.dp.toPx(), 3.dp.toPx()), androidx.compose.ui.geometry.Size(20.dp.toPx() * (0.6f + t * 0.4f), 6.dp.toPx()))
                     val pos = ground + Offset(0f, -sin(PI * t).toFloat() * size.height * 0.22f)
+                    // A short fading trail behind the dart in the air.
+                    listOf(0.06f, 0.12f, 0.18f).forEachIndexed { i, back ->
+                        val tt = (t - back).coerceAtLeast(0f)
+                        val g = flightFrom + (target - flightFrom) * tt + Offset(0f, -sin(PI * tt).toFloat() * size.height * 0.22f)
+                        drawCircle(Palette.Teal.copy(alpha = 0.28f - i * 0.08f), (5 - i).dp.toPx(), g)
+                    }
                     drawDart(pos, atan2(target.y - flightFrom.y, target.x - flightFrom.x) + (1 - t) * -0.4f, 1.5f - 0.75f * t, wobble.value)
                 }
                 stuck != null -> {
