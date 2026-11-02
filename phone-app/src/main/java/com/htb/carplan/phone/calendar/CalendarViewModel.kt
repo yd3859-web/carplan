@@ -206,7 +206,7 @@ class CalendarViewModel : ViewModel() {
      * Every event goes to the solo group for now (4장 adds picking a group for trips).
      * [onAdded] gets the group and event id so a trip can open its first day right away.
      */
-    fun addEvent(event: Event, groupId: String? = null, onAdded: (groupId: String, eventId: String) -> Unit = { _, _ -> }) {
+    fun addEvent(event: Event, groupId: String? = null, firstStop: com.htb.carplan.shared.model.Place? = null, onAdded: (groupId: String, eventId: String) -> Unit = { _, _ -> }) {
         val s = _session.value ?: return
         val gid = groupId ?: s.soloGroupId
         if (event.categoryId == BuiltInCategory.TRIP.id) _lastGroupId.value = gid
@@ -217,7 +217,11 @@ class CalendarViewModel : ViewModel() {
                 if (circle != null) GroupRepository().addEventWith(circle, event.copy(createdBy = s.uid), s.uid)
                 else gid to calendar.addEvent(gid, event.copy(createdBy = s.uid))
             }
-                .onSuccess { (g, eid) -> onAdded(g, eid) }
+                .onSuccess { (g, eid) ->
+                    // A안: the place picked with [다트] is the first day's first stop.
+                    firstStop?.let { p -> runCatching { com.htb.carplan.shared.data.TripRepository().addStop(g, eid, event.startDate, p, null, "다트", s.uid) } }
+                    onAdded(g, eid)
+                }
                 .onFailure { _error.value = it.message }
         }
     }

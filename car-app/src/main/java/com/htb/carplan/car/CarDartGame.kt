@@ -95,7 +95,11 @@ private val Corner = RoundedCornerShape(4.dp)
 
 /** 6장 차 다트 (주차 중): full screen, the same throw-and-dive game as the phone, sharing the group's dart room. */
 @Composable
-fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
+fun CarDartGame(
+    vm: CarHomeViewModel, onDismiss: () -> Unit,
+    /** 일정 추가 창에서 열면(A안): the chosen place goes back to that window instead of today's trip. */
+    onPick: ((Place) -> Unit)? = null,
+) {
     val dart by vm.dart.collectAsStateWithLifecycle()
     val vehicle by vm.vehicle.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
@@ -183,7 +187,7 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                                     spots!!.isEmpty() -> Text("근처에서 못 찾았어요", fontSize = 20.sp, color = Palette.TextSoft)
                                     else -> spots!!.forEach { p ->
                                         Row(
-                                            Modifier.fillMaxWidth().heightIn(min = 76.dp).clickable { vm.addPlaceAsStop(p, "다트 추천 · ${cat!!.label}"); onDismiss() },
+                                            Modifier.fillMaxWidth().heightIn(min = 76.dp).clickable { if (onPick != null) onPick(p) else { vm.addPlaceAsStop(p, "다트 추천 · ${cat!!.label}"); onDismiss() } },
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(p.name, fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
@@ -193,7 +197,10 @@ fun CarDartGame(vm: CarHomeViewModel, onDismiss: () -> Unit) {
                                 }
                             }
                             Button(
-                                onClick = { vm.addDartAsStop(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
+                                onClick = {
+                                    if (onPick != null) { val parts = d.resultName.split(" "); onPick(Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName)) }
+                                    else { vm.addDartAsStop(); onDismiss() }
+                                }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
                                 modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(76.dp),
                             ) { Text("이 동네 그대로 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
                         }

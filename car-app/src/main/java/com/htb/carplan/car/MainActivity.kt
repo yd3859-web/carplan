@@ -1208,6 +1208,8 @@ private fun CarAddDialog(vm: CarHomeViewModel, date: LocalDate = LocalDate.now()
     var place by remember { mutableStateOf("") }
     // The place is matched right away (현대 내비 먼저, 카카오는 보조 → 좌표), so the navigation gets the exact spot, not a name to guess.
     var picked by remember { mutableStateOf<Place?>(null) }
+    // A안: not sure where yet → throw the dart here; the place it picks fills the place (and an empty title).
+    var darting by remember { mutableStateOf(false) }
     val time = if (timed) "%02d:%02d".format(hm.first, hm.second) else null
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     // Keyboard [완료] / Enter: put the keyboard away (the hardware keyboard types straight into the field).
@@ -1243,6 +1245,10 @@ private fun CarAddDialog(vm: CarHomeViewModel, date: LocalDate = LocalDate.now()
             CarAppear(timed) { CarTimeWheel(hm.first, hm.second, { h, m -> hm = h to m }, Modifier.padding(top = 10.dp).widthIn(max = 520.dp)) }
             Spacer(Modifier.height(18.dp))
             CarPlacePicker(vm, place, { place = it; picked = null }, picked, onPick = { picked = it; place = it.name })
+            OutlinedButton(
+                onClick = { darting = true }, shape = Corner, border = BorderStroke(1.dp, SheetEdge),
+                modifier = Modifier.padding(top = 12.dp).heightIn(min = 76.dp),
+            ) { Text("어디 갈지 모르겠으면  다트로 정하기", fontSize = 24.sp, color = Ink, fontWeight = FontWeight.SemiBold) }
             }
             Spacer(Modifier.height(12.dp))
             Button(
@@ -1256,6 +1262,10 @@ private fun CarAddDialog(vm: CarHomeViewModel, date: LocalDate = LocalDate.now()
         }
     }
     }
+    if (darting) CarDartGame(vm, onDismiss = { darting = false }, onPick = { p ->
+        darting = false; picked = p; place = p.name
+        if (title.isBlank()) title = p.name
+    })
     if (datePick) CarDatePickDialog(LocalDate.now().plusDays(dayOffset), onPick = { dayOffset = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), it); datePick = false }, onDismiss = { datePick = false })
 }
 

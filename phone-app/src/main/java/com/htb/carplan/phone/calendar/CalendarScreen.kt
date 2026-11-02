@@ -203,9 +203,9 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             // [같이 갈 사람]: 나만, or one 묶음 (자주 타는 사람). Event-only groups are not picked here.
             groups = groups.filter { it.solo || it.isCircle },
             defaultGroupId = groups.firstOrNull { it.solo }?.id,
-            onSave = { e, gid ->
+            onSave = { e, gid, firstStop ->
                 quickAddDate = null
-                vm.addEvent(e, gid) { g, eid ->
+                vm.addEvent(e, gid, firstStop) { g, eid ->
                     // A new trip opens straight into its first day's stops (3장).
                     if (e.categoryId == BuiltInCategory.TRIP.id) openTrip = TripRef(g, eid, e.startDate)
                 }

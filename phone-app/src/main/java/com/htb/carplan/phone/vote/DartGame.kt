@@ -93,7 +93,11 @@ import kotlin.random.Random
  * Everyone in the group sees the same throw land (shared dart room).
  */
 @Composable
-fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) -> String, onDismiss: () -> Unit) {
+fun DartGame(
+    groupId: String, eventId: String?, date: String?, nameOf: (String) -> String, onDismiss: () -> Unit,
+    /** 일정 추가 창에서 열면(A안): the chosen place goes back to that window instead of becoming a stop. */
+    onPick: ((com.htb.carplan.shared.model.Place) -> Unit)? = null,
+) {
     val vm: VoteDartViewModel = viewModel(key = "dart-$groupId-$eventId", factory = voteVmFactory(groupId, eventId, date))
     val dart by vm.dart.collectAsStateWithLifecycle()
     val me by vm.uid.collectAsStateWithLifecycle()
@@ -206,13 +210,19 @@ fun DartGame(groupId: String, eventId: String?, date: String?, nameOf: (String) 
                                                 Text(listOfNotNull(memoBadge(vm, p), p.address).joinToString("  ·  "), fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
                                             }
                                             // 묶음 4: not sure → put it to a vote with the others.
-                                            TextButton(onClick = { voteSeed = p }) { Text("투표", color = Palette.TextSoft, fontSize = 16.sp) }
-                                            if (eventId != null) TextButton(onClick = { vm.addPlaceAsStop(p, d) }) { Text("칸으로", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                                            if (onPick != null) TextButton(onClick = { onPick(p) }) { Text("이걸로", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
+                                            else TextButton(onClick = { voteSeed = p }) { Text("투표", color = Palette.TextSoft, fontSize = 16.sp) }
+                                            if (onPick == null && eventId != null) TextButton(onClick = { vm.addPlaceAsStop(p, d) }) { Text("칸으로", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
                                         }
                                     }
                                 }
                             }
-                            if (eventId != null) OutlinedButton(
+                            if (onPick != null) OutlinedButton(
+                                onClick = { val parts = d.resultName.split(" "); onPick(com.htb.carplan.shared.model.Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName)) },
+                                shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
+                                modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(48.dp),
+                            ) { Text("동네 그대로 넣기", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                            else if (eventId != null) OutlinedButton(
                                 onClick = { vm.addDartAsStop(d) }, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
                                 modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(48.dp),
                             ) { Text("동네 그대로 칸으로", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }

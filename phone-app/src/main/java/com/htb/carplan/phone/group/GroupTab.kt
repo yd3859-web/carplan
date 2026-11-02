@@ -313,12 +313,16 @@ fun GroupScreen(vm: GroupViewModel, groupId: String, onBack: () -> Unit, onOpenT
             categories = emptyList(),
             onAddCategory = { _, _, _ -> },
             fixedCategoryId = BuiltInCategory.TRIP.id,
-            onSave = { e, _ ->
+            dartGroupId = g.id,
+            onSave = { e, _, firstStop ->
                 newTrip = false
                 scope.launch {
                     // 초대 = 일정: the trip gets its own group with this 묶음's people (it does not live in the 묶음).
                     runCatching { GroupRepository().addEventWith(g, e.copy(createdBy = session?.uid.orEmpty()), session?.uid.orEmpty()) }
-                        .onSuccess { (gid, eid) -> onOpenTrip(gid, eid, e.startDate) }
+                        .onSuccess { (gid, eid) ->
+                            firstStop?.let { p -> runCatching { com.htb.carplan.shared.data.TripRepository().addStop(gid, eid, e.startDate, p, null, "다트", session?.uid.orEmpty()) } }
+                            onOpenTrip(gid, eid, e.startDate)
+                        }
                 }
             },
             onDismiss = { newTrip = false },

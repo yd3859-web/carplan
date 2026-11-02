@@ -112,9 +112,13 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     // 6장 다트 (주차 중): same room as the phones
     private val dartRepo = DartRepository()
-    val dart: StateFlow<Dart?> = trip.flatMapLatest { t -> t?.let { dartRepo.observeLatest(it.groupId) } ?: flowOf(null) }
-        .catch { emit(null) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    // No trip today (일정 추가 → [다트로 정하기], A안): the owner's own "나만" room.
+    val dart: StateFlow<Dart?> by lazy {
+        combine(trip, owner) { t, u -> t?.groupId ?: u?.soloGroupId }.distinctUntilChanged()
+            .flatMapLatest { g -> g?.let { dartRepo.observeLatest(it) } ?: flowOf(null) }
+            .catch { emit(null) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    }
 
     private var regionsLoaded = false
     /** 6장 Q14: the full 읍·면·동 list (assets/regions.csv, 3,559 rows) replaces the built-in starter list. */
@@ -140,14 +144,15 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 6장 game: the dart stuck at (lat, lng) → nearest 동네 in the scope (same as the phone). */
     fun throwDartAt(scope: DartScope, centerLat: Double?, centerLng: Double?, region: String?, lat: Double, lng: Double, radiusKm: Double = 100.0) {
-        val t = trip.value ?: return
+        val t = trip.value
         val u = owner.value ?: return
+        val groupId = t?.groupId ?: u.soloGroupId
         loadRegions()
         viewModelScope.launch {
             val cur = dart.value
-            val same = cur != null && cur.scope == scope && cur.region == region && cur.eventId == t.eventId
+            val same = cur != null && cur.scope == scope && cur.region == region && cur.eventId == t?.eventId
             val pick = Regions.nearest(lat, lng, Regions.pool(scope, centerLat, centerLng, region, radiusKm)) ?: run { _error.value = "그 범위엔 동네가 없어요"; return@launch }
-            runCatching { dartRepo.throwDart(t.groupId, if (same) cur!!.id else null, scope, centerLat, centerLng, region, pick, if (same) cur!!.throwCount + 1 else 1, u.uid, t.eventId, t.date) }
+            runCatching { dartRepo.throwDart(groupId, if (same) cur!!.id else null, scope, centerLat, centerLng, region, pick, if (same) cur!!.throwCount + 1 else 1, u.uid, t?.eventId, t?.date) }
                 .onFailure { _error.value = it.message }
         }
     }

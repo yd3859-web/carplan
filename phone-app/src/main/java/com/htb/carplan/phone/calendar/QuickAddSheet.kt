@@ -100,14 +100,19 @@ fun QuickAddSheet(
     initialDate: LocalDate,
     categories: List<CustomCategory>,
     onAddCategory: (String, Long, (String) -> Unit) -> Unit,
-    /** Saves the event; the second value is the group a trip goes to (null = solo / caller decides). */
-    onSave: (Event, String?) -> Unit,
+    /**
+     * Saves the event; the second value is the group a trip goes to (null = solo / caller decides).
+     * The third is a trip's first stop picked with [다트] (A안) — the caller adds it to the first day.
+     */
+    onSave: (Event, String?, Place?) -> Unit,
     onDismiss: () -> Unit,
     /** 4장: "새 여행" from a group screen fixes the category to 여행 and hides the category and group chips. */
     fixedCategoryId: String? = null,
     /** 같이 갈 사람 for a trip: the solo group and the 묶음s (자주 타는 사람); empty hides the chip. */
     groups: List<Group> = emptyList(),
     defaultGroupId: String? = null,
+    /** The group whose dart room [다트] uses (all members see the throw); null hides the chip. */
+    dartGroupId: String? = defaultGroupId,
 ) {
     var title by remember { mutableStateOf("") }
     var start by remember { mutableStateOf(initialDate) }
@@ -120,6 +125,9 @@ fun QuickAddSheet(
     var categoryId by remember { mutableStateOf(fixedCategoryId ?: BuiltInCategory.OTHER.id) }
     var place by remember { mutableStateOf<Place?>(null) }
     var pickingPlace by remember { mutableStateOf(false) }
+    // A안: no idea where yet → [다트]: throw, pick a place there, it lands in this window.
+    var darting by remember { mutableStateOf(false) }
+    var firstStop by remember { mutableStateOf<Place?>(null) }
 
     var groupId by remember { mutableStateOf(defaultGroupId) }
     var groupMenu by remember { mutableStateOf(false) }
@@ -137,7 +145,7 @@ fun QuickAddSheet(
         if (title.isBlank()) return
         if (isTrip) {
             // 3장: a trip is title + dates; its places live in day stops, edited on the next screen.
-            onSave(Event(categoryId = categoryId, title = title.trim(), startDate = start.toString(), endDate = end.toString(), allDay = true, memo = memo.orEmpty().trim()), groupId)
+            onSave(Event(categoryId = categoryId, title = title.trim(), startDate = start.toString(), endDate = end.toString(), allDay = true, memo = memo.orEmpty().trim()), groupId, firstStop)
             return
         }
         onSave(
@@ -154,6 +162,7 @@ fun QuickAddSheet(
                 memo = memo.orEmpty().trim(),
                 checklist = checklist.filter { it.isNotBlank() }.map { ChecklistItem(it.trim()) },
             ),
+            null,
             null,
         )
     }
@@ -183,6 +192,7 @@ fun QuickAddSheet(
 
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (!isTrip) Chip(Icons.Filled.Place, place?.name ?: "장소", active = place != null) { pickingPlace = true }
+                if (dartGroupId != null) Chip(Icons.Filled.Place, if (isTrip) firstStop?.let { "첫 칸 " + it.name } ?: "다트로 정하기" else "다트", active = isTrip && firstStop != null) { darting = true }
                 Box {
                     Chip(Icons.Filled.DateRange, dateLabel(start, end, if (isTrip) null else time, if (isTrip) Repeat.NONE else repeat), active = true) { if (isTrip) rangePicker = true else dateMenu = true }
                     DropdownMenu(dateMenu, onDismissRequest = { dateMenu = false }) {
@@ -242,6 +252,15 @@ fun QuickAddSheet(
         }
     }
 
+    if (darting && dartGroupId != null) com.htb.carplan.phone.vote.DartGame(
+        dartGroupId, null, null, nameOf = { "" }, onDismiss = { darting = false },
+        onPick = { p ->
+            darting = false
+            // A trip: the place becomes the first day's first stop, and names an untitled trip after the 동네.
+            if (isTrip) { firstStop = p; if (title.isBlank()) title = p.address.split(" ").lastOrNull()?.takeIf { it.isNotBlank() } ?: p.name }
+            else { place = p; if (title.isBlank()) title = p.name }
+        },
+    )
     if (pickingPlace) com.htb.carplan.phone.trip.PlaceSearchSheet(
         vm = com.htb.carplan.phone.trip.FreePlaces, initialQuery = place?.name.orEmpty(),
         onPick = { place = it; pickingPlace = false }, onDismiss = { pickingPlace = false },
