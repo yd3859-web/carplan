@@ -194,11 +194,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.AddPanel(vm: CarHomeV
     var busy by remember { mutableStateOf(false) }
     var added by remember { mutableStateOf<String?>(null) }
     // The car keyboard covers half the screen: it goes away as soon as there is something to pick.
-    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // CarIME ignores Compose's keyboard hide(): ask InputMethodManager directly.
+    val view = androidx.compose.ui.platform.LocalView.current
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     fun search() {
         if (query.isBlank() || busy) return
-        keyboard?.hide(); focus.clearFocus()
+        view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)?.hideSoftInputFromWindow(view.windowToken, 0); focus.clearFocus()
         busy = true
         scope.launch { results = vm.searchPlaces(query); busy = false }
     }

@@ -1185,16 +1185,25 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
     var hm by remember { mutableStateOf((java.time.LocalTime.now().hour + 1) % 24 to 0) }
     var place by remember { mutableStateOf("") }
     val time = if (timed) "%02d:%02d".format(hm.first, hm.second) else null
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    // Keyboard [완료] / Enter: put the keyboard away (the hardware keyboard types straight into the field).
+    val done = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
+        // The car keyboard (CarIME) ignores Compose's hide(): ask InputMethodManager directly.
+        val view = androidx.compose.ui.platform.LocalView.current
+        val hideKeyboard = remember(view) { { view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)?.hideSoftInputFromWindow(view.windowToken, 0); Unit } }
+        val doneAction = androidx.compose.foundation.text.KeyboardActions(onDone = { hideKeyboard(); focus.clearFocus() })
         CarEnter(Entry.SCREEN) {
         Column(Modifier.fillMaxSize().background(Bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
+            // The keyboard shrinks this window: the fields scroll instead of squashing (the place field used to become a line, text unseen).
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CarBackButton(onBack = onDismiss)
                 Text("일정 추가", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.padding(start = 16.dp))
             }
             Spacer(Modifier.height(16.dp))
             OutlinedTextField(
-                title, { title = it }, placeholder = { Text("무슨 일정이에요?", fontSize = 28.sp, color = Soft) }, singleLine = true, shape = Corner,
+                title, { title = it }, placeholder = { Text("무슨 일정이에요?", fontSize = 28.sp, color = Soft) }, singleLine = true, shape = Corner, keyboardOptions = done, keyboardActions = doneAction,
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, color = Ink), modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(18.dp))
@@ -1210,10 +1219,11 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
             CarAppear(timed) { CarTimeWheel(hm.first, hm.second, { h, m -> hm = h to m }, Modifier.padding(top = 10.dp).widthIn(max = 520.dp)) }
             Spacer(Modifier.height(18.dp))
             OutlinedTextField(
-                place, { place = it }, placeholder = { Text("장소 (선택) — 이름만 적어도 내비가 찾아요", fontSize = 26.sp, color = Soft) }, singleLine = true, shape = Corner,
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, color = Ink), modifier = Modifier.fillMaxWidth(),
+                place, { place = it }, placeholder = { Text("장소 (선택) — 이름만 적어도 내비가 찾아요", fontSize = 26.sp, color = Soft) }, singleLine = true, shape = Corner, keyboardOptions = done, keyboardActions = doneAction,
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 26.sp, color = Ink), modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(12.dp))
             Button(
                 enabled = title.isNotBlank(), onClick = {
                     val date = LocalDate.now().plusDays(dayOffset).toString()
