@@ -424,7 +424,7 @@ class TripNavigator(
                     if (start && t.waitingPickups.isNotEmpty() && t.day?.pickupSharing != true) { ask(p.reason); return@collect }
                 }
                 // 11장: a pickup added while already driving — ask once per person (route + sharing).
-                if (_guiding.value && _prompt.value == null && t.day?.pickupSharing != true && t.waitingPickups.any { it.uid !in pickupAsked }) askPickup(t)
+                if (_guiding.value && _prompt.value == null && t.day?.pickupSharing != true && t.waitingPickups.any { "${t.eventId}/${t.date}/${it.uid}" !in pickupAsked }) askPickup(t)
                 // Drop a "다음 목적지" prompt whose stop vanished (a change prompt is handled above).
                 _prompt.value?.let { p -> if (p.reason != PromptReason.ROUTE_CHANGE && p.reason != PromptReason.FUEL && p.reason != PromptReason.FUELED && p.reason != PromptReason.PICKUP && p.reason != PromptReason.COMMUTE && t.stops.none { it.id == p.stop.id && !it.visited }) dismiss() }
             }
@@ -781,11 +781,11 @@ class TripNavigator(
     }
 
     /** 11장 Q27: pickups exist → one question that both starts the route and turns sharing on. */
-    /** Pickups already asked about (a no is not asked again). */
+    /** Pickups already asked about, per trip day ("event/date/uid"; a no is not asked again that day). */
     private val pickupAsked = HashSet<String>()
 
     private fun askPickup(t: TodayTrip) {
-        pickupAsked += t.waitingPickups.map { it.uid }
+        pickupAsked += t.waitingPickups.map { "${t.eventId}/${t.date}/${it.uid}" }
         val names = t.waitingPickups.joinToString(", ") { it.name.ifBlank { "일행" } }
         val message = "$names 태우러 가요. 위치를 일행에게 보여 줄까요?"
         show(NextPrompt(t.next ?: Stop(place = t.waitingPickups.first().place), PromptReason.PICKUP, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }

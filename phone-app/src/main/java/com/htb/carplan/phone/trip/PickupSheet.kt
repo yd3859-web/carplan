@@ -1,5 +1,6 @@
 package com.htb.carplan.phone.trip
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,19 +54,23 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     val sharing = day?.pickupSharing == true
     val carPos = car?.state?.let { s -> if (sharing && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
 
-    // 11장 4: the road from the car to my pickup place (Kakao Mobility); refetched once the car moved ~500 m (API quota).
-    var path by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
+    // 11장 4: the road from the car to my pickup place (Kakao Mobility — the phone has no Hyundai navigation, and the
+    // car's own route line is not available from the SDK). Fetched once when the car sets off and kept, so the friend
+    // sees the whole way and how much of it is done; fetched again only when the car leaves it (a detour).
+    var route by remember { mutableStateOf<List<Pair<Double, Double>>>(emptyList()) }
     var routeLeg by remember { mutableStateOf<Leg?>(null) }
-    var pathFrom by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var fetchedAt by remember { mutableStateOf(0L) }
     val target = mine?.place?.takeIf { it.hasCoords() && mine.status == PickupStatus.WAITING }
     LaunchedEffect(carPos, target) {
         val c = carPos; val tg = target
-        if (c == null || tg == null) { path = emptyList(); routeLeg = null; pathFrom = null; return@LaunchedEffect }
-        pathFrom?.let { if (RouteMath.metersBetween(it.first, it.second, c.first, c.second) < 500) return@LaunchedEffect }
+        if (c == null || tg == null) { route = emptyList(); routeLeg = null; return@LaunchedEffect }
+        val off = route.takeIf { it.size >= 2 }?.let { r -> r.minOf { RouteMath.metersBetween(it.first, it.second, c.first, c.second) } }
+        if (off != null && (off < OFF_ROUTE_M || System.currentTimeMillis() - fetchedAt < REFETCH_MS)) return@LaunchedEffect
         runCatching { kakao.route(Place(name = "차", lat = c.first, lng = c.second), tg) }
-            .onSuccess { path = it.path; routeLeg = it.leg; pathFrom = c }
-            .onFailure { path = emptyList() }
+            .onSuccess { route = it.path; routeLeg = it.leg; fetchedAt = System.currentTimeMillis() }
     }
+    // Where the car is on that road: driven part, the rest, and the direction it points.
+    val progress = remember(route, carPos) { carPos?.let { routeProgress(route, it) } }
 
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -79,20 +84,32 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                 fontSize = 15.sp, color = if (sharing) Palette.Teal else Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )
             val markers = buildList {
-                carPos?.let { add(MapMarker(it.first, it.second, "차", MapMarker.Kind.CAR)) }
+                carPos?.let { add(MapMarker(it.first, it.second, "", MapMarker.Kind.CAR, bearing = progress?.bearing)) }
                 pickups.filter { it.place.hasCoords() }.forEach { add(MapMarker(it.place.lat, it.place.lng, it.name.ifBlank { "일행" }, if (it.uid == me) MapMarker.Kind.ME else MapMarker.Kind.PICKUP)) }
                 stops.firstOrNull { it.place.hasCoords() }?.let { add(MapMarker(it.place.lat, it.place.lng, it.place.name, MapMarker.Kind.STOP)) }
             }
             val center = carPos ?: mine?.place?.takeIf { it.hasCoords() }?.let { it.lat to it.lng } ?: markers.firstOrNull()?.let { it.lat to it.lng }
-            if (center != null) SimpleMap(center.first, center.second, zoom = 13, markers = markers, path = path)
+            // While the car comes: frame the car and my pickup place together; otherwise around the places.
+            val fit = listOfNotNull(carPos, target?.let { it.lat to it.lng }).takeIf { it.size == 2 }.orEmpty()
+            if (center != null) SimpleMap(center.first, center.second, zoom = 13, markers = markers, path = progress?.ahead ?: route, passed = progress?.behind.orEmpty(), fit = fit)
             else Text("태울 곳을 고르면 지도가 떠요", fontSize = 15.sp, color = Palette.TextSoft)
             // 11장 4: time left = the car's own ETA (the same number the car shows, every 30 s); the phone's route only fills
             // in the distance, and the time when the car has none yet (P4).
             val carEta = mine?.etaSeconds?.takeIf { carPos != null && mine.status == PickupStatus.WAITING }
-            val etaText = (carEta ?: routeLeg?.seconds?.toLong())?.let { sec ->
-                "차가 약 ${(sec / 60).coerceAtLeast(1)}분 뒤 도착" + (routeLeg?.let { " · ${"%.1f".format(it.meters / 1000.0)} km" } ?: "")
+            val left = progress?.aheadMeters ?: routeLeg?.meters?.toDouble()
+            val arrived = mine?.arrivedAt != null && mine.status == PickupStatus.WAITING
+            val etaText = if (arrived) "차가 도착했어요" else (carEta ?: routeLeg?.seconds?.toLong())?.let { sec ->
+                "차가 약 ${(sec / 60).coerceAtLeast(1)}분 뒤 도착" + (left?.let { " · 남은 ${"%.1f".format(it / 1000.0)} km" } ?: "")
             }
-            etaText?.let { Text(it, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 6.dp)) }
+            etaText?.let { Text(it, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 8.dp)) }
+            // How far the car has come: a bar over the whole road (since it set off) and the numbers under it.
+            progress?.takeIf { it.totalMeters > 0 && target != null }?.let { pr ->
+                val done = (pr.behindMeters / pr.totalMeters).toFloat().coerceIn(0f, 1f)
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(6.dp).background(Palette.Line, Corner)) {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(done).height(6.dp).background(Palette.Teal, Corner))
+                }
+                Text("${"%.1f".format(pr.totalMeters / 1000.0)} km 중 ${"%.1f".format(pr.behindMeters / 1000.0)} km 왔어요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+            }
 
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -130,4 +147,29 @@ private fun statusText(s: PickupStatus, arrived: Boolean) = when {
     s == PickupStatus.DONE -> "끝"
     arrived -> "차 도착 · 탔으면 눌러 주세요"
     else -> "기다리는 중"
+}
+
+private const val OFF_ROUTE_M = 300.0
+private const val REFETCH_MS = 30_000L
+
+/** The car on its road: [behind] = driven (start → car), [ahead] = car → pickup, lengths in meters, [bearing] in degrees. */
+private class RouteProgress(val behind: List<Pair<Double, Double>>, val ahead: List<Pair<Double, Double>>, val behindMeters: Double, val aheadMeters: Double, val bearing: Double?) {
+    val totalMeters get() = behindMeters + aheadMeters
+}
+
+private fun routeProgress(route: List<Pair<Double, Double>>, car: Pair<Double, Double>): RouteProgress? {
+    if (route.size < 2) return null
+    fun m(a: Pair<Double, Double>, b: Pair<Double, Double>) = RouteMath.metersBetween(a.first, a.second, b.first, b.second)
+    val i = route.indices.minBy { m(route[it], car) }
+    val behind = route.subList(0, i + 1) + listOf(car)
+    val ahead = listOf(car) + route.subList((i + 1).coerceAtMost(route.size), route.size)
+    fun len(p: List<Pair<Double, Double>>) = p.zipWithNext().sumOf { (a, b) -> m(a, b) }
+    // Direction: along the road just ahead of the car (the car reports no heading).
+    val from = route[i]; val to = route.getOrNull(i + 1) ?: route[i]
+    val bearing = if (from == to) null else run {
+        val y = Math.sin(Math.toRadians(to.second - from.second)) * Math.cos(Math.toRadians(to.first))
+        val x = Math.cos(Math.toRadians(from.first)) * Math.sin(Math.toRadians(to.first)) - Math.sin(Math.toRadians(from.first)) * Math.cos(Math.toRadians(to.first)) * Math.cos(Math.toRadians(to.second - from.second))
+        (Math.toDegrees(Math.atan2(y, x)) + 360) % 360
+    }
+    return RouteProgress(behind, ahead, len(behind), len(ahead), bearing)
 }
