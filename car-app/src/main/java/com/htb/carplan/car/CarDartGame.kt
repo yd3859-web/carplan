@@ -1,6 +1,7 @@
 package com.htb.carplan.car
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -133,7 +134,7 @@ fun CarDartGame(
                     CarBackButton(onBack = onDismiss)
                     Column(Modifier.weight(1f).padding(start = 8.dp)) {
                         Text("다트 — 동네 뽑기", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                        Text(if (compact) "아래로 당겼다 놓으세요" else "다트를 아래로 당겼다 놓으세요 · 폰에도 같이 떠요", fontSize = 20.sp, color = Palette.TextSoft, maxLines = 1)
+                        Text(if (compact) "다트를 잡고 당겼다 놓기" else "아래 다트를 잡고 당겼다 놓으세요 · 당긴 반대쪽으로 날아가요", fontSize = 20.sp, color = Palette.TextSoft, maxLines = 1)
                     }
                     if (!compact) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { scopes() }
                 }
@@ -319,6 +320,10 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         var stuck by remember { mutableStateOf<Pair<Double, Double>?>(null) } // where the dart is, in geo
         var flying by remember { mutableStateOf(false) }
         val cs = rememberCoroutineScope()
+        // A pull too short to throw: the dart springs back to rest instead of flying (the player throws, not the app).
+        val springBack = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+        val grabRadius = with(density) { 120.dp.toPx() }
+        val minPull = with(density) { 40.dp.toPx() }
 
         suspend fun throwTo(target: Offset, ms: Int, from: Offset = launchAt) {
             flying = true; onFlying(true)
@@ -417,19 +422,21 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { if (!flying) { pull = Offset.Zero; focus = null } },
+                    // Only a drag that starts on the dart pulls it; a swipe elsewhere does nothing.
+                    onDragStart = { at -> if (!flying && (at - launchAt).getDistance() < grabRadius) { pull = Offset.Zero; focus = null } },
                     onDrag = { c, d -> c.consume(); pull = pull?.plus(d) },
                     onDragCancel = { pull = null },
                     onDragEnd = {
                         val p = pull; pull = null
-                        if (p == null || p.getDistance() < 24f || flying) return@detectDragGestures
+                        if (p == null || flying) return@detectDragGestures
+                        if (p.getDistance() < minPull) { cs.launch { springBack.snapTo(backOf(p)); springBack.animateTo(Offset.Zero, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium)) }; return@detectDragGestures }
                         cs.launch {
                             // let the camera finish zooming back out before the dart leaves the hand
                             while (camK.isRunning) kotlinx.coroutines.delay(16)
                             val reach = launchAt.y - boardH * 0.04f
                             val power = min(1f, p.getDistance() / (h * 0.40f))
                             val dir = Offset(-p.x, -p.y) / p.getDistance()
-                            val shake = Offset(gauss() * w * 0.025f, gauss() * boardH * 0.03f)
+                            val shake = Offset(gauss() * w * 0.008f, gauss() * boardH * 0.01f) // a little hand shake; it lands near the aim circle
                             val target = Offset(
                                 (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
@@ -488,7 +495,7 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                     val sp = toScreen(stuck!!.first, stuck!!.second)
                     drawDart(dartColors, sp, atan2(sp.y - launchAt.y, sp.x - launchAt.x), 0.75f + 0.25f * detail, wobble.value)
                 }
-                else -> drawDart(dartColors, launchAt, (-PI / 2).toFloat(), 1.5f)
+                else -> drawDart(dartColors, launchAt + springBack.value, (-PI / 2).toFloat(), 1.5f)
             }
         }
     }
