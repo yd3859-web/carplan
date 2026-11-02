@@ -56,6 +56,9 @@ class VehicleMonitor(private val context: Context) {
     private var fuelCapacity: Float? = null
     private var evCapacity: Float? = null
 
+    /** Tank size in liters (fuel) or battery size in kWh (EV), when the car reports it — for the automatic 주유 record. */
+    fun capacity(ev: Boolean): Double? = (if (ev) evCapacity else fuelCapacity)?.takeIf { it > 0f }?.let { it / 1000.0 }
+
     /** 20장 디버그: forced fuel % / car type for the demo; null = real value. */
     @Volatile var fuelOverride: Double? = null
         set(v) { field = v; _state.update { it.copy(fuelPercent = v ?: realFuel) } }

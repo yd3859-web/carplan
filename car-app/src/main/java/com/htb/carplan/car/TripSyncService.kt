@@ -39,6 +39,7 @@ class TripSyncService : LifecycleService() {
             val cars = CarRepository()
             cars.ensureCar(carId)
             CarRuntime.navigator(this@TripSyncService).bind(carId)
+            CarRuntime.navigator(this@TripSyncService).tankSize = monitor::capacity
             monitor.state.debounce(1_000).collect { state ->
                 runCatching { cars.updateState(carId, state) }.onFailure { Log.w(TAG, "state upload failed", it) }
                 CarRuntime.navigator(this@TripSyncService).onCarState(state) // 12장 fuel check

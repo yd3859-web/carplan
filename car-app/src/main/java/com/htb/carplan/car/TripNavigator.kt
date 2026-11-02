@@ -38,6 +38,7 @@ import com.htb.carplan.shared.model.TripDay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlin.math.roundToLong
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -149,7 +150,6 @@ class TripNavigator(
     private var fuelAtPark: Double? = null
     /** The station the driver picked (12장), so the fill-up record says where and at what price. */
     private var pickedStation: GasStation? = null
-    private var fueledAsked = false
     /** 12장 설정: cars/{id}.fuelAlertPercent (default 20); the range threshold scales with it (20% → 50 km). */
     private var fuelAlertPercent = LOW_FUEL_PERCENT
 
@@ -481,12 +481,13 @@ class TripNavigator(
         if (gear == Gear.P && prev != Gear.P) {
             // Parked = arrived: "근처 주차장 찾아볼까요?" is no longer a question.
             if (_prompt.value?.reason == PromptReason.PARKING) { askJob?.cancel(); closePrompt() }
-            fuelAtPark = carState.fuelPercent; fueledAsked = false
+            fuelAtPark = carState.fuelPercent
             router.requestCurrentLocation()
             parkTimer?.cancel()
             if (drovenSinceRecord) parkTimer = scope.launch { delay(PARK_CONFIRM_MS); confirmArrival(reason = "P 5분") }
         }
         if (prev == Gear.P && gear != Gear.P) {
+            fillJob?.let { j -> if (j.isActive) { j.cancel(); fill?.let { scope.launch { logFuel(it) } }; fill = null } }
             drovenSinceRecord = true
             parkTimer?.cancel()
             parkedRecord?.let { (g, e, r) -> scope.launch { runCatching { records.markLeft(g, e, parkedDate, r) } } }
@@ -683,7 +684,8 @@ class TripNavigator(
         // 15장 Q44: parked and the tank/battery went up ≥ 5 points → "주유했어요?" once per parking.
         if (lastGear == Gear.P) {
             val base = fuelAtPark?.let { minOf(it, fuel) }?.also { fuelAtPark = it } ?: fuel.also { fuelAtPark = it }
-            if (!fueledAsked && fuel >= base + 5) { fueledAsked = true; askFueled(state.isEv == true) }
+            // Filling up: no question — wait until the level stops rising, then the record writes itself.
+            if (fuel >= base + 5) onFilling(base, fuel, state.isEv == true)
         }
         val range = state.rangeKm
         val t = trip.value
@@ -719,28 +721,59 @@ class TripNavigator(
         show(NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")) { askJob = scope.launch { voice.say(message) } }
     }
 
-    private fun askFueled(ev: Boolean) {
-        val message = if (ev) "충전했어요? 충전 기록을 남길까요?" else "주유했어요? 주유 기록을 남길까요?"
-        show(NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUELED, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }
+    /** Battery/tank size from the car (L or kWh); set by TripSyncService. */
+    var tankSize: (Boolean) -> Double? = { null }
+    private data class Fill(val from: Double, val to: Double, val ev: Boolean)
+    private var fill: Fill? = null
+    private var fillJob: Job? = null
+
+    /** The level went up while parked: remember the rise; [FILL_SETTLE_MS] after the last rise, write the record. */
+    private fun onFilling(from: Double, to: Double, ev: Boolean) {
+        if (fill?.to == to) return
+        fill = Fill(from, to, ev)
+        router.requestCurrentLocation() // where the car is parked = which station
+        fillJob?.cancel()
+        fillJob = scope.launch {
+            delay(FILL_SETTLE_MS)
+            fill?.let { logFuel(it) }
+            fill = null
+        }
     }
 
-    /** "네" to 주유했어요?: a 주유 record in the owner's solo group with today's odometer (15장). */
-    private fun logFuel() {
-        scope.launch {
-            runCatching {
-                val car = carId.value?.let { calendar.observeCar(it).first() } ?: return@launch
-                val owner = car.ownerUid ?: return@launch
-                val user = groups.user(owner) ?: return@launch
-                val st = pickedStation?.also { pickedStation = null }
-                val memo = st?.let { "${it.name} · ${"%,d".format(it.price)}원/L" }.orEmpty()
-                maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, memo = memo, byUid = owner, auto = true, intervals = car.intervals)
-                // 묶음 6: the same stop is one record — the 주유 shows on the record of where the car is parked.
-                parkedRecord?.let { (g, e, r) ->
-                    runCatching { records.setNoteIfBlank(g, e, parkedDate, r, (if (carState.isEv == true) "충전함" else "주유함") + (st?.let { " · ${it.name} ${"%,d".format(it.price)}원/L" } ?: "")) }
-                }
-                _notice.value = (if (carState.isEv == true) "충전" else "주유") + " 기록 남김 — 금액은 폰 차량 탭에서"
-            }.onFailure { _error.value = it.message }
-        }
+    /**
+     * 15장 자동 주유 기록: how much went in (rise in % × the car's tank size) × the price at the station the car is
+     * parked at (the one picked from the list, else Opinet's nearest within 300 m) = the amount. Wrong numbers are
+     * fixed on the phone's 차량 탭. EV: kWh only (charging prices are not in Opinet).
+     */
+    private suspend fun logFuel(f: Fill) {
+        runCatching {
+            fuelAtPark = f.to // the next fill counts from here
+            val car = carId.value?.let { calendar.observeCar(it).first() } ?: return
+            val owner = car.ownerUid ?: return
+            val user = groups.user(owner) ?: return
+            // A car that does not report its tank: an ordinary 55 L tank, said so in the memo.
+            val size = tankSize(f.ev) ?: if (f.ev) null else DEFAULT_TANK_L
+            val guessed = tankSize(f.ev) == null && size != null
+            val amount = size?.let { it * (f.to - f.from) / 100.0 }
+            val loc = lastLocation
+            val picked = pickedStation?.takeIf { st -> loc == null || RouteMath.metersBetween(loc.first, loc.second, st.place.lat, st.place.lng) <= STATION_NEAR_M }
+            // Parked at a station → its price. GPS off by a little (or no station that close) → the nearest within 2 km, said so.
+            val around = if (f.ev || picked != null || !opinet.available) emptyList() else loc?.let { (la, lo) -> runCatching { opinet.around(la, lo, radiusMeters = STATION_FALLBACK_M) }.getOrNull() }.orEmpty()
+            val st = if (f.ev) null else picked ?: around.minByOrNull { it.meters }
+            val nearOnly = picked == null && st != null && st.meters > STATION_NEAR_M
+            Log.i(TAG, "fuel record ${f.from}→${f.to}% size=$size station=${st?.name}@${st?.meters}m ${st?.price}")
+            pickedStation = null
+            val won = if (amount != null && st != null) (amount * st.price / 10).roundToLong() * 10 else null
+            val liters = amount?.let { (it * 10).roundToLong() / 10.0 }
+            val memo = listOfNotNull(st?.let { "${it.name} · ${"%,d".format(it.price)}원/L" }, if (f.ev) liters?.let { "${it}kWh" } else null, if (nearOnly) "근처 가격 기준" else null, if (guessed) "탱크 크기 추정" else null).joinToString(" · ")
+            maintenance.log(user.soloGroupId, car.id, MaintenanceItem.FUEL, LocalDate.now(), carState.odometerKm, amountWon = won, liters = if (f.ev) null else liters, memo = memo, byUid = owner, auto = true, intervals = car.intervals)
+            val what = if (f.ev) "충전" else "주유"
+            val howMuch = listOfNotNull(liters?.let { if (f.ev) "${it}kWh" else "${it}L" }, won?.let { "${"%,d".format(it)}원" }).joinToString(" · ")
+            // 묶음 6: the same stop is one record — the 주유 shows on the record of where the car is parked.
+            parkedRecord?.let { (g, e, r) -> runCatching { records.setNoteIfBlank(g, e, parkedDate, r, "${what}함" + (if (howMuch.isNotEmpty()) " · $howMuch" else "") + (st?.let { " · ${it.name}" } ?: "")) } }
+            _notice.value = "$what 기록 남김" + (if (howMuch.isNotEmpty()) " · $howMuch" else "") + " · 고칠 건 폰 차량 탭에서"
+            voice.say("$what 기록 남겼어요." + (won?.let { " ${"%,d".format(it)}원이에요." } ?: ""))
+        }.onFailure { _error.value = it.message }
     }
 
     /** 11장 Q27: pickups exist → one question that both starts the route and turns sharing on. */
@@ -1045,7 +1078,7 @@ class TripNavigator(
             findStation(); return
         }
         if (_prompt.value?.reason == PromptReason.FUELED) {
-            askJob?.cancel(); closePrompt(); logFuel(); return
+            askJob?.cancel(); closePrompt(); return
         }
         if (_prompt.value?.reason == PromptReason.COMMUTE) {
             askJob?.cancel(); closePrompt()
@@ -1390,6 +1423,10 @@ class TripNavigator(
     }
 
     companion object {
+        private const val FILL_SETTLE_MS = 60_000L
+        private const val DEFAULT_TANK_L = 55.0
+        private const val STATION_NEAR_M = 300
+        private const val STATION_FALLBACK_M = 2_000
         private const val TAG = "TripNavigator"
         /** 2 waypoints + destination (SDK names only FIRST and SECOND waypoint). */
         const val MAX_PLACES = 3
