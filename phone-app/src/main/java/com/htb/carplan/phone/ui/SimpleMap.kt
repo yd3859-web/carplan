@@ -53,16 +53,22 @@ fun SimpleMap(
     passed: List<Pair<Double, Double>> = emptyList(),
     /** Points that must all be on screen: centre and zoom are chosen from them (overrides the two above). */
     fit: List<Pair<Double, Double>> = emptyList(),
+    /** Full-screen maps pass their own size (no frame); the default is the framed box of [height]. */
+    modifier: Modifier = Modifier.fillMaxWidth().height(height).clip(Corner).border(1.dp, Palette.Line, Corner),
+    /** Share of the height kept free at the bottom (a card over the map): framing [fit] uses the space above it. */
+    bottomInset: Float = 0f,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth().height(height).clip(Corner).border(1.dp, Palette.Line, Corner).background(Palette.Panel)) {
+    BoxWithConstraints(modifier.background(Color(0xFFF2F2F0))) {
         val tile = 256.dp
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }; val hPx = with(density) { maxHeight.toPx() }
         val tilePx = with(density) { tile.toPx() }
-        val (cLat, cLng, z) = if (fit.size >= 2) fitView(fit, wPx / tilePx, hPx / tilePx) else Triple(centerLat, centerLng, zoom)
+        val freeH = hPx * (1 - bottomInset)
+        val (cLat, cLng, z) = if (fit.size >= 2) fitView(fit, wPx / tilePx, freeH / tilePx) else Triple(centerLat, centerLng, zoom)
         val n = 2.0.pow(z)
         val cx = (cLng + 180) / 360 * n
-        val cy = (1 - ln(tan(Math.toRadians(cLat)) + 1 / Math.cos(Math.toRadians(cLat))) / PI) / 2 * n
+        // With a card at the bottom, the framed points sit in the middle of the space above it.
+        val cy = (1 - ln(tan(Math.toRadians(cLat)) + 1 / Math.cos(Math.toRadians(cLat))) / PI) / 2 * n + (hPx - freeH) / 2 / tilePx
         val tx = floor(cx).toInt(); val ty = floor(cy).toInt()
         val zoom = z
         // pixel of the centre inside the 3×3 mosaic, then shift so it sits mid-view
@@ -74,7 +80,7 @@ fun SimpleMap(
             if (y < 0 || y >= n.toInt()) continue
             AsyncImage(
                 model = tileRequest(zoom, Math.floorMod(x, n.toInt()), y),
-                contentDescription = null, contentScale = ContentScale.FillBounds,
+                contentDescription = null, contentScale = ContentScale.FillBounds, colorFilter = FlatMap,
                 // Unbounded: a map lower than one tile would otherwise squash every tile and leave gaps between rows.
                 modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset((ox + (dx + 1) * tilePx).toInt(), (oy + (dy + 1) * tilePx).toInt()) }
                     .wrapContentSize(Alignment.TopStart, unbounded = true).size(tile),
@@ -110,7 +116,7 @@ fun SimpleMap(
                         when (m.kind) { MapMarker.Kind.CAR -> Palette.Teal; MapMarker.Kind.ME -> Palette.Background; MapMarker.Kind.PICKUP -> Palette.TextStrong; MapMarker.Kind.STOP -> Palette.TextSoft },
                     ).border(2.dp, if (m.kind == MapMarker.Kind.ME) Palette.TextStrong else Palette.Background, CircleShape),
                 )
-                Text(m.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.offset(x = size + 2.dp, y = (-2).dp).background(Color(0xCCFFFFFF)))
+                if (m.label.isNotEmpty()) Text(m.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.offset(x = size + 2.dp, y = (-2).dp).background(Color(0xCCFFFFFF)))
             }
         }
         Text(TILE_ATTRIBUTION, fontSize = 10.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xAAFFFFFF)))
@@ -118,16 +124,32 @@ fun SimpleMap(
 }
 
 
-/** Tile source: OpenStreetMap, identified with our app name as its usage policy asks (demo-scale use only). */
+/** Tile source, identified with our app name as the providers' usage policies ask (demo-scale use only). */
 internal const val TILE_URL = "https://tile.openstreetmap.org/%d/%d/%d.png"
 internal const val TILE_ATTRIBUTION = "© OpenStreetMap"
+
+/**
+ * Flat grey look (정원 11/2 참고 이미지: 회색 바탕·흰 길·건물 윤곽만) without a styled-tile key: the OSM tile with its
+ * colour taken out and lifted towards white, so roads read white-ish and blocks light grey, and our blue route stands out.
+ */
+private val FlatMap = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+    androidx.compose.ui.graphics.ColorMatrix().apply {
+        setToSaturation(0f)
+        val k = 0.55f; val lift = 255f * 0.47f // squeeze contrast and brighten
+        timesAssign(androidx.compose.ui.graphics.ColorMatrix(floatArrayOf(
+            k, 0f, 0f, 0f, lift,
+            0f, k, 0f, 0f, lift,
+            0f, 0f, k, 0f, lift,
+            0f, 0f, 0f, 1f, 0f,
+        )))
+    },
+)
 internal const val TILE_USER_AGENT = "carplan/0.1 (Pleos Connect contest demo)"
 @Composable
 internal fun tileRequest(zoom: Int, x: Int, y: Int): coil3.request.ImageRequest =
     coil3.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
         .data(TILE_URL.format(zoom, x, y))
-        // Cache key carries a version so tiles cached before the user-agent fix (block images) are not reused.
-        .memoryCacheKey(TILE_URL.format(zoom, x, y) + "#v2").diskCacheKey(TILE_URL.format(zoom, x, y) + "#v2")
+        .memoryCacheKey(TILE_URL.format(zoom, x, y)).diskCacheKey(TILE_URL.format(zoom, x, y))
         .httpHeaders(coil3.network.NetworkHeaders.Builder().set("User-Agent", TILE_USER_AGENT).build())
         .build()
 

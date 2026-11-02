@@ -200,6 +200,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     private val simulator = CarRuntime.simulator(app)
     val sim: StateFlow<SimState> = simulator.state
     fun playSim() = simulator.play()
+    /** 폰으로 보기: same drive, but the car screen stays out of the way and Pleos does not lock the phone app. */
+    fun playSimForPhone() = simulator.play(forPhone = true)
     fun stopSim() = simulator.stop()
     fun pauseSim() = simulator.togglePause()
     fun speedSim() = simulator.toggleSpeed()

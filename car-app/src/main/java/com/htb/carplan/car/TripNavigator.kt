@@ -442,7 +442,8 @@ class TripNavigator(
         val cur = _prompt.value
         waiting.removeAll { it.first.reason == p.reason }
         // Same reason again (the next stop changed under a start question): the newer one takes the screen.
-        if (cur == null || rank(p.reason) > rank(cur.reason) || cur.reason == p.reason) {
+        // A start question replaced by another start question (a pickup came in under "갈까요?") also takes over.
+        if (cur == null || rank(p.reason) > rank(cur.reason) || cur.reason == p.reason || (p.reason in START_REASONS && cur.reason in START_REASONS)) {
             if (cur != null && cur.single) waiting.addFirst(cur to {}) // a bumped notice comes back; a bumped question is dropped (stale answer)
             askJob?.cancel()
             _prompt.value = p

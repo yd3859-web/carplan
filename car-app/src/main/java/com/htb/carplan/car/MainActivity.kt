@@ -1128,6 +1128,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 HorizontalDivider(color = Line)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk)) { Text("시뮬레이션 재생", fontSize = 20.sp) }
+                    TextButton(onClick = { vm.playSimForPhone(); onDismiss() }) { Text("폰으로 보기 재생", color = Ink, fontSize = 20.sp) }
                     TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 20.sp, color = Soft) }
                     if (guiding) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.makeTestTrip() }) { Text(if (trip?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 20.sp, color = Ink) }

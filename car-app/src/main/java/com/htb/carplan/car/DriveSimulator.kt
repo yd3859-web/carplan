@@ -31,6 +31,9 @@ data class SimState(
     val remainMeters: Int? = null,
     /** True when gear/door/seat go through the Virtual Console (the app receives real car signals). */
     val viaConsole: Boolean = false,
+    /** 폰으로 보기: gear/speed stay off the Virtual Console (Pleos would cover the phone app "주행 중") and carplan
+     *  stays in the back — the app itself still sees D, moves and arrives, so the phone shows the car coming. */
+    val forPhone: Boolean = false,
 )
 
 /**
@@ -55,11 +58,11 @@ class DriveSimulator(
     private var heartbeat: Job? = null
     private val routes = HashMap<String, com.htb.carplan.shared.net.Route>()
 
-    fun play() {
+    fun play(forPhone: Boolean = false) {
         if (job?.isActive == true) return
         job = scope.launch {
             val viaConsole = console.reachable()
-            _state.value = SimState(running = true, viaConsole = viaConsole, phase = "준비", speedX = _state.value.speedX)
+            _state.value = SimState(running = true, viaConsole = viaConsole, phase = "준비", speedX = _state.value.speedX, forPhone = forPhone)
             if (viaConsole) heartbeat = scope.launch { while (isActive) { console.heartbeat(); delay(1_000) } }
             navigator.simActive = true
             try { runDay() } finally {
@@ -170,7 +173,7 @@ class DriveSimulator(
         val realSeconds = route?.leg?.seconds?.toDouble() ?: (total / 1000 / 40 * 3600)
         val avgKph = (total / realSeconds * 3.6).coerceIn(25.0, 90.0)
         // Screen time for the leg at 1x: a 30-minute drive takes ~45 s.
-        val screenMs = (realSeconds * 1000 / 40).coerceIn(20_000.0, 60_000.0)
+        val screenMs = (realSeconds * 1000 / 40).coerceIn(20_000.0, 60_000.0) * (if (_state.value.forPhone) 4 else 1) // slow enough to watch on the phone
         var done = 0.0
         var lastSpeedAt = 0L
         var hinted = false
@@ -199,7 +202,7 @@ class DriveSimulator(
         return true
     }
 
-    private fun showUs() = scope.launch { repeat(2) { delay(1_500); bringToFront() } }
+    private fun showUs() = scope.launch { if (_state.value.forPhone) return@launch; repeat(2) { delay(1_500); bringToFront() } }
 
     private fun pointAt(path: List<Pair<Double, Double>>, cum: DoubleArray, d: Double): Pair<Double, Double> {
         var i = cum.indexOfFirst { it >= d }.coerceAtLeast(1)
@@ -224,7 +227,7 @@ class DriveSimulator(
     // ---- signals: Virtual Console when it is there, else straight into the monitor ----
 
     private suspend fun gear(g: Gear) {
-        if (_state.value.viaConsole) console.put("/vehicle/gear?gear=" + if (g == Gear.D) "Drive" else "Park")
+        if (_state.value.viaConsole && !_state.value.forPhone) console.put("/vehicle/gear?gear=" + if (g == Gear.D) "Drive" else "Park")
         else monitor.simGear(g)
     }
 
@@ -243,7 +246,7 @@ class DriveSimulator(
     private suspend fun lock(locked: Boolean) { if (_state.value.viaConsole) console.put("/vehicle/body?doors_locked=$locked") }
 
     private suspend fun speed(kph: Int) {
-        if (_state.value.viaConsole) console.put("/vehicle/controls?speed=$kph&accelerator=${if (kph > 0) 20 else 0}&brake=${if (kph > 0) 0 else 30}&steering=0")
+        if (_state.value.viaConsole && !_state.value.forPhone) console.put("/vehicle/controls?speed=$kph&accelerator=${if (kph > 0) 20 else 0}&brake=${if (kph > 0) 0 else 30}&steering=0")
     }
 
     companion object {

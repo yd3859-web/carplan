@@ -72,6 +72,17 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     // Where the car is on that road: driven part, the rest, and the direction it points.
     val progress = remember(route, carPos) { carPos?.let { routeProgress(route, it) } }
 
+    // 카카오T처럼 (정원 11/2): while the car is coming for me, the whole screen is the map with the car gliding along.
+    var showSheet by remember { mutableStateOf(false) }
+    if (carPos != null && target != null && mine.status == PickupStatus.WAITING && !showSheet) {
+        val driver = car?.ownerUid?.let { vm.names.value[it] }?.ifBlank { null } ?: "운전자"
+        PickupLiveScreen(
+            route = route, carPos = carPos, pickup = target, driver = driver, etaSeconds = mine.etaSeconds, arrived = mine.arrivedAt != null,
+            onBoarded = vm::boarded, onDetails = { showSheet = true }, onBack = onDismiss,
+        )
+        return
+    }
+
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("픽업", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
