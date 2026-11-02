@@ -14,6 +14,7 @@ import ai.pleos.playground.navi.data.RecentDestinationInfo
 import ai.pleos.playground.navi.constants.NaviErrorCode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.withLock
 import android.content.Context
 import android.util.Log
 import com.htb.carplan.shared.model.Place
@@ -103,6 +104,16 @@ class NaviRouter(private val context: Context) {
         }
         override fun onBookMarkChanged() { requestSaved() }
         override fun onError(code: NaviErrorCode) { Log.w(TAG, "navi error $code") }
+        override fun onTripInfo(info: ai.pleos.playground.navi.data.TripInfo) {
+            Log.i(TAG, "trip ${info.distance}m ${info.eta}s soc=${info.estimatedSocAtDest}")
+            tripAnswer?.complete(TripEstimate(info.distance, info.eta, info.estimatedSocAtDest.takeIf { it in 1..100 }))
+        }
+        override fun onRouteStateInfo(info: ai.pleos.playground.navi.data.RouteStateInfo) {
+            // Battery energy the navigation expects at the destination of the route it is guiding, in Wh (EV; emulator:
+            // 75631 of a 77.4 kWh pack); 0 = not known / not guiding.
+            Log.i(TAG, "route state dest=${info.remainDestinationChargingInt}Wh waypoints=${info.remainWaypointChargingInt}")
+            _arriveWh.value = info.remainDestinationChargingInt.takeIf { it > 0 }
+        }
     }
 
     fun start() {
@@ -161,6 +172,38 @@ class NaviRouter(private val context: Context) {
     /** Asks for the next turns (주행 화면); the answer arrives at onTBTInfo. */
     fun requestTbt() { if (ready) runCatching { navi.getTBTInfo() } }
 
+    private val tripLock = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var tripAnswer: kotlinx.coroutines.CompletableDeferred<TripEstimate>? = null
+    @Volatile private var tripAskedAt = 0L
+    /** A trip question answers with a route-start echo: not a real route start (TripNavigator ignores it). */
+    val tripBusy: Boolean get() = System.currentTimeMillis() - tripAskedAt < TRIP_ECHO_MS
+
+    /**
+     * 현대 내비에게 "여기까지 몇 분·몇 km·도착 때 배터리"를 묻기 (requestTrip → onTripInfo, 2026-11-02 에뮬 확인):
+     * the navigation computes it from the car's position without starting guidance. Null when it does not answer.
+     */
+    suspend fun estimate(place: Place): TripEstimate? {
+        if (!ready) return null
+        return tripLock.withLock {
+            val answer = kotlinx.coroutines.CompletableDeferred<TripEstimate>()
+            tripAnswer = answer
+            tripAskedAt = System.currentTimeMillis()
+            runCatching { navi.requestTrip(ai.pleos.playground.navi.data.TripRequest(place.lat, place.lng, "", place.name, "")) }.onFailure { tripAnswer = null; return@withLock null }
+            kotlinx.coroutines.withTimeoutOrNull(TRIP_TIMEOUT_MS) { answer.await() }.also { tripAnswer = null }
+        }
+    }
+
+    private val _arriveWh = MutableStateFlow<Int?>(null)
+    /** Battery energy (Wh) left at the destination of the route being guided, from the navigation (EV). */
+    val arriveWh: StateFlow<Int?> = _arriveWh
+    fun requestRouteState() { if (ready) runCatching { navi.getRouteStateInfo() } }
+
+    /** The navigation's own nearby charging stations screen, brought to the front. */
+    fun openChargers() {
+        if (ready) runCatching { navi.requestNavigationScreen(NavigationScreenRequest.NearbyChargingStations) }
+        openNavigation()
+    }
+
     /** Asks for 즐겨찾기 + 최근 목적지; answers fill [saved]. */
     fun requestSaved() { if (ready) runCatching { navi.getBookmarkInfo(); navi.getRecentDestinationInfo() } }
 
@@ -180,9 +223,14 @@ class NaviRouter(private val context: Context) {
         private const val MAX_WAYPOINTS = 2
         private const val PICK_SETTLE_MS = 5_000L
         private const val PICK_POLL_MS = 1_000L
+        private const val TRIP_TIMEOUT_MS = 5_000L
+        private const val TRIP_ECHO_MS = 3_000L
         const val NAVI_PACKAGE = "ai.umos.maps.android.navigation.app"
     }
 }
 
 /** A place the navigation already knows: [kind] is the 즐겨찾기 type (HOME, OFFICE, …), null for a recent one. */
 data class SavedPlace(val place: Place, val kind: String?)
+
+/** The navigation's answer for one place: road meters, seconds, battery % on arrival (EV, when known). */
+data class TripEstimate(val meters: Int, val seconds: Int, val socAtDest: Int?)

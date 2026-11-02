@@ -218,6 +218,8 @@ class TripNavigator(
     private var fuelPlan: GasStation? = null
     /** Q55 on screen: what the day takes in fuel, and (when short) the station to stop at. */
     private val _fuelUsage = MutableStateFlow<FuelUsage?>(null)
+    /** Battery/tank size from the car (L or kWh); set by TripSyncService. Declared before init (collectors read it). */
+    var tankSize: (Boolean) -> Double? = { null }
     val fuelUsage: StateFlow<FuelUsage?> = _fuelUsage.asStateFlow()
     private val _fuelSuggestion = MutableStateFlow<FuelSuggestion?>(null)
     val fuelSuggestion: StateFlow<FuelSuggestion?> = _fuelSuggestion.asStateFlow()
@@ -369,7 +371,7 @@ class TripNavigator(
         router.addListener(object : NaviHelperEventListener {
             override fun onWayPointArrived(info: WaypointArrivedInfo) { Log.i(TAG, "waypoint arrived ${info.name}"); onArrived() }
             override fun onDestinationArrived(info: DestinationArrivedInfo) { Log.i(TAG, "destination arrived ${info.name}"); onArrived() }
-            override fun onRouteStarted(info: RouteStartInfo) { if (!router.pickBusy) onRouteStarted(info.duration) }
+            override fun onRouteStarted(info: RouteStartInfo) { if (!router.pickBusy && !router.tripBusy) onRouteStarted(info.duration) }
             override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
                 if (simActive) return // the simulator owns the position (the emulator GPS never moves)
                 lastLocation = info.latitude to info.longitude
@@ -393,13 +395,23 @@ class TripNavigator(
             }
             override fun onRouteCancelled() {
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
-                if (System.currentTimeMillis() - lastRouteSentAt < OWN_CANCEL_WINDOW_MS || router.pickBusy) return
+                if (System.currentTimeMillis() - lastRouteSentAt < OWN_CANCEL_WINDOW_MS || router.pickBusy || router.tripBusy) return
                 Log.i(TAG, "route cancelled by navigation")
                 inNavi = emptyList()
                 _guiding.value = false
             }
         })
         scope.launch { guiding.collect { on -> if (on) startEtaLoop() else etaJob?.cancel() } }
+        // EV: the navigation's own battery % at the destination replaces our ×1.3 guess on the fuel line.
+        scope.launch {
+            router.arriveWh.collect { wh ->
+                if (wh == null || carState.isEv != true || !_guiding.value) return@collect
+                val packWh = tankSize(true)?.times(1000) ?: return@collect
+                val pct = (wh / packWh * 100).toInt().coerceIn(0, 100)
+                Log.i(TAG, "navi arrival battery ${wh}Wh of ${packWh}Wh = $pct%")
+                _fuelUsage.update { it?.copy(leftPercent = pct, short = it.short && pct < 10) }
+            }
+        }
         scope.launch { guiding.collect { updateLiveLoop() } }
         // The fuel check only ran when the fuel value changed: a low tank seen while the start question was up was
         // never asked about. Look again whenever the screen is free of questions and when guiding starts or stops.
@@ -726,8 +738,6 @@ class TripNavigator(
         show(NextPrompt(trip.value?.next ?: Stop(), PromptReason.FUEL, message = message, single = true, button = "$what 찾기")) { askJob = scope.launch { voice.say(message) } }
     }
 
-    /** Battery/tank size from the car (L or kWh); set by TripSyncService. */
-    var tankSize: (Boolean) -> Double? = { null }
     private data class Fill(val from: Double, val to: Double, val ev: Boolean)
     private var fill: Fill? = null
     private var fillJob: Job? = null
@@ -947,7 +957,7 @@ class TripNavigator(
                     .map { p -> NearPlace(p.kakaoId ?: p.name, p.name, RouteMath.metersBetween(loc.first, loc.second, p.lat, p.lng).toInt(), p) }
                     .sortedBy { it.meters }.take(5)
             }.getOrNull()
-            if (found.isNullOrEmpty()) { router.search(what); return@launch }
+            if (found.isNullOrEmpty()) { if (what == "충전소") router.openChargers() else router.search(what); return@launch }
             val kind = if (what == "주유소" || what == "충전소") NaviEntry.Kind.STATION else NaviEntry.Kind.EXTRA
             _nearby.value = NearbyList("가까운 $what", kind, found, "고르면 다음 경유지로 들어가요 · 내비 화면은 [내비 보기]로")
         }
@@ -1253,11 +1263,15 @@ class TripNavigator(
     /** Pickup order compares many legs: a straight-line guess is enough (no Kakao call per permutation). */
     private fun guessSeconds(a: Place, b: Place): Int = RouteMath.estimateSeconds(RouteMath.metersBetween(a.lat, a.lng, b.lat, b.lng))
 
-    /** "지금 출발하면 n시 n분 도착" — Kakao driving time, one call per question, cached; straight-line estimate without a key. */
+    /**
+     * "지금 출발하면 n시 n분 도착": the Hyundai navigation's own estimate from the car (requestTrip, no guidance started);
+     * Kakao only when the navigation does not answer, then a straight-line guess. Cached per leg.
+     */
     private suspend fun legSeconds(a: Place, b: Place): Int {
         val key = "%.4f,%.4f>%.4f,%.4f".format(a.lat, a.lng, b.lat, b.lng)
         legCache[key]?.let { return it }
-        val s = runCatching { kakao.directions(a, b).seconds }.getOrElse { RouteMath.estimateSeconds(RouteMath.metersBetween(a.lat, a.lng, b.lat, b.lng)) }
+        val s = router.estimate(b)?.seconds?.takeIf { it > 0 }
+            ?: runCatching { kakao.directions(a, b).seconds }.getOrElse { RouteMath.estimateSeconds(RouteMath.metersBetween(a.lat, a.lng, b.lat, b.lng)) }
         legCache[key] = s
         return s
     }
@@ -1332,6 +1346,7 @@ class TripNavigator(
     /** The navigation computed a route: publish when it expects to reach the next stop (10장 7·8). */
     private fun onRouteStarted(durationSeconds: Int) {
         Log.i(TAG, "route started, next in ${durationSeconds}s")
+        scope.launch { delay(1_500); router.requestRouteState() } // battery % at the destination (EV)
         // The start's duration is to the first point: the next stop only when nothing (station, pickup) is in front.
         if (inNavi.firstOrNull()?.kind == NaviEntry.Kind.STOP) publishEta(durationSeconds, force = true) else etaAfterStart = true
     }
