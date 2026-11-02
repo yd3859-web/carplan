@@ -159,31 +159,24 @@ private fun EditButton(label: String, enabled: Boolean = true, onClick: () -> Un
     ) { Text(label, color = if (enabled) c.ink else c.railPassed, fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
 }
 
-/** Arrival time of one place: hour chips + 30분, or none (the rail then shows the expected time only). */
+/** Arrival time of one place: a 시·분 wheel, or none (the rail then shows the expected time only). */
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.TimePanel(stop: Stop, onTime: (String?) -> Unit, onClose: () -> Unit) {
     val c = LocalCarColors.current
-    val cur = stop.time?.split(":")
-    var hour by remember(stop.id) { mutableStateOf(cur?.getOrNull(0)?.toIntOrNull()) }
-    var half by remember(stop.id) { mutableStateOf(cur?.getOrNull(1) == "30") }
+    var timed by remember(stop.id) { mutableStateOf(stop.time != null) }
+    var hm by remember(stop.id) { mutableStateOf(wheelTime(stop.time, 10 to 0)) }
     Text(stop.place.name, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     Text("몇 시에 도착할까요?", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
     Column(Modifier.weight(1f).padding(top = 12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        (6..22).chunked(5).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { h -> Chip("${h}시", hour == h, Modifier.weight(1f)) { hour = h } }
-                repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Chip("정각", !half, Modifier.weight(1f)) { half = false }
-            Chip("30분", half, Modifier.weight(1f)) { half = true }
-            Chip("시간 없음", hour == null, Modifier.weight(1f)) { hour = null }
+            Chip("시간 정하기", timed, Modifier.weight(1f)) { timed = true }
+            Chip("시간 없음", !timed, Modifier.weight(1f)) { timed = false }
         }
+        CarAppear(timed) { CarTimeWheel(hm.first, hm.second, { h, m -> hm = h to m }) }
     }
     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         CarCloseButton(onClick = onClose, label = "취소")
-        val time = hour?.let { "%02d:%02d".format(it, if (half) 30 else 0) }
+        val time = if (timed) "%02d:%02d".format(hm.first, hm.second) else null
         Button(
             onClick = { onTime(time) }, modifier = Modifier.weight(1f).heightIn(min = 76.dp), shape = Corner,
             colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),

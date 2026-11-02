@@ -1172,16 +1172,16 @@ internal fun rememberQr(text: String, size: Int): Bitmap? =
         if (value == null) value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { qrBitmap(text, size) }
     }.value
 
-/** 차에서 일정 만들기 (Q19): full screen, big fields, hours as buttons, never closed by a stray tap. */
+/** 차에서 일정 만들기 (Q19): full screen, big fields, time on a 시·분 wheel, never closed by a stray tap. */
 @Composable
 private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> Unit, onDismiss: () -> Unit) {
     var title by remember { mutableStateOf("") }
     // Opened from the calendar on a later day: that day is already chosen.
     var dayOffset by remember { mutableStateOf(java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)) }
-    var hour by remember { mutableStateOf<Int?>(null) }
-    var half by remember { mutableStateOf(false) }
+    var timed by remember { mutableStateOf(false) }
+    var hm by remember { mutableStateOf((java.time.LocalTime.now().hour + 1) % 24 to 0) }
     var place by remember { mutableStateOf("") }
-    val time = hour?.let { "%02d:%02d".format(it, if (half) 30 else 0) }
+    val time = if (timed) "%02d:%02d".format(hm.first, hm.second) else null
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         CarEnter(Entry.SCREEN) {
         Column(Modifier.fillMaxSize().background(Bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
@@ -1202,11 +1202,12 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
                 }
             }
             Text("몇 시", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 14.dp))
-            Row(Modifier.padding(top = 6.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilterChip(selected = hour == null, onClick = { hour = null }, shape = Corner, colors = chipColors(), label = { Text("종일", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
-                (6..22).forEach { h -> FilterChip(selected = hour == h, onClick = { hour = h }, shape = Corner, colors = chipColors(), label = { Text("${h}시", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) }) }
-                FilterChip(selected = half, onClick = { half = !half }, enabled = hour != null, shape = Corner, colors = chipColors(), label = { Text("30분", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilterChip(selected = !timed, onClick = { timed = false }, shape = Corner, colors = chipColors(), label = { Text("종일", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
+                FilterChip(selected = timed, onClick = { timed = true }, shape = Corner, colors = chipColors(), label = { Text(time ?: "시간 정하기", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
             }
+            // 시간 정하기 → 시·분을 굴려서 고름 (hour buttons were too many to scan).
+            CarAppear(timed) { CarTimeWheel(hm.first, hm.second, { h, m -> hm = h to m }, Modifier.padding(top = 10.dp).widthIn(max = 520.dp)) }
             Spacer(Modifier.height(18.dp))
             OutlinedTextField(
                 place, { place = it }, placeholder = { Text("장소 (선택) — 이름만 적어도 내비가 찾아요", fontSize = 26.sp, color = Soft) }, singleLine = true, shape = Corner,
