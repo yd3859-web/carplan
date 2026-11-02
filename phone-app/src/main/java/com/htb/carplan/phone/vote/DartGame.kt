@@ -51,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -115,7 +116,9 @@ fun DartGame(
         if (!iThrew) oldKey = first?.let { it.id + "#" + it.throwCount }
         baselineDone = true
     }
+    var resetTick by remember { mutableStateOf(0) }
     val freshDart = dart?.takeIf { (baselineDone || iThrew) && it.id + "#" + it.throwCount != oldKey }
+    fun throwAgain() { oldKey = freshDart?.let { it.id + "#" + it.throwCount } ?: oldKey; resetTick++ }
     val me by vm.uid.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -142,6 +145,13 @@ fun DartGame(
         Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, radiusKm).ifEmpty { Regions.all }
     }
     val shown = freshDart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
+    // Changing 전국 / 내 위치 / 지역 (or the 시·도, the km) clears the board: the stuck dart goes and the dart is back in hand.
+    var scopeSeen by remember { mutableStateOf(false) }
+    LaunchedEffect(scope, region, radiusKm) {
+        if (!scopeSeen) { scopeSeen = true; return@LaunchedEffect }
+        oldKey = dart?.let { it.id + "#" + it.throwCount } ?: oldKey
+        resetTick++
+    }
     var flying by remember { mutableStateOf(false) }
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
 
@@ -162,6 +172,12 @@ fun DartGame(
                             scope = DartScope.NEAR
                         }
                         ScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
+                        // Its place is always kept (hidden until there is a result) so the chips never jump under a finger.
+                        val canAgain = shown != null && !flying
+                        OutlinedButton(
+                            onClick = { if (canAgain) throwAgain() }, enabled = canAgain, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.TextStrong),
+                            modifier = Modifier.alpha(if (canAgain) 1f else 0f),
+                        ) { Text("다시 던지기", fontSize = 16.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold) }
                     }
                     Spacer(Modifier.padding(end = 12.dp))
                 }
@@ -185,6 +201,7 @@ fun DartGame(
                         pool = pool,
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
+                        resetTick = resetTick,
                         onLanded = { lat, lng ->
                             iThrew = true
                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) // the dart sticks
@@ -308,7 +325,7 @@ private data class Label(val name: String, val lat: Double, val lng: Double)
  * that spot and the 시·군·구 lines, their names and the nearby 동네 names fade in — detail only where it matters.
  */
 @Composable
-private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Boolean) -> Unit, onLanded: (Double, Double) -> Unit) {
+private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Boolean) -> Unit, onLanded: (Double, Double) -> Unit, resetTick: Int = 0) {
     val context = LocalContext.current
     var assetsReady by remember { mutableStateOf(MapAssets.sgg != null) }
     LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { MapAssets.load(context) }; assetsReady = true }
@@ -381,6 +398,11 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         }
 
         var seenKey by remember { mutableStateOf<String?>(null) }
+        // [다시 던지기]: the stuck dart comes back to the hand and the map zooms back out.
+        LaunchedEffect(resetTick) {
+            if (resetTick == 0) return@LaunchedEffect
+            stuck = null; flightTo = null; fly.snapTo(0f); focus = null; seenKey = ""
+        }
         LaunchedEffect(hit?.key) {
             val s = hit ?: return@LaunchedEffect
             if (seenKey == null) {
