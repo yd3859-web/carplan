@@ -64,6 +64,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -1178,6 +1180,7 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
     var title by remember { mutableStateOf("") }
     // Opened from the calendar on a later day: that day is already chosen.
     var dayOffset by remember { mutableStateOf(java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)) }
+    var datePick by remember { mutableStateOf(false) }
     var timed by remember { mutableStateOf(false) }
     var hm by remember { mutableStateOf((java.time.LocalTime.now().hour + 1) % 24 to 0) }
     var place by remember { mutableStateOf("") }
@@ -1197,9 +1200,12 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
             Spacer(Modifier.height(18.dp))
             Text("언제", color = Soft, fontSize = 20.sp)
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                (listOf("오늘" to 0L, "내일" to 1L, "모레" to 2L) + (if (dayOffset > 2 || dayOffset < 0) listOf(dayLabel(LocalDate.now().plusDays(dayOffset)) to dayOffset) else emptyList())).forEach { (label, off) ->
+                listOf("오늘" to 0L, "내일" to 1L, "모레" to 2L).forEach { (label, off) ->
                     FilterChip(selected = dayOffset == off, onClick = { dayOffset = off }, shape = Corner, colors = chipColors(), label = { Text(label, fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
                 }
+                // Any other day: a month calendar in a window.
+                val other = dayOffset !in 0L..2L
+                FilterChip(selected = other, onClick = { datePick = true }, shape = Corner, colors = chipColors(), label = { Text(if (other) dayLabel(LocalDate.now().plusDays(dayOffset)) else "날짜 고르기", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
             }
             Text("몇 시", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 14.dp))
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1224,6 +1230,55 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
             ) { Text(listOfNotNull(dayLabel(LocalDate.now().plusDays(dayOffset)), time ?: "종일", title.ifBlank { null }).joinToString("  ") + "  추가", fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
         }
     }
+    }
+    if (datePick) CarDatePickDialog(LocalDate.now().plusDays(dayOffset), onPick = { dayOffset = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), it); datePick = false }, onDismiss = { datePick = false })
+}
+
+/** 날짜 고르기: one month, ‹ › or a side swipe to change it, tap a day to choose. Days before today can't be chosen. */
+@Composable
+private fun CarDatePickDialog(initial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
+    val c = LocalCarColors.current
+    val today = LocalDate.now()
+    var month by remember { mutableStateOf(java.time.YearMonth.from(initial)) }
+    CarDialog(onDismiss = onDismiss, title = "날짜 고르기", width = 760.dp, buttons = { CarCloseButton(onClick = onDismiss) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val canBack = month > java.time.YearMonth.from(today)
+            OutlinedButton(onClick = { month = month.minusMonths(1) }, enabled = canBack, shape = Corner, modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 76.dp), border = BorderStroke(1.dp, c.line)) {
+                Text("‹", color = if (canBack) c.ink else c.railPassed, fontSize = 28.sp)
+            }
+            Text("${month.year}년 ${month.monthValue}월", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { month = month.plusMonths(1) }, shape = Corner, modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 76.dp), border = BorderStroke(1.dp, c.line)) {
+                Text("›", color = c.ink, fontSize = 28.sp)
+            }
+        }
+        Row(Modifier.padding(top = 12.dp)) {
+            listOf("일", "월", "화", "수", "목", "금", "토").forEach { d -> Text(d, color = c.soft, fontSize = 20.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) }
+        }
+        val lead = month.atDay(1).dayOfWeek.value % 7 // Sunday first
+        val days = month.lengthOfMonth()
+        Column(Modifier.padding(top = 6.dp).monthSwipe(month, onPrev = { if (month > java.time.YearMonth.from(today)) month = month.minusMonths(1) }, onNext = { month = month.plusMonths(1) })) {
+            for (r in 0 until (lead + days + 6) / 7) Row {
+                for (col in 0 until 7) {
+                    val n = r * 7 + col - lead + 1
+                    Box(Modifier.weight(1f).height(72.dp).padding(2.dp), contentAlignment = Alignment.Center) {
+                        if (n in 1..days) {
+                            val d = month.atDay(n)
+                            val past = d < today
+                            val on = d == initial
+                            Box(
+                                Modifier.fillMaxSize().background(if (on) c.ink else c.bg, Corner)
+                                    .then(if (d == today && !on) Modifier.border(2.dp, c.ink, Corner) else Modifier)
+                                    .then(if (past) Modifier else Modifier.clickable { onPick(d) }),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("$n", fontSize = 26.sp, fontWeight = if (on || d == today) FontWeight.Bold else FontWeight.Normal,
+                                    color = when { on -> c.onInk; past -> c.railPassed; col == 0 -> c.warn; else -> c.ink })
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
