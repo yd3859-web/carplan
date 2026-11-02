@@ -1198,15 +1198,9 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), onSave: (Event) -> U
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 28.sp, color = Ink), modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(18.dp))
-            Text("언제", color = Soft, fontSize = 20.sp)
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("오늘" to 0L, "내일" to 1L, "모레" to 2L).forEach { (label, off) ->
-                    FilterChip(selected = dayOffset == off, onClick = { dayOffset = off }, shape = Corner, colors = chipColors(), label = { Text(label, fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
-                }
-                // Any other day: a month calendar in a window.
-                val other = dayOffset !in 0L..2L
-                FilterChip(selected = other, onClick = { datePick = true }, shape = Corner, colors = chipColors(), label = { Text(if (other) dayLabel(LocalDate.now().plusDays(dayOffset)) else "날짜 고르기", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
-            }
+            Text("날짜", color = Soft, fontSize = 20.sp)
+            // One button: the chosen day; it opens the month calendar.
+            FilterChip(selected = true, onClick = { datePick = true }, shape = Corner, colors = chipColors(), modifier = Modifier.padding(top = 6.dp), label = { Text(dayTitle(LocalDate.now().plusDays(dayOffset)), fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
             Text("몇 시", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 14.dp))
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilterChip(selected = !timed, onClick = { timed = false }, shape = Corner, colors = chipColors(), label = { Text("종일", fontSize = 26.sp, modifier = Modifier.padding(10.dp)) })
