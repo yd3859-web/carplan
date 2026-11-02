@@ -156,6 +156,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     val stations by vm.stations.collectAsStateWithLifecycle()
     val nearby by vm.nearby.collectAsStateWithLifecycle()
     var debug by remember { mutableStateOf(false) }
+    var settings by remember { mutableStateOf(false) }
     var dartOpen by remember { mutableStateOf(false) }
     val dart by vm.dart.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
@@ -186,7 +187,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     Column(Modifier.fillMaxSize()) {
         val passengers by vm.passengerCount.collectAsStateWithLifecycle()
         val careDue by vm.careDue.collectAsStateWithLifecycle()
-        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen, onGroup = { qr = true }, onDemo = { debug = true })
+        StatusBand(car, vehicle, qrGroup?.name, passengers, careDue, onNavi = vm::openNavigation, onListen = vm::listen, onGroup = { qr = true }, onDemo = { debug = true }, onSettings = { settings = true })
         val voiceState by vm.voiceState.collectAsStateWithLifecycle()
         CarAppear(voiceState.listening || voiceState.choices) { VoiceBar(voiceState, onCommand = vm::runCommand, onClose = vm::closeVoice) }
         val sim by vm.sim.collectAsStateWithLifecycle()
@@ -309,6 +310,7 @@ private fun CarHome(vm: CarHomeViewModel) {
     if (stations.isNotEmpty()) StationDialog(stations, onPick = vm::goViaStation, onDismiss = vm::dismissStations)
     nearby?.let { n -> NearbyDialog(n, onPick = { vm.goViaNearby(it, n.kind) }, onDismiss = vm::dismissNearby) }
     if (debug) DebugDialog(vehicle, vm, onDismiss = { debug = false })
+    if (settings && !vehicle.drivingRestricted) SettingsDialog(onDemo = { settings = false; debug = true }, onDismiss = { settings = false })
     if (dartOpen && !vehicle.drivingRestricted) CarDartGame(vm, onDismiss = { dartOpen = false })
     if (qr && !vehicle.drivingRestricted) {
         InviteQrDialog(qrGroup, seated = seatedPrompt, tripTitle = trip?.title, friendCode = vm.ownerFriendCode, ownerName = vm.ownerName, onShareTrip = vm::inviteToTodayTrip, onDismiss = { qr = false; seatedPrompt = false })
@@ -316,6 +318,18 @@ private fun CarHome(vm: CarHomeViewModel) {
 }
 
 /** All car dialogs: dark scrim, grey sheet with an edge and shadow, white cards inside — readable over the white screen. */
+/** 설정 (정원 2026-11-02): for now one tile, the 시연 메뉴 (시뮬레이션 재생 · 시험 여행 …). Parked only. */
+@Composable
+private fun SettingsDialog(onDemo: () -> Unit, onDismiss: () -> Unit) {
+    CarDialog(onDismiss = onDismiss, title = "설정", buttons = { TextButton(onClick = onDismiss) { Text("닫기", fontSize = 22.sp, color = Ink) } }) {
+        Button(
+            onClick = onDemo, modifier = Modifier.fillMaxWidth().height(96.dp).border(1.dp, SheetEdge, Corner), shape = Corner,
+            colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink),
+        ) { Text("시연 메뉴", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+        Text("시뮬레이션 재생 · 시험 여행 만들기 · 연료 바꾸기 등", fontSize = 20.sp, color = Soft, modifier = Modifier.padding(top = 10.dp))
+    }
+}
+
 @Composable
 private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, buttons: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
     // A bump on the road must not close a window: only its [닫기] does (no tap-outside dismiss).
@@ -348,7 +362,7 @@ private fun chipColors(): SelectableChipColors = FilterChipDefaults.filterChipCo
 )
 
 @Composable
-private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit, onGroup: () -> Unit, onDemo: () -> Unit) {
+private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: Int, careDue: String?, onNavi: () -> Unit, onListen: () -> Unit, onGroup: () -> Unit, onDemo: () -> Unit, onSettings: () -> Unit) {
     // Half screen: only fuel (+ 주유 필요), the group and [말하기] — range, 정비 and the navigation button stay off
     // (the navigation is right next to us).
     val compact = LocalCompact.current
@@ -374,6 +388,12 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         // Voice is the main way to act while driving: a full-size button, filled so it reads first in the band.
         Button(onClick = onListen, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk), modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 160.dp)) {
             Text("말하기", fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        }
+        // [설정] next to [말하기] (정원 2026-11-02): parked only, holds the 시연 메뉴 for now.
+        if (!v.drivingRestricted) {
+            OutlinedButton(onClick = onSettings, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, SheetEdge), modifier = Modifier.heightIn(min = 76.dp).widthIn(min = 120.dp)) {
+                Text("설정", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Ink)
+            }
         }
         // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
         if (v.drivingRestricted) {
