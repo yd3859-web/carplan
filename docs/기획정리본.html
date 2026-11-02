@@ -457,6 +457,8 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
       <tr><td>주유소를 경유지로</td><td class="yes">된다</td><td>경유지 추가</td></tr>
       <tr><td>차에서 근처 주차장·카페·주유소</td><td class="yes">된다</td><td>내비 검색 요청 후 우리 앱이 내비 앱을 실행 → 결과가 뜬 채로 앞에 나옴. 결과 목록은 우리 앱으로 안 옴</td></tr>
       <tr><td>근처 충전소</td><td class="yes">된다</td><td>내비 주변 충전소 화면</td></tr>
+      <tr><td>내비 즐겨찾기·최근 목적지 받기</td><td class="yes">된다</td><td>getBookmarkInfo(집·회사·충전소·기타)·getRecentDestinationInfo → 이름·주소·좌표. 차 앱 장소 고르기 첫 목록(2026-11-02 확인, 에뮬 즐겨찾기는 빈 칸)</td></tr>
+      <tr><td>내비에서 고른 곳 받아오기</td><td class="yes">된다</td><td>우리 앱이 내비 검색을 열고, 운전자가 고르면 getDestinationInfo로 이름·좌표를 받음. onDestinationChanged는 안 옴 → 1초마다 물어봄(경로 시작 신호는 먼 곳이면 약 10초 뒤). 받은 뒤 원래 경로로 되돌리거나 취소하고 우리 앱을 앞으로(2026-11-02)</td></tr>
       <tr><td>추천을 우리 화면에 직접 표시</td><td class="ext">외부 API</td><td>카카오 로컬 카테고리 검색. 빈자리·요금은 없음</td></tr>
       <tr><td>도착 몇 분 전 동승자 알림</td><td class="yes">된다 + 직접</td><td>남은 시간(된다)과 서버 푸시</td></tr>
       <tr><td>일정 수정 → 내비 갱신</td><td class="yes">된다 + 직접</td><td>앱이 뒤에 있어도 내비 경로 변경 확인. 폰 → 서버 → 차는 직접</td></tr>

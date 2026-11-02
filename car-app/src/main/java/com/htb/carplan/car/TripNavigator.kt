@@ -360,10 +360,14 @@ class TripNavigator(
         .stateIn(scope, SharingStarted.Eagerly, null)
 
     init {
+        // 내비에서 고르기 replaced the navigation's route: put today's back if we were guiding.
+        router.restoreRoute = {
+            if (_guiding.value && inNavi.isNotEmpty()) { lastRouteSentAt = System.currentTimeMillis(); router.route(inNavi.map { it.place }); true } else false
+        }
         router.addListener(object : NaviHelperEventListener {
             override fun onWayPointArrived(info: WaypointArrivedInfo) { Log.i(TAG, "waypoint arrived ${info.name}"); onArrived() }
             override fun onDestinationArrived(info: DestinationArrivedInfo) { Log.i(TAG, "destination arrived ${info.name}"); onArrived() }
-            override fun onRouteStarted(info: RouteStartInfo) { onRouteStarted(info.duration) }
+            override fun onRouteStarted(info: RouteStartInfo) { if (!router.pickBusy) onRouteStarted(info.duration) }
             override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
                 if (simActive) return // the simulator owns the position (the emulator GPS never moves)
                 lastLocation = info.latitude to info.longitude
@@ -383,7 +387,7 @@ class TripNavigator(
             }
             override fun onRouteCancelled() {
                 // Our own re-request cancels the previous route first; only a cancel we did not cause ends guiding.
-                if (System.currentTimeMillis() - lastRouteSentAt < OWN_CANCEL_WINDOW_MS) return
+                if (System.currentTimeMillis() - lastRouteSentAt < OWN_CANCEL_WINDOW_MS || router.pickBusy) return
                 Log.i(TAG, "route cancelled by navigation")
                 inNavi = emptyList()
                 _guiding.value = false

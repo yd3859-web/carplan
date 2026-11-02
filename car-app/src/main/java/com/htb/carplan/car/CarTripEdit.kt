@@ -184,57 +184,22 @@ private fun androidx.compose.foundation.layout.ColumnScope.TimePanel(stop: Stop,
     }
 }
 
-/** Add a place: type, press [찾기] once, pick. No key / nothing found → add by name (the navigation searches it later). */
+/** Add a place: the navigation's saved places, or type → [내비에서 찾기] (현대 내비) / [목록으로] (Kakao), or the name alone. */
 @Composable
 private fun androidx.compose.foundation.layout.ColumnScope.AddPanel(vm: CarHomeViewModel) {
     val c = LocalCarColors.current
-    val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<Place>?>(null) }
-    var busy by remember { mutableStateOf(false) }
     var added by remember { mutableStateOf<String?>(null) }
-    // The car keyboard covers half the screen: it goes away as soon as there is something to pick.
-    // CarIME ignores Compose's keyboard hide(): ask InputMethodManager directly.
-    val view = androidx.compose.ui.platform.LocalView.current
-    val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    fun search() {
-        if (query.isBlank() || busy) return
-        view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)?.hideSoftInputFromWindow(view.windowToken, 0); focus.clearFocus()
-        busy = true
-        scope.launch { results = vm.searchPlaces(query); busy = false }
-    }
-    fun add(p: Place) { vm.addStop(p, null); added = p.name; query = ""; results = null }
+    fun add(p: Place) { vm.addStop(p, null); added = p.name; query = "" }
     Text("장소 넣기", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold)
     Text(if (LocalCompact.current) "맨 뒤에 들어가요 · 시간과 순서는 목록에서" else "맨 뒤에 들어가요 · 시간과 순서는 왼쪽에서", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
-    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            query, { query = it; results = null }, placeholder = { Text("어디로 갈까요?", fontSize = 26.sp, color = c.soft) }, singleLine = true, shape = Corner,
-            textStyle = TextStyle(fontSize = 26.sp, color = c.ink), modifier = Modifier.weight(1f),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { search() }),
-        )
-        Button(
-            onClick = ::search, enabled = query.isNotBlank() && !busy, shape = Corner,
-            modifier = Modifier.padding(start = 10.dp).heightIn(min = 76.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk, disabledContainerColor = c.disabled, disabledContentColor = c.soft),
-        ) { Text(if (busy) "찾는 중" else "찾기", fontSize = 26.sp, fontWeight = FontWeight.Bold) }
-    }
-    Column(Modifier.weight(1f).padding(top = 8.dp).verticalScroll(rememberScrollState())) {
-        results?.forEach { p ->
-            Column(Modifier.fillMaxWidth().heightIn(min = 88.dp).clickable { add(p) }.padding(vertical = 10.dp), verticalArrangement = Arrangement.Center) {
-                Text(p.name, color = c.ink, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                p.address.takeIf { it.isNotBlank() }?.let { Text(it, color = c.soft, fontSize = 20.sp, maxLines = 1) }
-            }
-            HorizontalDivider(color = c.line)
-        }
-        if (results != null) {
-            if (results!!.isEmpty()) Text("찾은 곳이 없어요", color = c.soft, fontSize = 24.sp, modifier = Modifier.padding(top = 12.dp))
+    Column(Modifier.weight(1f).padding(top = 12.dp).verticalScroll(rememberScrollState())) {
+        CarPlacePicker(vm, query, { query = it; added = null }, picked = null, onPick = ::add, hint = "어디로 갈까요?")
+        if (query.isNotBlank()) OutlinedButton(
             // Always possible: the name alone (갈 때 내비 검색으로 찾음, 기존 규칙).
-            OutlinedButton(
-                onClick = { add(Place(name = query.trim())) }, shape = Corner, border = BorderStroke(1.dp, c.line),
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = 76.dp),
-            ) { Text("'${query.trim()}' 이름만 넣기", color = c.ink, fontSize = 24.sp, maxLines = 1) }
-        }
+            onClick = { add(Place(name = query.trim())) }, shape = Corner, border = BorderStroke(1.dp, c.line),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = 76.dp),
+        ) { Text("'${query.trim()}' 이름만 넣기", color = c.ink, fontSize = 24.sp, maxLines = 1) }
         added?.let { Text("$it 넣었어요", color = c.accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp)) }
     }
 }

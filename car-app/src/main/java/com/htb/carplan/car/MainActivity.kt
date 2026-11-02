@@ -291,7 +291,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         onDismiss = { more = false },
     )
     if (adding && !vehicle.drivingRestricted) {
-        CarAddDialog(date = addDate, search = vm::searchPlaces, onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false; addDate = LocalDate.now() })
+        CarAddDialog(vm, date = addDate, onSave = { vm.addEvent(it); adding = false }, onDismiss = { adding = false; addDate = LocalDate.now() })
     }
     if (editing && !vehicle.drivingRestricted) CarTripEdit(vm, onDismiss = { editing = false })
     if (pickTrip && trip != null && !vehicle.drivingRestricted) CarDialog(onDismiss = { pickTrip = false }, title = "어느 여행으로 갈까요?", buttons = { CarCloseButton(onClick = { pickTrip = false }) }) {
@@ -1177,7 +1177,7 @@ internal fun rememberQr(text: String, size: Int): Bitmap? =
 
 /** 차에서 일정 만들기 (Q19): full screen, big fields, time on a 시·분 wheel, never closed by a stray tap. */
 @Composable
-private fun CarAddDialog(date: LocalDate = LocalDate.now(), search: suspend (String) -> List<Place>, onSave: (Event) -> Unit, onDismiss: () -> Unit) {
+private fun CarAddDialog(vm: CarHomeViewModel, date: LocalDate = LocalDate.now(), onSave: (Event) -> Unit, onDismiss: () -> Unit) {
     var title by remember { mutableStateOf("") }
     // Opened from the calendar on a later day: that day is already chosen.
     var dayOffset by remember { mutableStateOf(java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date)) }
@@ -1185,12 +1185,8 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), search: suspend (Str
     var timed by remember { mutableStateOf(false) }
     var hm by remember { mutableStateOf((java.time.LocalTime.now().hour + 1) % 24 to 0) }
     var place by remember { mutableStateOf("") }
-    // The place is matched right away (카카오 장소 검색 → 좌표), so the navigation gets the exact spot, not a name to guess.
+    // The place is matched right away (현대 내비 먼저, 카카오는 보조 → 좌표), so the navigation gets the exact spot, not a name to guess.
     var picked by remember { mutableStateOf<Place?>(null) }
-    var results by remember { mutableStateOf<List<Place>?>(null) }
-    var searching by remember { mutableStateOf(false) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val c = LocalCarColors.current
     val time = if (timed) "%02d:%02d".format(hm.first, hm.second) else null
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     // Keyboard [완료] / Enter: put the keyboard away (the hardware keyboard types straight into the field).
@@ -1225,38 +1221,7 @@ private fun CarAddDialog(date: LocalDate = LocalDate.now(), search: suspend (Str
             // 시간 정하기 → 시·분을 굴려서 고름 (hour buttons were too many to scan).
             CarAppear(timed) { CarTimeWheel(hm.first, hm.second, { h, m -> hm = h to m }, Modifier.padding(top = 10.dp).widthIn(max = 520.dp)) }
             Spacer(Modifier.height(18.dp))
-            fun find() {
-                if (place.isBlank() || searching) return
-                hideKeyboard(); focus.clearFocus()
-                searching = true
-                scope.launch { results = search(place); searching = false }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    place, { place = it; picked = null; results = null }, placeholder = { Text("장소 (선택)", fontSize = 26.sp, color = Soft) }, singleLine = true, shape = Corner,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { find() }),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 26.sp, color = Ink), modifier = Modifier.weight(1f),
-                )
-                Button(
-                    onClick = ::find, enabled = place.isNotBlank() && picked == null && !searching, shape = Corner,
-                    modifier = Modifier.padding(start = 10.dp).heightIn(min = 76.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk, disabledContainerColor = Disabled, disabledContentColor = Soft),
-                ) { Text(if (searching) "찾는 중" else "찾기", fontSize = 26.sp, fontWeight = FontWeight.Bold) }
-            }
-            picked?.let { p ->
-                Text("위치 확인 · ${p.address.ifBlank { p.name }}", color = c.accent, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 8.dp))
-            }
-            results?.let { list ->
-                list.forEach { p ->
-                    Column(Modifier.fillMaxWidth().heightIn(min = 88.dp).clickable { picked = p; place = p.name; results = null }.padding(vertical = 10.dp), verticalArrangement = Arrangement.Center) {
-                        Text(p.name, color = Ink, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        p.address.takeIf { it.isNotBlank() }?.let { Text(it, color = Soft, fontSize = 20.sp, maxLines = 1) }
-                    }
-                    HorizontalDivider(color = c.line)
-                }
-                if (list.isEmpty()) Text("찾은 곳이 없어요 · 이대로 넣으면 갈 때 내비가 이름으로 찾아요", color = Soft, fontSize = 22.sp, modifier = Modifier.padding(top = 10.dp))
-            }
+            CarPlacePicker(vm, place, { place = it; picked = null }, picked, onPick = { picked = it; place = it.name })
             }
             Spacer(Modifier.height(12.dp))
             Button(

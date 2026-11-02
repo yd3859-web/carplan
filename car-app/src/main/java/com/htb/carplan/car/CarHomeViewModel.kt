@@ -368,6 +368,14 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
 
 
     fun openNavigation() = router.openNavigation()
+
+    /** 현대 내비가 아는 곳(즐겨찾기·최근 목적지)과 내비에서 고르기. */
+    val naviSaved = router.saved
+    val naviPicked = router.picked
+    fun refreshNaviSaved() = router.requestSaved()
+    fun pickInNavi(keyword: String) = router.pickInNavi(keyword)
+    fun stopNaviPick() = router.stopPicking()
+    fun consumeNaviPick() = router.consumePicked()
     /** Ask the navigation where the car is (answer lands in [live] / [lastLocation]). */
     fun requestLocation() = router.requestCurrentLocation()
     fun lastLocation(): Pair<Double, Double>? = navigator.simLocation()

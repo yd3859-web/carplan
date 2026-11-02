@@ -31,6 +31,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 
 ## Pleos 에뮬레이터에서 확인된 것 (docs/기획정리본.html 09장)
 - 된다: 경로 없이 현재 위치, 경유지 넣기(SDK 번호는 첫째·둘째뿐 → 경유지 2개 + 목적지, 도착할 때마다 채움), 기어 P/D 이벤트, 연료량은 android.car 표준 `FUEL_LEVEL`(Pleos `getFuelPercent`는 실패), 주행 제한(UX restriction), 앱이 뒤에 있어도 내비 경로 변경.
+- 된다(2026-11-02): 내비 즐겨찾기·최근 목적지(이름·주소·좌표), **내비에서 고른 목적지 받아오기**(`NaviRouter.pickInNavi` — 내비 검색을 열고 1초마다 `getDestinationInfo`, 고르면 원래 경로 복원·우리 앱 앞으로). 장소 고르기는 `CarPlacePicker`(내비 먼저, 카카오 [목록으로]는 보조). 남은 시간은 길안내 중 내비 값(`onDrivingInfo`)이 먼저.
 - 안 된다: 시동 상태, 경로선 좌표, 타이어 공기압(시스템 권한), 내비 검색 결과를 데이터로 받기, 에뮬 GPS로 차 이동, TTS와 STT 동시 사용(말하기 끝난 뒤 듣기).
 - Pleos 권한이 manifest에 빠지면 SDK 호출 순간 앱이 죽는다. 새 SDK 기능을 쓰면 권한부터 확인.
 - 에뮬레이터는 반드시 Cold boot. Virtual Console: `adb forward tcp:8088 tcp:8088` 후 http://127.0.0.1:8088
