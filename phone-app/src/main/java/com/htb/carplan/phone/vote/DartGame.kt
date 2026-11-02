@@ -1,5 +1,6 @@
 package com.htb.carplan.phone.vote
 
+import kotlinx.coroutines.flow.first
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -101,6 +102,20 @@ fun DartGame(
 ) {
     val vm: VoteDartViewModel = viewModel(key = "dart-$groupId-$eventId", factory = voteVmFactory(groupId, eventId, date))
     val dart by vm.dart.collectAsStateWithLifecycle()
+
+    // Every opening is a fresh board (정원 2026-11-02): the dart waits at the bottom for the player.
+    // An older result already in the room is not shown; throws made while the game is open are (mine or a friend's).
+    var oldKey by remember { mutableStateOf<String?>(null) }
+    var baselineDone by remember { mutableStateOf(false) }
+    var iThrew by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val first = kotlinx.coroutines.withTimeoutOrNull(2_500) {
+            androidx.compose.runtime.snapshotFlow { dart }.first { it != null }
+        }
+        if (!iThrew) oldKey = first?.let { it.id + "#" + it.throwCount }
+        baselineDone = true
+    }
+    val freshDart = dart?.takeIf { (baselineDone || iThrew) && it.id + "#" + it.throwCount != oldKey }
     val me by vm.uid.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -126,7 +141,7 @@ fun DartGame(
     val pool = remember(scope, region, here, regionsReady, radiusKm) {
         Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, radiusKm).ifEmpty { Regions.all }
     }
-    val shown = dart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
+    val shown = freshDart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
     var flying by remember { mutableStateOf(false) }
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
 
@@ -171,6 +186,7 @@ fun DartGame(
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
                         onLanded = { lat, lng ->
+                            iThrew = true
                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) // the dart sticks
                             if (noPosition) vm.message.value = "위치를 몰라서 던질 수 없어요 · [지역]에서 시·도를 골라 주세요"
                             else vm.throwDartAt(context, scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm)

@@ -1,5 +1,6 @@
 package com.htb.carplan.car
 
+import kotlinx.coroutines.flow.first
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -102,6 +103,20 @@ fun CarDartGame(
     onPick: ((Place) -> Unit)? = null,
 ) {
     val dart by vm.dart.collectAsStateWithLifecycle()
+
+    // Every opening is a fresh board (정원 2026-11-02): the dart waits at the bottom for the player.
+    // An older result already in the room is not shown; throws made while the game is open are (mine or a friend's).
+    var oldKey by remember { mutableStateOf<String?>(null) }
+    var baselineDone by remember { mutableStateOf(false) }
+    var iThrew by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val first = kotlinx.coroutines.withTimeoutOrNull(2_500) {
+            androidx.compose.runtime.snapshotFlow { dart }.first { it != null }
+        }
+        if (!iThrew) oldKey = first?.let { it.id + "#" + it.throwCount }
+        baselineDone = true
+    }
+    val freshDart = dart?.takeIf { (baselineDone || iThrew) && it.id + "#" + it.throwCount != oldKey }
     val vehicle by vm.vehicle.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
     var regionsReady by remember { mutableStateOf(false) }
@@ -117,7 +132,7 @@ fun CarDartGame(
     val pool = remember(scope, region, here, regionsReady, radiusKm) {
         Regions.pool(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, radiusKm).ifEmpty { Regions.all }
     }
-    val shown = dart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
+    val shown = freshDart?.takeIf { it.scope == scope && (scope != DartScope.REGION || it.region == region) }
     var flying by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
@@ -153,7 +168,7 @@ fun CarDartGame(
                         pool = pool,
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
-                        onLanded = { lat, lng -> vm.throwDartAt(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm) },
+                        onLanded = { lat, lng -> iThrew = true; vm.throwDartAt(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm) },
                     )
                     androidx.compose.animation.AnimatedVisibility(
                         visible = shown != null && !flying,
