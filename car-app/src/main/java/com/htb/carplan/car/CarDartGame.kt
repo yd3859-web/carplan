@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -186,6 +187,8 @@ fun CarDartGame(
                         hit = shown?.let { HitSpot(it.resultLat, it.resultLng, it.id + "#" + it.throwCount) },
                         onFlying = { flying = it },
                         resetTick = resetTick,
+                        areaSido = if (scope == DartScope.REGION) region else null,
+                        near = if (scope == DartScope.NEAR) here?.let { Triple(it.first, it.second, radiusKm) } else null,
                         onLanded = { lat, lng -> iThrew = true; vm.throwDartAt(scope, here?.first, here?.second, if (scope == DartScope.REGION) region else null, lat, lng, radiusKm) },
                     )
                     androidx.compose.animation.AnimatedVisibility(
@@ -258,8 +261,11 @@ private data class HitSpot(val lat: Double, val lng: Double, val key: String)
 /** Simple projection with a fixed latitude correction; the camera (centre + px per degree) animates. */
 private const val COS_LAT = 0.80 // cos(36.5°)
 
-/** Boundary polylines from assets ("lng,lat;lng,lat…" per line) with a bounding box per line for culling. */
-private class GeoLines(val pts: List<FloatArray>, val box: List<FloatArray>)
+/**
+ * Boundary polylines from assets ("lng,lat;lng,lat…" per line) with a bounding box per line for culling.
+ * sgg_lines.txt lines start with "시도A|시도B|": the 시·도 on each side (B empty = sea/border, A = B = a line inside one 시·도).
+ */
+private class GeoLines(val pts: List<FloatArray>, val box: List<FloatArray>, val sideA: List<String>, val sideB: List<String>)
 
 private object MapAssets {
     @Volatile var sido: GeoLines? = null
@@ -270,8 +276,13 @@ private object MapAssets {
     }
     private fun read(context: android.content.Context, name: String): GeoLines {
         val pts = ArrayList<FloatArray>(); val box = ArrayList<FloatArray>()
-        context.assets.open(name).bufferedReader().forEachLine { line ->
-            if (line.isBlank()) return@forEachLine
+        val sideA = ArrayList<String>(); val sideB = ArrayList<String>()
+        context.assets.open(name).bufferedReader().forEachLine { raw ->
+            if (raw.isBlank()) return@forEachLine
+            val bar = raw.lastIndexOf('|')
+            val tags = if (bar < 0) emptyList() else raw.substring(0, bar).split('|')
+            sideA += tags.getOrElse(0) { "" }; sideB += tags.getOrElse(1) { "" }
+            val line = if (bar < 0) raw else raw.substring(bar + 1)
             val parts = line.split(';')
             val a = FloatArray(parts.size * 2)
             var minX = 999f; var minY = 999f; var maxX = -999f; var maxY = -999f
@@ -282,18 +293,27 @@ private object MapAssets {
             }
             pts += a; box += floatArrayOf(minX, minY, maxX, maxY)
         }
-        return GeoLines(pts, box)
+        return GeoLines(pts, box, sideA, sideB)
     }
 }
 
-private data class Label(val name: String, val lat: Double, val lng: Double)
+private data class Label(val name: String, val lat: Double, val lng: Double, val sido: String = "")
+
+/** 수원시장안구 → 장안구: on a 시·도 map the 구 name alone reads faster. */
+private fun shortSgg(s: String) = Regex("^(.+시)(.+구)$").find(s)?.groupValues?.get(2) ?: s
 
 /**
  * The board: only 시·도 outlines and their names (calm, readable). When a dart sticks, the camera dives into
  * that spot and the 시·군·구 lines, their names and the nearby 동네 names fade in — detail only where it matters.
  */
 @Composable
-private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Boolean) -> Unit, onLanded: (Double, Double) -> Unit, resetTick: Int = 0) {
+private fun DotMapBoard(
+    pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Boolean) -> Unit, onLanded: (Double, Double) -> Unit, resetTick: Int = 0,
+    /** 지역: that 시·도 drawn as its own map — its outline and its 시·군·구 (대구 → 동구·서구·수성구…), nothing else. */
+    areaSido: String? = null,
+    /** 내 위치: (lat, lng, km) — 시·군·구 lines and names around, and the km circle. */
+    near: Triple<Double, Double, Double>? = null,
+) {
     val context = LocalContext.current
     var assetsReady by remember { mutableStateOf(MapAssets.sgg != null) }
     LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { MapAssets.load(context) }; assetsReady = true }
@@ -303,18 +323,22 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
     val cTeal = colors.accent; val cNavy = colors.ink; val cSoft = colors.soft; val cLine = colors.line
     val cOff = colors.railPassed; val cDot = colors.soft
     val dartColors = DartColors(barrel = colors.ink, shaft = if (colors.dark) Color(0xFFD0D4D8) else Color(0xFF2B2F33), flight = colors.accent)
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
         val w = with(density) { maxWidth.toPx() }; val h = with(density) { maxHeight.toPx() }
         val boardH = h * 0.86f
         val all = Regions.all
         val sidoLabels = remember(all.size) { all.groupBy { it.sido }.map { (k, v) -> Label(shortSido(k), v.map { it.lat }.average(), v.map { it.lng }.average()) } }
-        val sggLabels = remember(all.size) { all.groupBy { it.sido + "|" + it.sigungu }.map { (_, v) -> Label(v.first().sigungu, v.map { it.lat }.average(), v.map { it.lng }.average()) } }
+        val sggLabels = remember(all.size) { all.groupBy { it.sido + "|" + it.sigungu }.map { (_, v) -> Label(shortSgg(v.first().sigungu), v.map { it.lat }.average(), v.map { it.lng }.average(), v.first().sido) } }
+        // 지역·내 위치: a map of its own (시·군·구 from the start) instead of the national map zoomed in.
+        val localMap = areaSido != null || near != null
         val poolSidos = remember(pool) { pool.map { shortSido(it.sido) }.toSet() }
 
         // Scope framing (whole pool) and detail framing (the dart's 동네).
-        val south = pool.minOf { it.lat }; val north = pool.maxOf { it.lat }
-        val west = pool.minOf { it.lng }; val east = pool.maxOf { it.lng }
+        // 내 위치 frames the whole km circle (not just the 동네 centres inside it).
+        val nearLat = near?.let { it.third / 111.0 }; val nearLng = near?.let { it.third / (111.0 * COS_LAT) }
+        val south = if (near != null) near.first - nearLat!! else pool.minOf { it.lat }; val north = if (near != null) near.first + nearLat!! else pool.maxOf { it.lat }
+        val west = if (near != null) near.second - nearLng!! else pool.minOf { it.lng }; val east = if (near != null) near.second + nearLng!! else pool.maxOf { it.lng }
         val spanLng = max(0.05, east - west); val spanLat = max(0.05, north - south)
         val scopeK = min(w * 0.86 / (spanLng * COS_LAT), boardH * 0.86 / spanLat).toFloat()
         val detailK = max(scopeK * 2.2f, boardH / 0.6f) // about 65 km tall around the hit
@@ -396,10 +420,11 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
         Canvas(Modifier.fillMaxSize()) {
             val viewW0 = camLng.value - (w / 2) / (camK.value * COS_LAT); val viewW1 = camLng.value + (w / 2) / (camK.value * COS_LAT)
             val viewS0 = camLat.value - (boardH / 2) / camK.value; val viewS1 = camLat.value + (boardH / 2) / camK.value
-            fun drawLines(g: GeoLines?, color: Color, width: Float) {
+            fun drawLines(g: GeoLines?, color: Color, width: Float, keep: (Int) -> Boolean = { true }) {
                 g ?: return
                 val path = Path()
                 g.pts.forEachIndexed { i, a ->
+                    if (!keep(i)) return@forEachIndexed
                     val b = g.box[i]
                     if (b[2] < viewW0 || b[0] > viewW1 || b[3] < viewS0 || b[1] > viewS1) return@forEachIndexed
                     var k = 0
@@ -411,15 +436,39 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                 }
                 drawPath(path, color, style = Stroke(width, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
             }
-            if (assetsReady) {
+            val sgg = MapAssets.sgg
+            if (assetsReady && sgg != null && areaSido != null) {
+                // 지역 map: only this 시·도 — thin 시·군·구 lines inside, a bold outline around.
+                drawLines(sgg, ink.copy(alpha = 0.45f * appear.value), 1.2.dp.toPx()) { i -> sgg.sideA[i] == areaSido && sgg.sideB[i] == areaSido }
+                drawLines(sgg, ink.copy(alpha = 0.85f * appear.value), 2.dp.toPx()) { i -> (sgg.sideA[i] == areaSido || sgg.sideB[i] == areaSido) && sgg.sideA[i] != sgg.sideB[i] }
+            } else if (assetsReady && sgg != null && near != null) {
+                // 내 위치 map: 시·군·구 lines all around, 시·도 borders and the coast bolder.
+                drawLines(sgg, ink.copy(alpha = 0.4f * appear.value), 1.2.dp.toPx()) { i -> sgg.sideA[i] == sgg.sideB[i] }
+                drawLines(sgg, ink.copy(alpha = 0.8f * appear.value), 1.8.dp.toPx()) { i -> sgg.sideA[i] != sgg.sideB[i] }
+            } else if (assetsReady) {
                 // Overview: coarse 시·도 outline. Dived in: the finer 시·군·구 lines (coast included) take over.
                 if (detail > 0f) drawLines(MapAssets.sgg, ink.copy(alpha = 0.55f * detail * appear.value), 1.2.dp.toPx())
                 if (detail < 1f) drawLines(MapAssets.sido, ink.copy(alpha = 0.75f * (1f - detail) * appear.value), 1.6.dp.toPx())
             }
-            // NEAR scope: the 100 km circle
-            // names
+            // names (a name that would overlap one already drawn is skipped, so a dense 시·도 stays readable)
+            val placed = ArrayList<androidx.compose.ui.geometry.Rect>()
+            fun fits(at: Offset, sz: androidx.compose.ui.unit.IntSize): Boolean {
+                val r = androidx.compose.ui.geometry.Rect(at, androidx.compose.ui.geometry.Size(sz.width.toFloat(), sz.height.toFloat())).inflate(2.dp.toPx())
+                if (placed.any { it.overlaps(r) }) return false
+                placed += r; return true
+            }
+            // 내 위치: the km circle and where the car is.
+            if (near != null) {
+                val c = toScreen(near.first, near.second)
+                val r = (near.third / 111.0 * camK.value).toFloat()
+                drawCircle(ink.copy(alpha = 0.5f * appear.value), r, c, style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f))))
+                drawCircle(ink.copy(alpha = appear.value), 6.dp.toPx(), c)
+                val m = measurer.measure("여기", androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ink.copy(alpha = appear.value)))
+                fits(c - Offset(8.dp.toPx(), 8.dp.toPx()), androidx.compose.ui.unit.IntSize(m.size.width + 20.dp.toPx().toInt(), m.size.height))
+                drawText(m, topLeft = c + Offset(10.dp.toPx(), -m.size.height / 2f))
+            }
             val big = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = cSoft)
-            if (detail < 1f) sidoLabels.forEach { l ->
+            if (!localMap && detail < 1f) sidoLabels.forEach { l ->
                 val p = toScreen(l.lat, l.lng)
                 if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
                 val on = l.name in poolSidos
@@ -427,15 +476,9 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                 val m = measurer.measure(l.name, st)
                 drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
             }
-            if (detail > 0f) {
-                sggLabels.forEach { l ->
-                    val p = toScreen(l.lat, l.lng)
-                    if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
-                    val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold, color = cSoft.copy(alpha = detail)))
-                    drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
-                }
-                val st = stuck
-                if (st != null) all.asSequence()
+            // The dart's 동네 and its neighbours go first so they always win a crowded spot.
+            val st = stuck
+            if (detail > 0f && st != null) (if (localMap) pool else all).asSequence()
                     .map { it to RouteMathDeg(it.lat, it.lng, st.first, st.second) }
                     .sortedBy { it.second }.take(14).forEach { (rg, _) ->
                         val p = toScreen(rg.lat, rg.lng)
@@ -443,8 +486,18 @@ private fun DotMapBoard(pool: List<Regions.Region>, hit: HitSpot?, onFlying: (Bo
                         val isHit = hit != null && kotlin.math.abs(rg.lat - hit.lat) < 1e-6 && kotlin.math.abs(rg.lng - hit.lng) < 1e-6
                         drawCircle((if (isHit) cTeal else cDot).copy(alpha = detail), (if (isHit) 6 else 3).dp.toPx(), p)
                         val m = measurer.measure(rg.dong ?: rg.sigungu, androidx.compose.ui.text.TextStyle(fontSize = if (isHit) 20.sp else 13.sp, fontWeight = if (isHit) FontWeight.Black else FontWeight.Normal, color = (if (isHit) ink else cSoft).copy(alpha = detail)))
-                        drawText(m, topLeft = p + Offset(8.dp.toPx(), -m.size.height / 2f))
+                        if (fits(p + Offset(8.dp.toPx(), -m.size.height / 2f), m.size)) drawText(m, topLeft = p + Offset(8.dp.toPx(), -m.size.height / 2f))
                     }
+            val sggAlpha = if (localMap) appear.value else detail
+            if (sggAlpha > 0f) sggLabels.forEach { l ->
+                if (areaSido != null && l.sido != areaSido) return@forEach
+                // 내 위치: names outside the km circle stay faint (the dart can't land there).
+                val inside = near == null || RouteMathDeg(l.lat, l.lng, near.first, near.second) <= (near.third / 111.0).let { it * it }
+                val p = toScreen(l.lat, l.lng)
+                if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
+                val m = measurer.measure(l.name, androidx.compose.ui.text.TextStyle(fontSize = if (localMap) 20.sp else 16.sp, fontWeight = FontWeight.Bold, color = (if (localMap) ink else cSoft).copy(alpha = sggAlpha * (if (inside) 1f else 0.35f))))
+                val at = p - Offset(m.size.width / 2f, m.size.height / 2f)
+                if (fits(at, m.size)) drawText(m, topLeft = at)
             }
             // impact ripple
             val sp = stuck?.let { toScreen(it.first, it.second) }
