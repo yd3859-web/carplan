@@ -154,6 +154,8 @@ fun DartGame(
         resetTick++
     }
     var flying by remember { mutableStateOf(false) }
+    // 지도 가리기 (정원 2026-11-03): throw blind, the map shows once the dart sticks.
+    var hideMap by remember { mutableStateOf(false) }
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -164,7 +166,7 @@ fun DartGame(
                     IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "닫기", tint = Palette.TextStrong) }
                     Column(Modifier.weight(1f)) {
                         Text("다트 — 동네 뽑기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                        Text("아래 다트를 잡고 당겼다 놓으세요. 당긴 반대쪽으로 날아가 꽂힌 곳 가까운 동네가 뽑혀요", fontSize = 15.sp, color = Palette.TextSoft)
+                        Text("다트가 좌우로 흔들려요. 당겼다 놓는 순간의 방향으로 날아가고, 세게 당길수록 멀리 가요", fontSize = 15.sp, color = Palette.TextSoft)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
@@ -173,6 +175,7 @@ fun DartGame(
                             scope = DartScope.NEAR
                         }
                         ScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
+                        ScopeChip("지도 가리기", hideMap) { hideMap = !hideMap }
                         // Its place is always kept (hidden until there is a result) so the chips never jump under a finger.
                         val canAgain = shown != null && !flying
                         OutlinedButton(
@@ -204,6 +207,7 @@ fun DartGame(
                         onFlying = { flying = it },
                         resetTick = resetTick,
                         areaSido = if (scope == DartScope.REGION) region else null,
+                        hideMap = hideMap,
                         near = if (scope == DartScope.NEAR) here?.let { Triple(it.first, it.second, radiusKm) } else null,
                         onLanded = { lat, lng ->
                             iThrew = true
@@ -345,6 +349,8 @@ private fun DotMapBoard(
     areaSido: String? = null,
     /** 내 위치: (lat, lng, km) — 시·군·구 lines and names around, and the km circle. */
     near: Triple<Double, Double, Double>? = null,
+    /** 지도 가리기: lines and names stay hidden until the dart sticks. */
+    hideMap: Boolean = false,
 ) {
     val context = LocalContext.current
     var assetsReady by remember { mutableStateOf(MapAssets.sgg != null) }
@@ -394,7 +400,6 @@ private fun DotMapBoard(
         val launchAt = Offset(w / 2, h - with(density) { 200.dp.toPx() })
         // How far the dart is drawn back: follows the finger, up to a slingshot's reach.
         val maxBack = with(density) { 60.dp.toPx() }
-        fun backOf(p: Offset): Offset { val d = p.getDistance(); return if (d == 0f) p else p / d * min(d * 0.6f, maxBack) }
         var pull by remember { mutableStateOf<Offset?>(null) }
         val fly = remember { Animatable(0f) }
         val wobble = remember { Animatable(0f) }
@@ -408,7 +413,38 @@ private fun DotMapBoard(
         val springBack = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
         val grabRadius = with(density) { 120.dp.toPx() }
         val minPull = with(density) { 40.dp.toPx() }
+        // The dart sways left and right in a fan (정원 2026-11-03): you can't aim at a place, only pick the moment and the power.
+        val swingMax = 50f
+        var swingDeg by remember { mutableStateOf(0f) }
+        LaunchedEffect(Unit) {
+            val t0 = androidx.compose.runtime.withFrameNanos { it }
+            while (true) androidx.compose.runtime.withFrameNanos { n ->
+                if (!flying && stuck == null) swingDeg = (sin((n - t0) / 1e9 * 2 * PI / 1.8) * swingMax).toFloat()
+            }
+        }
+        fun swingDir(): Offset { val a = Math.toRadians(-90.0 + swingDeg); return Offset(kotlin.math.cos(a).toFloat(), sin(a).toFloat()) }
+        // How far the dart is drawn back: with the finger, up to a slingshot's reach, straight behind where it points.
+        fun backOf(p: Offset): Offset = swingDir() * -min(p.getDistance() * 0.6f, maxBack)
+        // 지도 가리기: hidden until the dart sticks, then the map fades in.
+        val reveal = remember { Animatable(if (hideMap) 0f else 1f) }
+        LaunchedEffect(stuck != null, hideMap) { if (stuck != null || !hideMap) reveal.animateTo(1f, tween(700)) else reveal.snapTo(0f) }
 
+        // The dart never lands outside the range (정원 2026-11-03): 내 위치 = inside the km circle,
+        // 지역 = inside that 시·도, 전국 = on land. A throw that would go out lands on the edge / the nearest 동네 inside.
+        fun keepInside(t: Offset): Offset {
+            if (near != null) {
+                val c = toScreen(near.first, near.second)
+                val r = (near.third / 111.0 * camK.value).toFloat() * 0.96f
+                val d = t - c
+                return if (d.getDistance() <= r) t else c + d / d.getDistance() * r
+            }
+            val (la, lo) = toGeo(t)
+            val anyNear = Regions.nearest(la, lo, Regions.all)
+            val inside = anyNear != null && RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < 0.06 * 0.06 && (areaSido == null || anyNear.sido == areaSido)
+            if (inside) return t
+            val n = Regions.nearest(la, lo, pool) ?: return t
+            return toScreen(n.lat, n.lng)
+        }
         suspend fun throwTo(target: Offset, ms: Int, from: Offset = launchAt) {
             flying = true; onFlying(true)
             flightFrom = from; flightTo = target; stuck = null
@@ -447,6 +483,7 @@ private fun DotMapBoard(
         Canvas(Modifier.fillMaxSize()) {
             val viewW0 = camLng.value - (w / 2) / (camK.value * COS_LAT); val viewW1 = camLng.value + (w / 2) / (camK.value * COS_LAT)
             val viewS0 = camLat.value - (boardH / 2) / camK.value; val viewS1 = camLat.value + (boardH / 2) / camK.value
+            val mapA = appear.value * reveal.value
             fun drawLines(g: GeoLines?, color: Color, width: Float, keep: (Int) -> Boolean = { true }) {
                 g ?: return
                 val path = Path()
@@ -466,16 +503,16 @@ private fun DotMapBoard(
             val sgg = MapAssets.sgg
             if (assetsReady && sgg != null && areaSido != null) {
                 // 지역 map: only this 시·도 — thin 시·군·구 lines inside, a bold outline around.
-                drawLines(sgg, ink.copy(alpha = 0.45f * appear.value), 1.2.dp.toPx()) { i -> sgg.sideA[i] == areaSido && sgg.sideB[i] == areaSido }
-                drawLines(sgg, ink.copy(alpha = 0.85f * appear.value), 2.dp.toPx()) { i -> (sgg.sideA[i] == areaSido || sgg.sideB[i] == areaSido) && sgg.sideA[i] != sgg.sideB[i] }
+                drawLines(sgg, ink.copy(alpha = 0.45f * mapA), 1.2.dp.toPx()) { i -> sgg.sideA[i] == areaSido && sgg.sideB[i] == areaSido }
+                drawLines(sgg, ink.copy(alpha = 0.85f * mapA), 2.dp.toPx()) { i -> (sgg.sideA[i] == areaSido || sgg.sideB[i] == areaSido) && sgg.sideA[i] != sgg.sideB[i] }
             } else if (assetsReady && sgg != null && near != null) {
                 // 내 위치 map: 시·군·구 lines all around, 시·도 borders and the coast bolder.
-                drawLines(sgg, ink.copy(alpha = 0.4f * appear.value), 1.2.dp.toPx()) { i -> sgg.sideA[i] == sgg.sideB[i] }
-                drawLines(sgg, ink.copy(alpha = 0.8f * appear.value), 1.8.dp.toPx()) { i -> sgg.sideA[i] != sgg.sideB[i] }
+                drawLines(sgg, ink.copy(alpha = 0.4f * mapA), 1.2.dp.toPx()) { i -> sgg.sideA[i] == sgg.sideB[i] }
+                drawLines(sgg, ink.copy(alpha = 0.8f * mapA), 1.8.dp.toPx()) { i -> sgg.sideA[i] != sgg.sideB[i] }
             } else if (assetsReady) {
                 // Overview: coarse 시·도 outline. Dived in: the finer 시·군·구 lines (coast included) take over.
-                if (detail > 0f) drawLines(MapAssets.sgg, ink.copy(alpha = 0.55f * detail * appear.value), 1.2.dp.toPx())
-                if (detail < 1f) drawLines(MapAssets.sido, ink.copy(alpha = 0.75f * (1f - detail) * appear.value), 1.6.dp.toPx())
+                if (detail > 0f) drawLines(MapAssets.sgg, ink.copy(alpha = 0.55f * detail * mapA), 1.2.dp.toPx())
+                if (detail < 1f) drawLines(MapAssets.sido, ink.copy(alpha = 0.75f * (1f - detail) * mapA), 1.6.dp.toPx())
             }
             // names (a name that would overlap one already drawn is skipped, so a dense 시·도 stays readable)
             val placed = ArrayList<androidx.compose.ui.geometry.Rect>()
@@ -488,9 +525,9 @@ private fun DotMapBoard(
             if (near != null) {
                 val c = toScreen(near.first, near.second)
                 val r = (near.third / 111.0 * camK.value).toFloat()
-                drawCircle(ink.copy(alpha = 0.5f * appear.value), r, c, style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f))))
-                drawCircle(ink.copy(alpha = appear.value), 6.dp.toPx(), c)
-                val m = measurer.measure("여기", androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ink.copy(alpha = appear.value)))
+                drawCircle(ink.copy(alpha = 0.5f * mapA), r, c, style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(16f, 12f))))
+                drawCircle(ink.copy(alpha = mapA), 6.dp.toPx(), c)
+                val m = measurer.measure("여기", androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ink.copy(alpha = mapA)))
                 fits(c - Offset(8.dp.toPx(), 8.dp.toPx()), androidx.compose.ui.unit.IntSize(m.size.width + 20.dp.toPx().toInt(), m.size.height))
                 drawText(m, topLeft = c + Offset(10.dp.toPx(), -m.size.height / 2f))
             }
@@ -499,7 +536,7 @@ private fun DotMapBoard(
                 val p = toScreen(l.lat, l.lng)
                 if (p.x < 0 || p.x > w || p.y < 0 || p.y > boardH) return@forEach
                 val on = l.name in poolSidos
-                val st = big.copy(color = (if (on) ink else Color(0xFFB9BEC4)).copy(alpha = (1f - detail) * appear.value), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+                val st = big.copy(color = (if (on) ink else Color(0xFFB9BEC4)).copy(alpha = (1f - detail) * mapA), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
                 val m = measurer.measure(l.name, st)
                 drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
             }
@@ -515,7 +552,7 @@ private fun DotMapBoard(
                         val m = measurer.measure(rg.dong ?: rg.sigungu, androidx.compose.ui.text.TextStyle(fontSize = if (isHit) 20.sp else 13.sp, fontWeight = if (isHit) FontWeight.Black else FontWeight.Normal, color = (if (isHit) ink else Palette.TextSoft).copy(alpha = detail)))
                         if (fits(p + Offset(8.dp.toPx(), -m.size.height / 2f), m.size)) drawText(m, topLeft = p + Offset(8.dp.toPx(), -m.size.height / 2f))
                     }
-            val sggAlpha = if (localMap) appear.value else detail
+            val sggAlpha = if (localMap) mapA else detail
             if (sggAlpha > 0f) sggLabels.forEach { l ->
                 if (areaSido != null && l.sido != areaSido) return@forEach
                 // 내 위치: names outside the km circle stay faint (the dart can't land there).
@@ -533,6 +570,10 @@ private fun DotMapBoard(
                 drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.8f), r, sp, style = Stroke(3.dp.toPx()))
                 drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.35f), r * 0.55f, sp, style = Stroke(2.dp.toPx()))
             }
+            if (reveal.value < 1f) {
+                val m = measurer.measure("지도를 가렸어요 · 꽂히면 보여요", androidx.compose.ui.text.TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink.copy(alpha = 0.45f * (1f - reveal.value))))
+                drawText(m, topLeft = Offset(w / 2 - m.size.width / 2f, boardH * 0.38f))
+            }
             drawLine(Palette.Line, Offset(0f, boardH), Offset(w, boardH), 1.dp.toPx())
         }
 
@@ -548,19 +589,19 @@ private fun DotMapBoard(
                         val p = pull; pull = null
                         if (p == null || flying) return@detectDragGestures
                         if (p.getDistance() < minPull) { cs.launch { springBack.snapTo(backOf(p)); springBack.animateTo(Offset.Zero, spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessMedium)) }; return@detectDragGestures }
+                        val dir = swingDir(); val back = backOf(p) // where it pointed the moment it was let go
                         cs.launch {
                             // let the camera finish zooming back out before the dart leaves the hand
                             while (camK.isRunning) kotlinx.coroutines.delay(16)
                             val reach = launchAt.y - boardH * 0.04f
                             val power = min(1f, p.getDistance() / (h * 0.40f))
-                            val dir = Offset(-p.x, -p.y) / p.getDistance()
                             val shake = Offset(gauss() * w * 0.008f, gauss() * boardH * 0.01f) // a little hand shake; it lands near the aim circle
                             val target = Offset(
                                 (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
                             )
                             // Released from where it was drawn back: the dart snaps forward out of the band.
-                            throwTo(target, 560, from = launchAt + backOf(p))
+                            throwTo(keepInside(target), 560, from = launchAt + back)
                             val (lat, lng) = toGeo(target)
                             onLanded(lat, lng)
                         }
@@ -572,9 +613,14 @@ private fun DotMapBoard(
         // aim guide + dart
         Canvas(Modifier.fillMaxSize()) {
             val p = pull
+            // The fan the dart sways in, while it is in the hand.
+            if (!flying && stuck == null) {
+                val fr = 120.dp.toPx()
+                drawArc(ink.copy(alpha = 0.2f), -90f - swingMax, swingMax * 2, true, launchAt - Offset(fr, fr), androidx.compose.ui.geometry.Size(fr * 2, fr * 2), style = Stroke(1.5.dp.toPx()))
+            }
             if (p != null && p.getDistance() > 8f) {
                 val power = min(1f, p.getDistance() / (size.height * 0.40f))
-                val dir = Offset(-p.x, -p.y) / p.getDistance()
+                val dir = swingDir()
                 val end = launchAt + dir * (launchAt.y - boardH * 0.04f) * power
                 drawLine(Palette.Teal, launchAt, end, 3.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
                 drawCircle(Palette.Teal, 14.dp.toPx(), end, style = Stroke(2.dp.toPx()))
@@ -588,7 +634,7 @@ private fun DotMapBoard(
                     val b = backOf(p)
                     val tremble = if (power > 0.85f) Offset(sin(System.nanoTime() / 2e7).toFloat(), 0f) * 2.dp.toPx() else Offset.Zero
                     val at = launchAt + b + tremble
-                    val heading = atan2(-p.y, -p.x)
+                    val heading = Math.toRadians(-90.0 + swingDeg).toFloat()
                     val tail = at - Offset(kotlin.math.cos(heading), sin(heading)) * 60.dp.toPx() * (1.5f + 0.2f * power) / 1.5f
                     val side = 46.dp.toPx()
                     listOf(launchAt + Offset(-side, 0f), launchAt + Offset(side, 0f)).forEach { a ->
@@ -613,7 +659,7 @@ private fun DotMapBoard(
                     val sp = toScreen(stuck!!.first, stuck!!.second)
                     drawDart(sp, atan2(sp.y - launchAt.y, sp.x - launchAt.x), 0.75f + 0.25f * detail, wobble.value)
                 }
-                else -> drawDart(launchAt + springBack.value, (-PI / 2).toFloat(), 1.5f)
+                else -> drawDart(launchAt + springBack.value, Math.toRadians(-90.0 + swingDeg).toFloat(), 1.5f)
             }
         }
     }
