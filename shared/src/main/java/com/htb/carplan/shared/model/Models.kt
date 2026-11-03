@@ -354,8 +354,12 @@ data class Dart(
     @ServerTimestamp val thrownAt: Timestamp? = null,
 )
 
-/** What a chat line is: words, or a card the app posts (다트 결과 · 투표 열림 · 투표 마감). */
-enum class ChatKind { TEXT, DART, VOTE_OPEN, VOTE_CLOSED }
+/**
+ * What a chat line is: words, or a card. New kinds go at the end (Firestore stores the name).
+ * PLACE = 장소 보내기 / 칸에서 "여기 어때?" · CHANGE = 칸 넣음·뺌 묶음 · PICKUP = 픽업 도착·탑승 ·
+ * ARRIVED = 도착해 기록 칸 · DAY_DONE = 하루 끝 · COMMENT = 칸 코멘트. CHANGE부터는 Functions가 씀(같이 가는 그룹만).
+ */
+enum class ChatKind { TEXT, DART, VOTE_OPEN, VOTE_CLOSED, PLACE, CHANGE, PICKUP, ARRIVED, DAY_DONE, COMMENT }
 
 /**
  * groups/{gid}/chat/{id} — 여행별 채팅방 (정원 2026-11-03 A안): one room per group, so a trip's own group

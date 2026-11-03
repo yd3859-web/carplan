@@ -127,7 +127,8 @@ exports.maintenanceDue = onSchedule({ schedule: "0 9 * * *", timeZone: "Asia/Seo
 // 여행별 채팅방 (A안 2026-11-03): 새 말·다트 카드 → 보낸 사람 빼고 그룹 전원. 투표 카드는 onVoteWritten이 이미 알려서 뺀다.
 exports.onChatCreated = onDocumentCreated("groups/{gid}/chat/{mid}", async (event) => {
   const m = event.data.data();
-  if (!m || m.kind === "VOTE_OPEN" || m.kind === "VOTE_CLOSED") return;
+  // 사람이 보낸 것만 알림: 말·다트·장소·칸 코멘트. 나머지 카드(투표·칸 변경·픽업·도착·하루 끝)는 원래 푸시가 있거나 조용히.
+  if (!m || !["TEXT", "DART", "PLACE", "COMMENT"].includes(m.kind)) return;
   const gid = event.params.gid;
   const group = await db.doc(`groups/${gid}`).get();
   // 누르면 그 여행 화면으로: 날짜가 없으면 여행 첫날
@@ -136,7 +137,90 @@ exports.onChatCreated = onDocumentCreated("groups/{gid}/chat/{mid}", async (even
   if (eventId && !date) date = (await db.doc(`groups/${gid}/events/${eventId}`).get()).get("startDate") || null;
   const who = await nameOf(m.uid);
   const title = group.get("name") || "채팅";
-  const body = m.kind === "DART" ? `${who}님이 다트 결과를 올렸어요 · ${m.text}` : `${who}: ${m.text}`;
+  const body = m.kind === "DART" ? `${who}님이 다트 결과를 올렸어요 · ${m.text}`
+    : m.kind === "PLACE" ? `${who}: ${(m.lines || [])[0] || "장소"} · ${m.text}`
+    : m.kind === "COMMENT" ? `${who} · ${(m.lines || [])[0] || "칸"}: ${m.text}`
+    : `${who}: ${m.text}`;
   const tokens = await groupTokens(gid, m.uid);
   await push(tokens, title, body, eventId && date ? { groupId: gid, eventId, date } : { groupId: gid });
+});
+
+// ---------- 채팅 자동 카드 (A안 2026-11-03): 앱에서 생긴 일을 그 여행 채팅방에. 같이 가는 그룹(2명 이상)만 ----------
+const { FieldValue } = require("firebase-admin/firestore");
+
+async function sharedGroup(gid) {
+  const g = await db.doc(`groups/${gid}`).get();
+  return (g.get("memberIds") || []).length > 1 ? g : null;
+}
+
+/** id가 같은 카드는 덮어씀(merge) — 같은 일이 두 번 와도 카드는 하나. */
+async function chatCard(gid, id, card, merge = false) {
+  await db.doc(`groups/${gid}/chat/${id}`).set({ ...card, createdAt: FieldValue.serverTimestamp() }, { merge });
+}
+
+// 칸 넣음 · 뺌 · 되살림 → 한 사람이 5분 안에 한 것은 카드 한 장으로 묶음
+exports.chatOnStopChanged = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}/stops/{sid}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (!after) return;
+  let what = null;
+  if (!before && !after.deleted) what = "넣음";
+  else if (before && !before.deleted && after.deleted) what = "뺌";
+  else if (before && before.deleted && !after.deleted) what = "되살림";
+  if (!what) return;
+  // 첫 초대 때 일정이 전용 그룹으로 옮겨지며 칸이 복사됨 → 예전에 만든 칸은 "넣음"이 아님
+  if (what === "넣음" && after.updatedAt?.toMillis && Date.now() - after.updatedAt.toMillis() > 2 * 60 * 1000) return;
+  const { gid, eid, date } = event.params;
+  if (!(await sharedGroup(gid))) return;
+  const who = after.updatedBy || after.createdBy || "";
+  const bucket = Math.floor(Date.now() / (5 * 60 * 1000));
+  await chatCard(gid, `change-${date}-${who}-${bucket}`, {
+    uid: who, kind: "CHANGE", text: "", eventId: eid, date,
+    lines: FieldValue.arrayUnion(`${after.place?.name || "장소"} ${what}`),
+  }, true);
+});
+
+// 픽업: 차가 도착 · 탔어요
+exports.chatOnPickup = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}/pickups/{uid}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (!after) return;
+  const { gid, eid, date, uid } = event.params;
+  const name = after.name || (await nameOf(uid));
+  const place = after.place?.name || "픽업 장소";
+  let card = null;
+  if (after.arrivedAt && !before?.arrivedAt) card = { id: `pickup-${date}-${uid}-arrived`, text: `차가 ${place}에 도착했어요`, lines: [`${name}님 태우러`] };
+  else if (after.status === "ON_BOARD" && before?.status !== "ON_BOARD") card = { id: `pickup-${date}-${uid}-board`, text: `${name}님이 탔어요`, lines: [place] };
+  if (!card || !(await sharedGroup(gid))) return;
+  await chatCard(gid, card.id, { uid, kind: "PICKUP", text: card.text, lines: card.lines, eventId: eid, date });
+});
+
+// 도착해 기록 칸이 열림 → "○○ 도착" [사진·한 줄 남기기]
+exports.chatOnArrived = onDocumentCreated("groups/{gid}/events/{eid}/days/{date}/records/{rid}", async (event) => {
+  const r = event.data.data();
+  const { gid, eid, date, rid } = event.params;
+  if (!(await sharedGroup(gid))) return;
+  const name = r.place?.name || "어딘가";
+  await chatCard(gid, `arrived-${date}-${rid}`, { uid: "", kind: "ARRIVED", text: `${name} 도착`, place: r.place || null, refId: rid, lines: r.unplanned ? ["계획 밖에 들른 곳"] : [], eventId: eid, date });
+});
+
+// 하루 끝(그날 상태 DONE) → "오늘 n곳 다녀왔어요" [하루 카드 만들기]
+exports.chatOnDayDone = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (!after || after.status !== "DONE" || before?.status === "DONE") return;
+  const { gid, eid, date } = event.params;
+  if (!(await sharedGroup(gid))) return;
+  const records = await db.collection(`groups/${gid}/events/${eid}/days/${date}/records`).get();
+  const names = records.docs.map((d) => d.get("place")?.name).filter(Boolean);
+  await chatCard(gid, `daydone-${date}`, { uid: "", kind: "DAY_DONE", text: `오늘 ${names.length}곳 다녀왔어요`, lines: names.length ? [names.join(" → ")] : [], eventId: eid, date });
+});
+
+// 칸 코멘트 → 채팅에도 한 줄 (대화가 두 곳으로 갈라지지 않게)
+exports.chatOnComment = onDocumentCreated("groups/{gid}/events/{eid}/days/{date}/comments/{cid}", async (event) => {
+  const c = event.data.data();
+  const { gid, eid, date, cid } = event.params;
+  if (!c?.text || !(await sharedGroup(gid))) return;
+  const stop = c.stopId ? await db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${c.stopId}`).get() : null;
+  await chatCard(gid, `comment-${cid}`, { uid: c.uid || "", kind: "COMMENT", text: c.text, refId: c.stopId || null, lines: [stop?.get("place")?.name || "칸"], eventId: eid, date });
 });

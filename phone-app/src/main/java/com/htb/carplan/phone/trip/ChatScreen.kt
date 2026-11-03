@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,14 +68,31 @@ object ChatSeen {
         lines.count { it.uid != me && (it.createdAt?.toDate()?.time ?: 0L) > seen }
 }
 
+/** What the chat can ask the trip screen to do — 우리 앱 기능을 채팅에서 바로 (A안 2026-11-03). */
+class ChatActions(
+    /** null while the trip is locked (운전자 폰 주행 중). */
+    val addStop: ((Place) -> Unit)?,
+    /** Open the place search (optionally with words already typed) and hand back the pick. */
+    val pickPlace: (query: String, onPick: (Place) -> Unit) -> Unit,
+    /** Open a vote, with these places as the first candidates (empty = blank vote / see the votes). */
+    val openVote: (List<Place>) -> Unit,
+    val openDart: () -> Unit,
+    val openPickup: () -> Unit,
+    /** Close the chat and show that day's rail. */
+    val showDay: (date: String?) -> Unit,
+    /** Close the chat, show that day and open 내보내기. */
+    val exportDay: (date: String?) -> Unit,
+)
+
 /**
- * 여행별 채팅방 (정원 2026-11-03 A안). Words plus the app's cards: 다트 결과 ([칸으로]), 투표 열림 ([투표하기]),
- * 투표 마감 (이긴 곳 [칸으로]). Full screen over the trip; the car never shows it.
+ * 여행별 채팅방 (정원 2026-11-03 A안). Words plus the app's cards — 다트·장소 ([칸으로]·[투표 후보로]),
+ * 투표 ([투표하기]·이긴 곳 [칸으로]), 칸 변경·코멘트 ([레일에서 보기]), 도착 ([사진·한 줄]), 하루 끝 ([하루 카드]).
+ * [+] opens 장소·투표·다트·픽업 right from the chat. Full screen over the trip; the car never shows it.
  */
 @Composable
 fun ChatScreen(
-    groupId: String, eventId: String?, title: String, me: String?, nameOf: (String?) -> String,
-    onAddStop: ((Place) -> Unit)?, onOpenVote: () -> Unit, onDismiss: () -> Unit,
+    groupId: String, eventId: String?, date: String?, title: String, me: String?, nameOf: (String?) -> String,
+    actions: ChatActions, onDismiss: () -> Unit,
 ) {
     val repo = remember { ChatRepository() }
     val lines by remember(groupId) { repo.observe(groupId) }.collectAsStateWithLifecycle(emptyList())
@@ -81,6 +100,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var added by remember { mutableStateOf(setOf<String>()) }
+    var plus by remember { mutableStateOf(false) }
     val list = rememberLazyListState()
     // Newest at the bottom; follow it as lines arrive, and count them as read.
     LaunchedEffect(lines.size) { if (lines.isNotEmpty()) list.animateScrollToItem(lines.lastIndex); ChatSeen.mark(context, groupId) }
@@ -89,6 +109,11 @@ fun ChatScreen(
         text = ""
         scope.launch { runCatching { repo.send(groupId, me, t, eventId) } }
     }
+    fun postPlace(p: Place) { if (me != null) scope.launch { runCatching { repo.sharePlace(groupId, me, p, eventId, date) } } }
+    // Places talked about since the last vote opened → one tap makes them a vote.
+    val lastVote = lines.indexOfLast { it.kind == ChatKind.VOTE_OPEN }
+    val talkedPlaces = lines.drop(lastVote + 1).filter { it.kind == ChatKind.PLACE || it.kind == ChatKind.DART }
+        .mapNotNull { it.place }.distinctBy { it.name }.takeLast(5)
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN) {
@@ -99,23 +124,48 @@ fun ChatScreen(
                         Text("채팅", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                         Text(title, fontSize = 15.sp, color = Palette.TextSoft, maxLines = 1)
                     }
+                    androidx.compose.material3.TextButton(onClick = { actions.showDay(date) }) { Text("레일 보기", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                 }
                 HorizontalDivider(color = Palette.Line)
                 LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (lines.isEmpty()) item {
-                        Text("아직 아무 말도 없어요. 다트 결과나 투표도 여기로 올라와요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 24.dp))
+                        Text("아직 아무 말도 없어요. 아래 [+]로 장소·투표·다트를 바로 보낼 수 있어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 24.dp))
                     }
                     items(lines, key = { it.id }) { m ->
-                        if (m.kind == ChatKind.TEXT) TextLine(m, mine = m.uid == me, nameOf = nameOf)
+                        if (m.kind == ChatKind.TEXT) TextLine(
+                            m, mine = m.uid == me, nameOf = nameOf,
+                            // 말풍선 길게 → 그 글로 장소 찾기 (누를 때만 검색: API 한도).
+                            onFindPlace = { actions.pickPlace(m.text) { p -> postPlace(p) } },
+                        )
                         else CardLine(
                             m, nameOf = { if (it == me) "나" else nameOf(it) }, mine = m.uid == me, added = m.id in added,
-                            onAdd = if (onAddStop != null && m.place != null) ({ onAddStop(m.place!!); added = added + m.id }) else null,
-                            onOpenVote = onOpenVote,
+                            onAdd = if (actions.addStop != null && m.place != null && m.kind != ChatKind.ARRIVED) ({ actions.addStop.invoke(m.place!!); added = added + m.id }) else null,
+                            actions = actions,
                         )
                     }
                 }
+                // Two or more places in the talk → [이 장소들로 투표].
+                if (talkedPlaces.size >= 2) Row(
+                    Modifier.fillMaxWidth().border(1.dp, Palette.Line).clickable { actions.openVote(talkedPlaces) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("이야기한 장소 ${talkedPlaces.size}곳 · " + talkedPlaces.joinToString(", ") { it.name }, fontSize = 15.sp, color = Palette.TextSoft, maxLines = 1, modifier = Modifier.weight(1f))
+                    Text("투표로 정하기", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
+                }
                 HorizontalDivider(color = Palette.Line)
+                // [+]: 우리 앱 기능을 채팅에서 바로.
+                if (plus) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PlusItem("장소 보내기") { plus = false; actions.pickPlace("") { p -> postPlace(p) } }
+                    PlusItem("투표 열기") { plus = false; actions.openVote(emptyList()) }
+                    PlusItem("다트") { plus = false; actions.openDart() }
+                    PlusItem("픽업") { plus = false; actions.openPickup() }
+                }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = { plus = !plus }, shape = Corner, border = BorderStroke(1.dp, if (plus) Palette.Navy else Palette.Line),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                        modifier = Modifier.padding(end = 8.dp).height(52.dp).widthIn(min = 52.dp),
+                    ) { Text(if (plus) "×" else "+", fontSize = 24.sp, color = Palette.Navy) }
                     TextField(
                         text, { text = it }, placeholder = { Text("메시지", fontSize = 17.sp) },
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp), singleLine = true,
@@ -135,33 +185,56 @@ fun ChatScreen(
     }
 }
 
+@Composable
+private fun PlusItem(label: String, onClick: () -> Unit) {
+    Text(
+        label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy,
+        modifier = Modifier.border(1.dp, Palette.Line, Corner).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
+    )
+}
+
 private fun hhmm(m: ChatMessage) = m.createdAt?.toDate()?.let { android.text.format.DateFormat.format("HH:mm", it).toString() } ?: ""
 
-/** Mine: black, on the right. Others: white with a line, name above. */
+/** Mine: black, on the right. Others: white with a line, name above. Long press → find a place in the words. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun TextLine(m: ChatMessage, mine: Boolean, nameOf: (String?) -> String) {
+private fun TextLine(m: ChatMessage, mine: Boolean, nameOf: (String?) -> String, onFindPlace: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
         if (!mine) Text(nameOf(m.uid), fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 2.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             if (mine) Text(hhmm(m), fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 6.dp))
-            Text(
-                m.text, fontSize = 17.sp, color = if (mine) Color.White else Palette.TextStrong,
-                modifier = Modifier.widthIn(max = 300.dp)
-                    .then(if (mine) Modifier.background(Palette.Navy, Corner) else Modifier.border(1.dp, Palette.SheetEdge, Corner))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
+            Box {
+                Text(
+                    m.text, fontSize = 17.sp, color = if (mine) Color.White else Palette.TextStrong,
+                    modifier = Modifier.widthIn(max = 300.dp)
+                        .then(if (mine) Modifier.background(Palette.Navy, Corner) else Modifier.border(1.dp, Palette.SheetEdge, Corner))
+                        .combinedClickable(onClick = {}, onLongClick = { menu = true })
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+                androidx.compose.material3.DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                    androidx.compose.material3.DropdownMenuItem({ Text("이 글로 장소 찾기", fontSize = 16.sp) }, onClick = { menu = false; onFindPlace() })
+                }
+            }
             if (!mine) Text(hhmm(m), fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 6.dp))
         }
     }
 }
 
-/** A card the app posted: the whole width, a small label, the headline, and its one action. */
+/** A card: the whole width, a small label, the headline, and the actions that fit it. */
 @Composable
-private fun CardLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean, added: Boolean, onAdd: (() -> Unit)?, onOpenVote: () -> Unit) {
+private fun CardLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean, added: Boolean, onAdd: (() -> Unit)?, actions: ChatActions) {
+    val who = nameOf(m.uid)
     val label = when (m.kind) {
-        ChatKind.DART -> if (mine) "다트 · 내가 올림" else "다트 · ${nameOf(m.uid)}님이 올림"
-        ChatKind.VOTE_OPEN -> "투표가 열렸어요 · ${nameOf(m.uid)}"
+        ChatKind.DART -> if (mine) "다트 · 내가 올림" else "다트 · ${who}님이 올림"
+        ChatKind.PLACE -> if (m.lines.isNotEmpty()) "${who}${if (mine) "가" else "님이"} 물어봐요" else "장소 · $who"
+        ChatKind.VOTE_OPEN -> "투표가 열렸어요 · $who"
         ChatKind.VOTE_CLOSED -> "투표 마감"
+        ChatKind.CHANGE -> "${who}${if (mine) "가" else "님이"} 일정을 바꿨어요"
+        ChatKind.PICKUP -> "픽업"
+        ChatKind.ARRIVED -> "도착"
+        ChatKind.DAY_DONE -> "하루 끝"
+        ChatKind.COMMENT -> "${who} · 칸 코멘트"
         ChatKind.TEXT -> ""
     }
     Column(Modifier.fillMaxWidth().border(1.dp, Palette.SheetEdge, Corner).padding(14.dp)) {
@@ -174,6 +247,11 @@ private fun CardLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean,
                 Text(m.text.split(" ").first(), fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
                 Text(m.text.split(" ").drop(1).joinToString(" ").ifBlank { m.text }, fontSize = 24.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
             }
+            ChatKind.PLACE -> {
+                m.lines.firstOrNull()?.let { Text(it, fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp)) }
+                Text(m.place?.name ?: m.text, fontSize = 22.sp, fontWeight = FontWeight.Black, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
+                m.place?.address?.takeIf { it.isNotBlank() }?.let { Text(it, fontSize = 15.sp, color = Palette.TextSoft, maxLines = 1) }
+            }
             ChatKind.VOTE_OPEN -> {
                 Text(m.text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp))
                 m.lines.forEach { Text("· $it", fontSize = 16.sp, color = Palette.TextStrong) }
@@ -182,15 +260,37 @@ private fun CardLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean,
                 Text(m.text, fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
                 Text(if (m.lines.isEmpty()) "결과 없음" else m.lines.joinToString(" · "), fontSize = 22.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
             }
+            ChatKind.CHANGE -> m.lines.forEach { Text(it, fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 2.dp)) }
+            ChatKind.COMMENT -> {
+                m.lines.firstOrNull()?.let { Text(it, fontSize = 15.sp, color = Palette.Teal, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
+                Text(m.text, fontSize = 18.sp, color = Palette.TextStrong)
+            }
+            ChatKind.PICKUP, ChatKind.ARRIVED, ChatKind.DAY_DONE -> {
+                Text(m.text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp))
+                m.lines.forEach { Text(it, fontSize = 15.sp, color = Palette.TextSoft) }
+            }
             ChatKind.TEXT -> {}
         }
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (m.kind == ChatKind.VOTE_OPEN) OutlinedButton(onClick = onOpenVote, shape = Corner, border = BorderStroke(1.dp, Palette.Line)) {
-                Text("투표하기", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold)
+            when (m.kind) {
+                ChatKind.VOTE_OPEN -> CardButton("투표하기") { actions.openVote(emptyList()) }
+                ChatKind.CHANGE, ChatKind.COMMENT -> CardButton("레일에서 보기") { actions.showDay(m.date) }
+                ChatKind.PICKUP -> CardButton("픽업 보기") { actions.openPickup() }
+                ChatKind.ARRIVED -> CardButton("사진·한 줄 남기기") { actions.showDay(m.date) }
+                ChatKind.DAY_DONE -> CardButton("하루 카드 만들기") { actions.exportDay(m.date) }
+                else -> {}
             }
-            if (onAdd != null) OutlinedButton(onClick = onAdd, enabled = !added, shape = Corner, border = BorderStroke(1.dp, Palette.Line)) {
-                Text(if (added) "칸으로 넣었어요" else "칸으로", fontSize = 16.sp, color = if (added) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold)
+            if (onAdd != null && (m.kind == ChatKind.DART || m.kind == ChatKind.PLACE || m.kind == ChatKind.VOTE_CLOSED)) {
+                CardButton(if (added) "칸으로 넣었어요" else "칸으로", enabled = !added, onClick = onAdd)
             }
+            if (m.place != null && (m.kind == ChatKind.DART || m.kind == ChatKind.PLACE)) CardButton("투표 후보로") { actions.openVote(listOf(m.place!!)) }
         }
+    }
+}
+
+@Composable
+private fun CardButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, enabled = enabled, shape = Corner, border = BorderStroke(1.dp, Palette.Line)) {
+        Text(label, fontSize = 16.sp, color = if (enabled) Palette.Navy else Palette.TextSoft, fontWeight = FontWeight.SemiBold)
     }
 }

@@ -71,16 +71,18 @@ fun voteVmFactory(groupId: String, eventId: String?, date: String?) = object : V
 
 /** 5장: the group's votes; open ones first. New vote = question + 2~5 options (text or place). */
 @Composable
-fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String) -> String, onPickPlace: ((Place) -> Unit) -> Unit, onDismiss: () -> Unit, seed: Place? = null) {
+fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String) -> String, onPickPlace: ((Place) -> Unit) -> Unit, onDismiss: () -> Unit, seed: Place? = null, seeds: List<Place> = emptyList()) {
+    // 채팅의 장소 여러 곳 → 한 번에 후보로 (A안 2026-11-03).
+    val starts = seeds.ifEmpty { listOfNotNull(seed) }.take(5)
     val vm: VoteDartViewModel = viewModel(key = "vote-$groupId-$eventId", factory = voteVmFactory(groupId, eventId, date))
     val votes by vm.list.collectAsStateWithLifecycle()
     val group by vm.group.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val loaded by vm.listLoaded.collectAsStateWithLifecycle()
-    var creating by remember { mutableStateOf(seed != null) }
+    var creating by remember { mutableStateOf(starts.isNotEmpty()) }
     // The list arrives a moment later: open on the list when there are votes, on "새 투표" only when there are none.
-    LaunchedEffect(loaded) { if (loaded && seed == null) creating = votes.isEmpty() }
+    LaunchedEffect(loaded) { if (loaded && starts.isEmpty()) creating = votes.isEmpty() }
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -88,7 +90,7 @@ fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String)
                 TextButton(onClick = { creating = !creating }) { Text(if (creating) "목록" else "새 투표", color = Palette.Navy) }
             }
             message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
-            if (creating) NewVote(onPickPlace = onPickPlace, seed = seed) { q, opts, places -> vm.create(q, opts, places); creating = false }
+            if (creating) NewVote(onPickPlace = onPickPlace, seeds = starts) { q, opts, places -> vm.create(q, opts, places); creating = false }
             else {
                 if (votes.isEmpty()) Text("아직 투표가 없어요", color = Palette.TextSoft, fontSize = 16.sp, modifier = Modifier.padding(vertical = 10.dp))
                 votes.forEach { v -> VoteCard(v, me, group?.memberIds?.size ?: 1, isOwner = group?.ownerUid == me || v.createdBy == me, nameOf, onCast = { vm.cast(v.id, it) }, onClose = { vm.close(v.id) }, onAddStop = { vm.addWinnerAsStop(it) }, canAddStop = eventId != null) }
@@ -99,11 +101,11 @@ fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String)
 }
 
 @Composable
-private fun NewVote(onPickPlace: ((Place) -> Unit) -> Unit, seed: Place? = null, onCreate: (String, List<String>, List<Place?>) -> Unit) {
-    // 5장 1: a stop's "이 장소로 투표" arrives as the first candidate (seed).
-    var question by remember { mutableStateOf(if (seed != null) "${seed.name} 어때요?" else "") }
-    val options = remember { mutableStateListOf(seed?.name ?: "", "") }
-    val places = remember { mutableStateListOf<Place?>(seed, null) }
+private fun NewVote(onPickPlace: ((Place) -> Unit) -> Unit, seeds: List<Place> = emptyList(), onCreate: (String, List<String>, List<Place?>) -> Unit) {
+    // 5장 1: a stop's "이 장소로 투표" arrives as the first candidate; the chat can bring several.
+    var question by remember { mutableStateOf(when { seeds.size == 1 -> "${seeds[0].name} 어때요?"; seeds.size > 1 -> "어디로 갈까요?"; else -> "" }) }
+    val options = remember { mutableStateListOf<String>().apply { addAll(seeds.map { it.name }); while (size < 2) add("") } }
+    val places = remember { mutableStateListOf<Place?>().apply { addAll(seeds); while (size < 2) add(null) } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(question, { question = it }, placeholder = { Text("점심 뭐 먹지?", fontSize = 17.sp) }, label = { Text("질문") }, singleLine = true, shape = Corner, modifier = Modifier.fillMaxWidth())
         options.forEachIndexed { i, o ->

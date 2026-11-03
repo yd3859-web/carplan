@@ -40,6 +40,15 @@ class ChatRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
             .set(ChatMessage(uid = uid, kind = ChatKind.DART, text = d.resultName, place = place, refId = d.id, eventId = d.eventId, date = d.date)).await()
     }
 
+    /**
+     * 장소 카드: [+] → 장소, 말풍선 길게 → 장소 찾기, 또는 칸에서 [채팅에 물어보기]([ask] = "여기 어때?").
+     * 받은 사람은 [칸으로]·[투표 후보로].
+     */
+    suspend fun sharePlace(groupId: String, uid: String, place: Place, eventId: String?, date: String?, ask: Boolean = false, refId: String? = null) {
+        db.collection(FirestorePaths.chat(groupId))
+            .add(ChatMessage(uid = uid, kind = ChatKind.PLACE, text = place.name, place = place, refId = refId, lines = if (ask) listOf("여기 어때?") else emptyList(), eventId = eventId, date = date)).await()
+    }
+
     /** 투표가 열리면 카드 하나 (투표 문서 id로 한 장만). */
     suspend fun voteOpened(groupId: String, voteId: String, v: Vote) {
         db.collection(FirestorePaths.chat(groupId)).document("vote-$voteId")

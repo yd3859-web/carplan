@@ -182,6 +182,11 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     val chatLines by remember(ref.groupId) { com.htb.carplan.shared.data.ChatRepository().observe(ref.groupId) }
         .collectAsStateWithLifecycle(emptyList())
     var chatSeen by remember(ref.groupId) { mutableStateOf(0L) }
+    val sharedTrip = (group?.memberIds?.size ?: 0) > 1
+    // 내보내기 메뉴 — the chat's [하루 카드 만들기] opens it too.
+    var exportMenu by remember { mutableStateOf(false) }
+    var placeQuery by remember { mutableStateOf("") }
+    var voteSeeds by remember { mutableStateOf<List<Place>>(emptyList()) }
     var placePicker by remember { mutableStateOf<((Place) -> Unit)?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -219,7 +224,6 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             }
             if (busy) Text("저장 중", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
             // 14장 내보내기: 이미지 1장(Q39) 또는 짧은 영상(사진 슬라이드 + 장소·시간 자막)
-            var exportMenu by remember { mutableStateOf(false) }
             var exporting by remember { mutableStateOf<String?>(null) }
             fun exportItems() = buildList {
                 stops.forEachIndexed { i, s ->
@@ -262,7 +266,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
 
         // P-c: the "decide together" tools, visible instead of hidden in ⋮.
         if (!locked) Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if ((group?.memberIds?.size ?: 0) > 1) {
+            if (sharedTrip) {
                 LaunchedEffect(ref.groupId, chatOpen) { chatSeen = ChatSeen.get(context, ref.groupId) }
                 val unread = ChatSeen.unread(chatLines, me, chatSeen)
                 ToolChip(if (unread == 0) "채팅" else "채팅 · 새 글 $unread") { chatOpen = true }
@@ -337,6 +341,11 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                             onRemove = { vm.remove(stop.id) },
                             onTimeTap = { if (!locked) timeFor = stop },
                             onSendComment = { vm.addComment(stop.id, it) },
+                            // ③ 칸 → 채팅: "여기 어때?" 장소 카드로 일행에게 물어보기.
+                            onAskChat = if (!sharedTrip || me == null) null else ({
+                                scope.launch { runCatching { com.htb.carplan.shared.data.ChatRepository().sharePlace(ref.groupId, me!!, stop.place, ref.eventId, date, ask = true, refId = stop.id) } }
+                                chatOpen = true
+                            }),
                             record = recordByStop[stop.id],
                             onAddPhoto = { r -> photoFor = r.id; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onRemovePhoto = { r, url -> vm.removePhoto(r.id, url) },
@@ -414,15 +423,22 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     }
     if (pickupOpen) PickupSheet(vm, onDismiss = { pickupOpen = false })
     if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
-    if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null }, seed = voteSeed)
+    if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placeQuery = ""; placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null; voteSeeds = emptyList() }, seed = voteSeed, seeds = voteSeeds)
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
     if (chatOpen) ChatScreen(
-        groupId = ref.groupId, eventId = ref.eventId, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,
-        onAddStop = if (locked) null else ({ p -> vm.addStop(p, null, "채팅") }),
-        onOpenVote = { voteOpen = true },
+        groupId = ref.groupId, eventId = ref.eventId, date = date, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,
+        actions = ChatActions(
+            addStop = if (locked) null else ({ p -> vm.addStop(p, null, "채팅") }),
+            pickPlace = { q, cb -> placeQuery = q; placePicker = cb },
+            openVote = { seeds -> voteSeeds = seeds; voteOpen = true },
+            openDart = { dartOpen = true },
+            openPickup = { pickupOpen = true },
+            showDay = { d -> chatOpen = false; ChatSeen.mark(context, ref.groupId); if (d != null && d in dates) vm.showDate(d) },
+            exportDay = { d -> chatOpen = false; ChatSeen.mark(context, ref.groupId); if (d != null && d in dates) vm.showDate(d); exportMenu = true },
+        ),
         onDismiss = { chatOpen = false; ChatSeen.mark(context, ref.groupId) },
     )
-    placePicker?.let { cb -> PlaceSearchSheet(vm = vm, onPick = { cb(it); placePicker = null }, onDismiss = { placePicker = null }) }
+    placePicker?.let { cb -> PlaceSearchSheet(vm = vm, initialQuery = placeQuery, onPick = { cb(it); placePicker = null; placeQuery = "" }, onDismiss = { placePicker = null; placeQuery = "" }) }
     noteFor?.let { r ->
         NoteDialog(initial = r.note, onSave = { vm.setNote(r.id, it); noteFor = null }, onDismiss = { noteFor = null })
     }
@@ -484,6 +500,7 @@ private fun TimelineStop(
     onRemovePhoto: (Record, String) -> Unit = { _, _ -> },
     onNote: (Record) -> Unit = {},
     onParking: (Record) -> Unit = {},
+    onAskChat: (() -> Unit)? = null,
 ) {
     val belowFill by animateFloatAsState(if (railBelowPassed) 1f else 0f, tween(450), label = "railFill")
     // Collapsed: the box, photos, the latest comment and one ghost bubble. Open: every comment, the composer, photo/note buttons.
@@ -506,6 +523,7 @@ private fun TimelineStop(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
                     if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 15.sp, color = Palette.TextSoft) }
+                    if (!locked && onAskChat != null) TextButton(onClick = onAskChat, modifier = Modifier.padding(top = 8.dp)) { Text("채팅에 물어보기", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                     else if (locked && record != null) Spacer(Modifier.height(8.dp))
                 }
             } else {
