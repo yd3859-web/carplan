@@ -244,6 +244,15 @@ fun CarDartGame(
                                 }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = Palette.OnNavy),
                                 modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(76.dp),
                             ) { Text("이 동네 그대로 넣기", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+                            // A안 채팅: 같이 가는 여행이면 결과를 일행 채팅방(폰)에 올림.
+                            if (onPick == null && vm.canShareDart()) {
+                                var posted by remember(d.id, d.throwCount) { mutableStateOf(false) }
+                                OutlinedButton(
+                                    onClick = { vm.shareDart(); posted = true }, enabled = !posted, shape = Corner,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Palette.SheetEdge),
+                                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(76.dp),
+                                ) { Text(if (posted) "일행 채팅에 보냈어요" else "일행 채팅에 보내기", fontSize = 24.sp, color = if (posted) Palette.TextSoft else Palette.TextStrong, fontWeight = FontWeight.SemiBold) }
+                            }
                         }
                     }
                     error?.let { Text(it, color = Palette.Teal, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }

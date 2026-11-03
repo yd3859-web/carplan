@@ -161,6 +161,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     /** Owner name of a uid for "○○님이 던짐" (names are in users/{uid}; the car only knows its owner). */
     fun nameOf(uid: String): String = if (uid == owner.value?.uid) owner.value?.name?.ifBlank { null } ?: "차주" else "일행"
 
+    /** A안 채팅: today's trip is shared with others (not the owner's own group) → the result can go to its chat. */
+    fun canShareDart(): Boolean { val t = trip.value ?: return false; return t.groupId != owner.value?.soloGroupId }
+
+    /** 다트 결과를 오늘 여행 채팅방에 카드로 (주차 중 차 화면, A안 2026-11-03). */
+    fun shareDart() {
+        val t = trip.value ?: return
+        val d = dart.value ?: return
+        val u = owner.value ?: return
+        viewModelScope.launch { runCatching { com.htb.carplan.shared.data.ChatRepository().shareDart(t.groupId, d, u.uid) }.onFailure { _error.value = it.message } }
+    }
+
     fun addDartAsStop() {
         val t = trip.value ?: return
         val d = dart.value ?: return

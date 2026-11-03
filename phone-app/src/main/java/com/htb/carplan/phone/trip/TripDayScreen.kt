@@ -177,6 +177,11 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     var pickupOpen by remember { mutableStateOf(false) }
     val pickups by vm.pickups.collectAsStateWithLifecycle()
     var dartOpen by remember { mutableStateOf(false) }
+    // 여행별 채팅방 (A안 2026-11-03): only once someone else is on the trip.
+    var chatOpen by remember { mutableStateOf(false) }
+    val chatLines by remember(ref.groupId) { com.htb.carplan.shared.data.ChatRepository().observe(ref.groupId) }
+        .collectAsStateWithLifecycle(emptyList())
+    var chatSeen by remember(ref.groupId) { mutableStateOf(0L) }
     var placePicker by remember { mutableStateOf<((Place) -> Unit)?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -257,6 +262,11 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
 
         // P-c: the "decide together" tools, visible instead of hidden in ⋮.
         if (!locked) Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if ((group?.memberIds?.size ?: 0) > 1) {
+                LaunchedEffect(ref.groupId, chatOpen) { chatSeen = ChatSeen.get(context, ref.groupId) }
+                val unread = ChatSeen.unread(chatLines, me, chatSeen)
+                ToolChip(if (unread == 0) "채팅" else "채팅 · 새 글 $unread") { chatOpen = true }
+            }
             ToolChip(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") { pickupOpen = true }
             ToolChip("투표") { voteOpen = true }
             ToolChip("다트 · 동네 뽑기") { dartOpen = true }
@@ -406,6 +416,12 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null }, seed = voteSeed)
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
+    if (chatOpen) ChatScreen(
+        groupId = ref.groupId, eventId = ref.eventId, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,
+        onAddStop = if (locked) null else ({ p -> vm.addStop(p, null, "채팅") }),
+        onOpenVote = { voteOpen = true },
+        onDismiss = { chatOpen = false; ChatSeen.mark(context, ref.groupId) },
+    )
     placePicker?.let { cb -> PlaceSearchSheet(vm = vm, onPick = { cb(it); placePicker = null }, onDismiss = { placePicker = null }) }
     noteFor?.let { r ->
         NoteDialog(initial = r.note, onSave = { vm.setNote(r.id, it); noteFor = null }, onDismiss = { noteFor = null })

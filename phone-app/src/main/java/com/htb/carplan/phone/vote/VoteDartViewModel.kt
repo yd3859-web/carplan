@@ -116,6 +116,12 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     /** The board needs the full 읍·면·동 list to frame the scope. */
     fun ensureRegions(context: Context) = loadRegionsOnce(context)
 
+    /** 다트 결과를 이 그룹 채팅방에 카드로 (A안 2026-11-03). */
+    fun shareDart(d: Dart) = act {
+        com.htb.carplan.shared.data.ChatRepository().shareDart(groupId, d, uid.value ?: return@act)
+        message.value = "채팅에 올렸어요"
+    }
+
     fun addDartAsStop(d: Dart) = act {
         val e = eventId ?: return@act
         val parts = d.resultName.split(" ")

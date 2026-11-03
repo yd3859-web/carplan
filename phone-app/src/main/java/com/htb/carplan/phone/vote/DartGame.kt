@@ -267,6 +267,15 @@ fun DartGame(
                                 onClick = { vm.addDartAsStop(d) }, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
                                 modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(48.dp),
                             ) { Text("동네 그대로 칸으로", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                            // A안: 결과를 일행 채팅방에 올려 같이 이야기 (같이 가는 사람이 있을 때만).
+                            val shared = (vm.group.collectAsStateWithLifecycle().value?.memberIds?.size ?: 0) > 1
+                            if (onPick == null && shared) {
+                                var posted by remember(d.id, d.throwCount) { mutableStateOf(false) }
+                                OutlinedButton(
+                                    onClick = { vm.shareDart(d); posted = true }, enabled = !posted, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
+                                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(48.dp),
+                                ) { Text(if (posted) "채팅에 올렸어요" else "채팅에 올리기", fontSize = 16.sp, color = if (posted) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                            }
                             Text("마음에 안 들면 다시 당겨서 던지세요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
                         }
                     }

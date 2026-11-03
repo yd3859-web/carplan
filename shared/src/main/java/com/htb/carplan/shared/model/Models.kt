@@ -353,3 +353,27 @@ data class Dart(
     val date: String? = null,
     @ServerTimestamp val thrownAt: Timestamp? = null,
 )
+
+/** What a chat line is: words, or a card the app posts (다트 결과 · 투표 열림 · 투표 마감). */
+enum class ChatKind { TEXT, DART, VOTE_OPEN, VOTE_CLOSED }
+
+/**
+ * groups/{gid}/chat/{id} — 여행별 채팅방 (정원 2026-11-03 A안): one room per group, so a trip's own group
+ * (초대 = 일정) is that trip's room. Phone only shows it; the car may post a 다트 card while parked.
+ */
+data class ChatMessage(
+    @DocumentId val id: String = "",
+    val uid: String = "",
+    val kind: ChatKind = ChatKind.TEXT,
+    /** The words, or the card's headline ("경주시 황남동", the vote question). */
+    val text: String = "",
+    /** A card's place: the dart's 동네, the vote's winning place — [칸으로] puts it on the trip. */
+    val place: Place? = null,
+    /** The dart / vote this card is about. */
+    val refId: String? = null,
+    /** Vote options or winners, one line each. */
+    val lines: List<String> = emptyList(),
+    val eventId: String? = null,
+    val date: String? = null,
+    @ServerTimestamp val createdAt: Timestamp? = null,
+)

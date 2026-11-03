@@ -123,3 +123,20 @@ exports.maintenanceDue = onSchedule({ schedule: "0 9 * * *", timeZone: "Asia/Seo
     await push(tokens, "차량 관리", `${d.get("title")} ${days <= 0 ? "오늘" : `${days}일 남음`}`, { groupId });
   }
 });
+
+// 여행별 채팅방 (A안 2026-11-03): 새 말·다트 카드 → 보낸 사람 빼고 그룹 전원. 투표 카드는 onVoteWritten이 이미 알려서 뺀다.
+exports.onChatCreated = onDocumentCreated("groups/{gid}/chat/{mid}", async (event) => {
+  const m = event.data.data();
+  if (!m || m.kind === "VOTE_OPEN" || m.kind === "VOTE_CLOSED") return;
+  const gid = event.params.gid;
+  const group = await db.doc(`groups/${gid}`).get();
+  // 누르면 그 여행 화면으로: 날짜가 없으면 여행 첫날
+  const eventId = m.eventId || group.get("forEvent") || null;
+  let date = m.date || null;
+  if (eventId && !date) date = (await db.doc(`groups/${gid}/events/${eventId}`).get()).get("startDate") || null;
+  const who = await nameOf(m.uid);
+  const title = group.get("name") || "채팅";
+  const body = m.kind === "DART" ? `${who}님이 다트 결과를 올렸어요 · ${m.text}` : `${who}: ${m.text}`;
+  const tokens = await groupTokens(gid, m.uid);
+  await push(tokens, title, body, eventId && date ? { groupId: gid, eventId, date } : { groupId: gid });
+});
