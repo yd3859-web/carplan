@@ -50,6 +50,8 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     val stops by vm.stops.collectAsStateWithLifecycle()
     vm.names.collectAsStateWithLifecycle().value
     var searching by remember { mutableStateOf(false) }
+    // 정원 2026-11-04: the pickup spot is picked on a map around where I am (search by name is one tap away inside).
+    var mapPicking by remember { mutableStateOf(false) }
     val mine = pickups.firstOrNull { it.uid == me }
     val sharing = day?.pickupSharing == true
     val carPos = car?.state?.let { s -> if (sharing && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
@@ -128,10 +130,10 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                     Text(mine?.place?.name ?: "아직 없음", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
                     mine?.let { Text(statusText(it.status, it.arrivedAt != null), fontSize = 15.sp, color = Palette.TextStrong) }
                 }
-                if (mine == null) Button(onClick = { searching = true }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("장소 고르기") }
+                if (mine == null) Button(onClick = { mapPicking = true }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("장소 고르기") }
                 else {
                     if (mine.status == PickupStatus.WAITING) Button(onClick = vm::boarded, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("탔어요") }
-                    TextButton(onClick = { searching = true }) { Text("바꾸기", color = Palette.TextSoft) }
+                    TextButton(onClick = { mapPicking = true }) { Text("바꾸기", color = Palette.TextSoft) }
                     TextButton(onClick = vm::removeMyPickup) { Text("빼기", color = Palette.TextSoft) }
                 }
             }
@@ -151,6 +153,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("닫기", color = Palette.TextSoft) } }
         }
     }
+    if (mapPicking) MapPickSheet(start = mine?.place, onPick = { vm.setMyPickup(it); mapPicking = false }, onSearch = { mapPicking = false; searching = true }, onDismiss = { mapPicking = false })
     if (searching) PlaceSearchSheet(vm = vm, initialQuery = mine?.place?.name.orEmpty(), onPick = { vm.setMyPickup(it); searching = false }, onDismiss = { searching = false })
 }
 

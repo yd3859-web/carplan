@@ -65,6 +65,18 @@ class KakaoApi(private val restKey: String) {
     suspend fun nearestPlace(lat: Double, lng: Double): Place? =
         KakaoCategory.entries.firstNotNullOfOrNull { c -> searchCategory(c, lat, lng, radiusMeters = 100, size = 1).firstOrNull() }
 
+    /**
+     * The address of a point (Kakao 좌표→주소, one call): road address if there is one, else the lot address, e.g.
+     * "경기 성남시 분당구 판교역로 166". For a spot picked on a map (픽업 자리).
+     */
+    suspend fun address(lat: Double, lng: Double): String? {
+        val url = "https://dapi.kakao.com/v2/local/geo/coord2address.json".toHttpUrl().newBuilder()
+            .addQueryParameter("x", lng.toString()).addQueryParameter("y", lat.toString()).build()
+        val doc = get(url.toString()).optJSONArray("documents")?.optJSONObject(0) ?: return null
+        return doc.optJSONObject("road_address")?.optString("address_name")?.takeIf { it.isNotBlank() }
+            ?: doc.optJSONObject("address")?.optString("address_name")?.takeIf { it.isNotBlank() }
+    }
+
     /** Driving time and distance from [from] to [to] (Kakao Mobility directions). */
     suspend fun directions(from: Place, to: Place): Leg {
         val url = "https://apis-navi.kakaomobility.com/v1/directions".toHttpUrl().newBuilder()
