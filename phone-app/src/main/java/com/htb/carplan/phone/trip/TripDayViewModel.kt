@@ -323,6 +323,30 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         trips.addStop(groupId, eventId, _date.value, place, time, memo, me())
     }
 
+    /**
+     * 근처 맛집·명소 (정원 2026-11-04: 등록된 위치에 따른 맛집·관광명소 추천): places of [category] within 2 km of [stop],
+     * the group's 또 갈래요 / 가 봄 first, then nearest; places already on the day are left out. One Kakao call per stop
+     * and kind, kept while the screen lives (API 한도).
+     */
+    private val nearbyCache = HashMap<String, List<Place>>()
+    suspend fun nearby(stop: Stop, category: KakaoCategory): Result<List<Place>> = runCatching {
+        val key = "${stop.place.lat},${stop.place.lng}#${category.code}"
+        nearbyCache[key] ?: run {
+            val found = kakao.searchCategory(category, stop.place.lat, stop.place.lng, radiusMeters = 2000, size = 15)
+            val onDay = stops.value.filterNot { it.deleted }.map { it.place.kakaoId ?: it.place.name }.toSet()
+            com.htb.carplan.shared.calendar.PlaceRank.rank(found.filter { (it.kakaoId ?: it.name) !in onDay }, runCatching { memos() }.getOrDefault(emptyMap()))
+                .also { nearbyCache[key] = it }
+        }
+    }
+
+    /** A recommended place goes in right after [afterId] (not at the end of the day). */
+    fun addStopAfter(place: Place, afterId: String, memo: String) = write {
+        val newId = trips.addStop(groupId, eventId, _date.value, place, null, memo, me())
+        val ids = stops.value.filterNot { it.deleted }.map { it.id }.filter { it != newId }.toMutableList()
+        val at = ids.indexOf(afterId)
+        if (at >= 0) { ids.add(at + 1, newId); trips.reorder(groupId, eventId, _date.value, ids, me()) }
+    }
+
     fun updateStop(stopId: String, place: Place, time: String?, memo: String) = write {
         trips.updateStop(groupId, eventId, _date.value, stopId, place, time, memo, me())
     }

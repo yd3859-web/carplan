@@ -184,6 +184,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     var chatSeen by remember(ref.groupId) { mutableStateOf(0L) }
     val sharedTrip = (group?.memberIds?.size ?: 0) > 1
     var tripInfoOpen by remember { mutableStateOf(false) }
+    var nearbyFor by remember { mutableStateOf<com.htb.carplan.shared.model.Stop?>(null) }
+    nearbyFor?.let { s -> NearbySheet(s, vm, canAdd = !locked, onDismiss = { nearbyFor = null }) }
     if (tripInfoOpen) event?.let { ev ->
         com.htb.carplan.phone.calendar.EventEditSheet(
             item = com.htb.carplan.shared.data.CalendarEvent(ref.groupId, ev), categories = emptyList(), onAddCategory = { _, _, _ -> },
@@ -373,6 +375,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                                 chatOpen = true
                             }),
                             record = recordByStop[stop.id],
+                            onNearby = if (stop.place.lat != 0.0 || stop.place.lng != 0.0) ({ nearbyFor = stop }) else null,
                             onAddPhoto = { r -> photoFor = r.id; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                             onRemovePhoto = { r, url -> vm.removePhoto(r.id, url) },
                             onNote = { r -> noteFor = r },
@@ -529,6 +532,8 @@ private fun TimelineStop(
     onNote: (Record) -> Unit = {},
     onParking: (Record) -> Unit = {},
     onAskChat: (() -> Unit)? = null,
+    /** 칸 근처 맛집·명소 (정원 2026-11-04). */
+    onNearby: (() -> Unit)? = null,
 ) {
     val belowFill by animateFloatAsState(if (railBelowPassed) 1f else 0f, tween(450), label = "railFill")
     // Collapsed: the box, photos, the latest comment and one ghost bubble. Open: every comment, the composer, photo/note buttons.
@@ -542,7 +547,8 @@ private fun TimelineStop(
             drawAbove = index > 0,
         )
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
-            StopBox(stop, state, estimate, editedBy, dragging, locked, { open = !open }, onRemove, onTimeTap, record)
+            // Long-press the card itself to drag it (정원 2026-11-04: only the small rail dot used to work).
+            StopBox(stop, state, estimate, editedBy, dragging, locked, { open = !open }, onRemove, onTimeTap, record, handle = if (locked) Modifier else modifier)
             record?.let { r -> RecordStrip(r, locked, editable = open, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }, onParking = { onParking(r) }) }
             val shownComments = if (open) comments else comments.takeLast(1)
             shownComments.forEach { c -> Bubble(c, nameOf) }
@@ -552,6 +558,8 @@ private fun TimelineStop(
                     if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
                     if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 15.sp, color = Palette.TextSoft) }
                     // 디자인 평가 2026-11-04: one quiet action per stop when folded; 채팅에 묻기 is in the opened stop.
+                    // 근처 맛집·명소: what is around this place, right under it (정원 2026-11-04).
+                    if (onNearby != null) TextButton(onClick = onNearby, modifier = Modifier.padding(top = 8.dp)) { Text("근처 맛집·명소", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                     if (locked && record != null) Spacer(Modifier.height(8.dp))
                 }
             } else {
@@ -579,13 +587,14 @@ private fun Rail(modifier: Modifier, state: NodeState, abovePassed: Boolean, bel
 @Composable
 private fun StopBox(
     stop: Stop, state: NodeState, estimate: String?, editedBy: String?, dragging: Boolean, locked: Boolean,
-    onOpen: () -> Unit, onRemove: () -> Unit, onTimeTap: () -> Unit, record: Record? = null,
+    onOpen: () -> Unit, onRemove: () -> Unit, onTimeTap: () -> Unit, record: Record? = null, handle: Modifier = Modifier,
 ) {
     val next = state == NodeState.NEXT
     val visited = state == NodeState.VISITED
     val arrived = record?.arrivedAt?.let { hhmm(it) }
     Row(
         Modifier
+            .then(handle)
             .fillMaxWidth()
             .shadow(if (dragging) 8.dp else 0.dp, Corner)
             .clip(Corner)
