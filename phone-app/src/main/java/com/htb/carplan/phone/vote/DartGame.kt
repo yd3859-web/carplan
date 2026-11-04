@@ -161,30 +161,38 @@ fun DartGame(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN) { Box(Modifier.fillMaxSize().background(Palette.Background).systemBarsPadding()) {
             Column(Modifier.fillMaxSize()) {
-                // Top bar: back · title · scope
+                // Top bar: back · title · scope. A phone is too narrow for one line (디자인 평가 2026-11-04: the title
+                // was squeezed to a letter a line and the map lost its height) → title line, then the chips scroll.
+                val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600
+                val canAgain = shown != null && !flying
+                val chips: @Composable () -> Unit = {
+                    ScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
+                    ScopeChip("내 위치", scope == DartScope.NEAR) {
+                        if (!hasLocationPermission(context)) askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                        scope = DartScope.NEAR
+                    }
+                    ScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
+                    ScopeChip("지도 가리기", hideMap) { hideMap = !hideMap }
+                }
+                // Its place is always kept (hidden until there is a result) so nothing jumps under a finger.
+                val again: @Composable () -> Unit = {
+                    OutlinedButton(
+                        onClick = { if (canAgain) throwAgain() }, enabled = canAgain, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.TextStrong),
+                        modifier = Modifier.alpha(if (canAgain) 1f else 0f),
+                    ) { Text("다시 던지기", fontSize = 16.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold) }
+                }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "닫기", tint = Palette.TextStrong) }
                     Column(Modifier.weight(1f)) {
-                        Text("다트 — 동네 뽑기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                        Text("다트가 좌우로 흔들려요. 당겼다 놓는 순간의 방향으로 날아가고, 세게 당길수록 멀리 가요", fontSize = 15.sp, color = Palette.TextSoft)
+                        Text("다트 · 동네 뽑기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1)
+                        Text(if (narrow) "흔들리는 다트를 당겼다 놓으세요" else "다트가 좌우로 흔들려요. 당겼다 놓는 순간의 방향으로 날아가고, 세게 당길수록 멀리 가요",
+                            fontSize = 15.sp, color = Palette.TextSoft, maxLines = if (narrow) 1 else 2)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ScopeChip("전국", scope == DartScope.NATIONAL) { scope = DartScope.NATIONAL }
-                        ScopeChip("내 위치", scope == DartScope.NEAR) {
-                            if (!hasLocationPermission(context)) askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                            scope = DartScope.NEAR
-                        }
-                        ScopeChip("지역", scope == DartScope.REGION) { scope = DartScope.REGION }
-                        ScopeChip("지도 가리기", hideMap) { hideMap = !hideMap }
-                        // Its place is always kept (hidden until there is a result) so the chips never jump under a finger.
-                        val canAgain = shown != null && !flying
-                        OutlinedButton(
-                            onClick = { if (canAgain) throwAgain() }, enabled = canAgain, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.TextStrong),
-                            modifier = Modifier.alpha(if (canAgain) 1f else 0f),
-                        ) { Text("다시 던지기", fontSize = 16.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold) }
-                    }
-                    Spacer(Modifier.padding(end = 12.dp))
+                    if (narrow) again()
+                    else Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { chips(); again() }
+                    Spacer(Modifier.padding(end = if (narrow) 4.dp else 12.dp))
                 }
+                if (narrow) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { chips() }
                 if (scope == DartScope.REGION) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Regions.sidoNames.forEach { s -> ScopeChip(s.removeSuffix("특별자치도").removeSuffix("특별자치시").removeSuffix("광역시").removeSuffix("특별시").removeSuffix("도").ifBlank { s }, region == s) { region = s } }
                 }
@@ -220,16 +228,18 @@ fun DartGame(
                     androidx.compose.animation.AnimatedVisibility(
                         visible = shown != null && !flying,
                         enter = slideInVertically(tween(420)) { it } + fadeIn(tween(300)),
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 92.dp),
+                        modifier = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600)
+                            Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 12.dp)
+                        else Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 92.dp),
                     ) {
                         val d = shown ?: return@AnimatedVisibility
                         Column(
-                            Modifier.widthIn(max = 420.dp).background(Palette.Background, Corner).border(1.dp, Palette.SheetEdge, Corner).padding(18.dp),
+                            Modifier.widthIn(max = 420.dp).fillMaxWidth().background(Palette.Background, Corner).border(1.dp, Palette.SheetEdge, Corner).padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(d.resultName.split(" ").first(), fontSize = 16.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
-                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == me) "내가 던짐" else "${nameOf(d.thrownBy)}님이 던짐"}", fontSize = 16.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
+                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == me) "내가 던짐" else "${nameOf(d.thrownBy)}님이 던짐"}", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
                             // Q57: what is there — the place goes in as the stop, not the 동네's middle.
                             var cat by remember(d.id, d.throwCount) { mutableStateOf<com.htb.carplan.shared.net.KakaoCategory?>(null) }
                             var spots by remember(d.id, d.throwCount) { mutableStateOf<List<com.htb.carplan.shared.model.Place>?>(null) }
@@ -243,7 +253,7 @@ fun DartGame(
                                 val list = spots
                                 when {
                                     list == null -> Text("찾는 중…", fontSize = 15.sp, color = Palette.TextSoft)
-                                    list.isEmpty() -> Text("근처에 ${cat!!.label}이(가) 없어요", fontSize = 15.sp, color = Palette.TextSoft)
+                                    list.isEmpty() -> Text("근처에 ${com.htb.carplan.shared.text.Josa.ga(cat!!.label)} 없어요", fontSize = 15.sp, color = Palette.TextSoft)
                                     else -> list.forEach { p ->
                                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Column(Modifier.weight(1f)) {
@@ -279,7 +289,7 @@ fun DartGame(
                             Text("마음에 안 들면 다시 당겨서 던지세요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
                         }
                     }
-                    message?.let { Text(it, color = Palette.Teal, fontSize = 16.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
+                    message?.let { Text(it, color = Palette.TextStrong, fontSize = 16.sp, modifier = Modifier.align(Alignment.TopCenter).background(Palette.Background.copy(alpha = 0.9f), Corner).padding(horizontal = 12.dp, vertical = 8.dp)) }
                 }
             }
         } }
@@ -370,7 +380,7 @@ private fun DotMapBoard(
         val w = with(density) { maxWidth.toPx() }; val h = with(density) { maxHeight.toPx() }
         val boardH = h * 0.86f
         val all = Regions.all
-        val sidoLabels = remember(all.size) { all.groupBy { it.sido }.map { (k, v) -> Label(shortSido(k), v.map { it.lat }.average(), v.map { it.lng }.average()) } }
+        val sidoLabels = remember(all.size) { all.groupBy { it.sido }.entries.sortedByDescending { it.value.size }.map { (k, v) -> Label(shortSido(k), v.map { it.lat }.average(), v.map { it.lng }.average()) } }
         val sggLabels = remember(all.size) { all.groupBy { it.sido + "|" + it.sigungu }.map { (_, v) -> Label(shortSgg(v.first().sigungu), v.map { it.lat }.average(), v.map { it.lng }.average(), v.first().sido) } }
         // 지역·내 위치: a map of its own (시·군·구 from the start) instead of the national map zoomed in.
         val localMap = areaSido != null || near != null
@@ -547,7 +557,9 @@ private fun DotMapBoard(
                 val on = l.name in poolSidos
                 val st = big.copy(color = (if (on) ink else Color(0xFFB9BEC4)).copy(alpha = (1f - detail) * mapA), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
                 val m = measurer.measure(l.name, st)
-                drawText(m, topLeft = p - Offset(m.size.width / 2f, m.size.height / 2f))
+                // On a phone the 시·도 names crowd (서울·인천·경기): bigger areas first, a name that would overlap is left out.
+                val at = p - Offset(m.size.width / 2f, m.size.height / 2f)
+                if (fits(at, m.size)) drawText(m, topLeft = at)
             }
             // The dart's 동네 and its neighbours go first so they always win a crowded spot.
             val st = stuck

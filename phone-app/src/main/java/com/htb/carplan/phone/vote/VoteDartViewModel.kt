@@ -57,7 +57,7 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     fun addWinnerAsStop(place: Place) = act {
         val e = eventId ?: return@act; val d = date ?: return@act
         trips.addStop(groupId, e, d, place, null, "투표로 정함", uid.value.orEmpty())
-        message.value = "${place.name}을(를) 칸으로 넣었어요"
+        message.value = "${com.htb.carplan.shared.text.Josa.eul(place.name)} 칸으로 넣었어요"
     }
 
     /** 6장: one throw. NEAR needs the phone's position; REGION a 시·도 name. */
@@ -110,7 +110,7 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
     fun addPlaceAsStop(place: Place, d: Dart) = act {
         val e = eventId ?: return@act
         trips.addStop(groupId, e, date ?: java.time.LocalDate.now().toString(), place, null, "다트 · " + d.resultName.split(" ").last(), uid.value.orEmpty())
-        message.value = "${place.name}을(를) 칸으로 넣었어요"
+        message.value = "${com.htb.carplan.shared.text.Josa.eul(place.name)} 칸으로 넣었어요"
     }
 
     /** The board needs the full 읍·면·동 list to frame the scope. */
@@ -126,7 +126,7 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
         val e = eventId ?: return@act
         val parts = d.resultName.split(" ")
         trips.addStop(groupId, e, date ?: java.time.LocalDate.now().toString(), Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName), null, "다트 · " + parts.dropLast(1).drop(1).joinToString(" "), uid.value.orEmpty())
-        message.value = "${parts.last()}을(를) 칸으로 넣었어요"
+        message.value = "${com.htb.carplan.shared.text.Josa.eul(parts.last())} 칸으로 넣었어요"
     }
 
     private var regionsLoaded = false

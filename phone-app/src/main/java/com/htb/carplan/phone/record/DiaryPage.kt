@@ -122,7 +122,7 @@ fun DiaryPage(
         val viewH = maxHeight
         Column(Modifier.fillMaxSize()) {
             TopBar(page, d, book, prev, next, state, onBack, onPage)
-            if (!wide && pts.isNotEmpty()) JourneyMap(trip, pts, records, roads, Modifier.fillMaxWidth().height(220.dp).padding(horizontal = 20.dp, vertical = 8.dp))
+            if (!wide && pts.isNotEmpty()) JourneyMap(trip, pts, records, roads, Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), compact = true)
             Row(Modifier.fillMaxSize()) {
                 if (wide && pts.isNotEmpty()) {
                     Box(Modifier.weight(1f).fillMaxHeight().padding(start = 20.dp, top = 8.dp, bottom = 20.dp)) {
@@ -265,24 +265,58 @@ private fun journeyNow(state: LazyListState, records: List<Record>, pts: List<Re
  * the card says where it stopped and for how long, or how far along the drive it is — with today's distance counting.
  */
 @Composable
-private fun JourneyMap(j: Journey, pts: List<Record>, records: List<Record>, roads: List<List<Pair<Double, Double>>>, modifier: Modifier) {
+private fun JourneyMap(j: Journey, pts: List<Record>, records: List<Record>, roads: List<List<Pair<Double, Double>>>, modifier: Modifier, compact: Boolean = false) {
     val all = roads.flatten().ifEmpty { pts.map { it.place.lat to it.place.lng } }
     val reached = j.at ?: j.leg ?: 0
+    // Phone (디자인 평가 2026-11-04: the card covered the whole small map): the map on its own, a one-line strip under it.
+    if (compact) {
+        Column(modifier) {
+            Box(Modifier.fillMaxWidth().height(150.dp).clip(Corner)) { JourneyTiles(j, pts, records, all, reached, inset = 0f) }
+            JourneyStrip(j, pts, Modifier.fillMaxWidth().padding(top = 6.dp))
+        }
+        return
+    }
     Box(modifier.clip(Corner)) {
-        SimpleMap(
-            centerLat = pts.first().place.lat, centerLng = pts.first().place.lng, zoom = 13,
-            markers = pts.mapIndexed { i, r ->
-                MapMarker(r.place.lat, r.place.lng, if (i <= reached) "${records.indexOf(r) + 1}" else "",
-                    if (i <= reached) MapMarker.Kind.PICKUP else MapMarker.Kind.STOP)
-            } + listOfNotNull(j.pos?.takeIf { j.leg != null }?.let { MapMarker(it.first, it.second, "", MapMarker.Kind.CAR, j.bearing) }),
-            passed = all,
-            path = j.driven,
-            fit = if (all.size >= 2) all else emptyList(),
-            bottomInset = 0.3f,
-            pulse = if (j.at != null) j.pos else null,
-            modifier = Modifier.fillMaxSize(),
-        )
+        JourneyTiles(j, pts, records, all, reached, inset = 0.3f)
         JourneyCard(j, pts, records, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp))
+    }
+}
+
+@Composable
+private fun JourneyTiles(j: Journey, pts: List<Record>, records: List<Record>, all: List<Pair<Double, Double>>, reached: Int, inset: Float) {
+    SimpleMap(
+        centerLat = pts.first().place.lat, centerLng = pts.first().place.lng, zoom = 13,
+        markers = pts.mapIndexed { i, r ->
+            MapMarker(r.place.lat, r.place.lng, if (i <= reached) "${records.indexOf(r) + 1}" else "",
+                if (i <= reached) MapMarker.Kind.PICKUP else MapMarker.Kind.STOP)
+        } + listOfNotNull(j.pos?.takeIf { j.leg != null }?.let { MapMarker(it.first, it.second, "", MapMarker.Kind.CAR, j.bearing) }),
+        passed = all,
+        path = j.driven,
+        fit = if (all.size >= 2) all else emptyList(),
+        bottomInset = inset,
+        pulse = if (j.at != null) j.pos else null,
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+/** The phone's one line under the map: parked "정차 · 남이섬 선착장 · 2시간 30분" or moving with a thin bar. */
+@Composable
+private fun JourneyStrip(j: Journey, pts: List<Record>, modifier: Modifier) {
+    val km by animateFloatAsState((j.drivenMeters / 1000).toFloat(), label = "kmStrip")
+    Column(modifier) {
+        val line = if (j.leg != null) "이동 중 · ${pts[j.leg + 1].place.name.ifBlank { "다음 곳" }}까지 " + "%.1fkm".format(j.legMeters * (1 - j.f) / 1000)
+        else j.at?.let { a ->
+            val r = pts[a]
+            val stay = r.arrivedAt?.toDate()?.time?.let { s -> r.leftAt?.toDate()?.time?.let { hours(it - s) } }
+            listOfNotNull(if (j.stops == 0) "출발" else "정차", r.place.name.ifBlank { "이름 없는 곳" }, stay).joinToString(" · ")
+        } ?: ""
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(line, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1, modifier = Modifier.weight(1f))
+            Text("오늘 %.1fkm".format(km), fontSize = 14.sp, color = Palette.TextSoft)
+        }
+        if (j.leg != null) Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(3.dp).background(Palette.Line)) {
+            Box(Modifier.fillMaxHeight().fillMaxWidth(j.f.coerceIn(0.01f, 1f)).background(Palette.Teal))
+        }
     }
 }
 

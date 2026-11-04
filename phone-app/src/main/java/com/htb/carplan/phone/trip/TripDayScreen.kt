@@ -210,18 +210,14 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     val nextId = if (driving) stops.firstOrNull { !it.visited }?.id else null
 
     Column(Modifier.fillMaxSize().background(Palette.Background).statusBarsPadding()) {
+        // Header (디자인 평가 2026-11-04: on a phone the title, who-line and car button shared one row and wrapped into
+        // a tall jumble): line 1 = back · title · ⋮, line 2 = who's coming · 같이 갈 사람, line 3 = the car, if any.
+        val members = group?.takeUnless { it.solo }?.memberIds.orEmpty()
+        val who = if (members.size <= 1) "나만" else (listOfNotNull(me) + members.filter { it != me }).take(3).joinToString(" · ") { vm.nameOf(it) } + if (members.size > 3) " 외 ${members.size - 3}명" else ""
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
-            Column(Modifier.weight(1f)) {
-                Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                // Who is coming (초대 = 일정): tap to invite friends, a 묶음, or someone new.
-                val members = group?.takeUnless { it.solo }?.memberIds.orEmpty()
-                val who = if (members.size <= 1) "나만" else (listOfNotNull(me) + members.filter { it != me }).take(3).joinToString(" · ") { vm.nameOf(it) } + if (members.size > 3) " 외 ${members.size - 3}명" else ""
-                Row(Modifier.clip(Corner).clickable { inviteOpen = true }, verticalAlignment = Alignment.CenterVertically) {
-                    Text(listOfNotNull(who, dayLine(day)).joinToString(" · "), fontSize = 15.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft)
-                    Text("  같이 갈 사람", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy)
-                }
-            }
+            Text(event?.title?.ifBlank { null } ?: "여행", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (busy) Text("저장 중", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(end = 12.dp))
             // 14장 내보내기: 이미지 1장(Q39) 또는 짧은 영상(사진 슬라이드 + 장소·시간 자막)
             var exporting by remember { mutableStateOf<String?>(null) }
@@ -232,14 +228,6 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                     unplannedAfter(i).forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true, u.photoUrls)) }
                 }
                 if (stops.isEmpty()) unplanned.forEach { u -> add(ExportItem(u.arrivedAt?.let { hhmm(it) }, u.place.name, u.note, u.photoUrls.firstOrNull(), true, u.photoUrls)) }
-            }
-            // 7장 2: "오늘 이 차로 가요" — the trip gets my car and me as driver; the car app then shows it.
-            val e = event
-            when {
-                e?.carId != null -> TextButton(onClick = { if (e.driverUid == me) vm.useMyCar(null) }) {
-                    Text(if (e.driverUid == me) "내 차 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}", color = Palette.Teal, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                }
-                myCarId != null -> TextButton(onClick = { vm.useMyCar(myCarId) }) { Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
             }
             // 내보내기 behind one menu; 픽업·투표·다트 sit in their own row under the header (P-c).
             Box {
@@ -264,6 +252,24 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             }
         }
 
+        // Who's coming (초대 = 일정) and the car, under the title, each on one line.
+        Row(Modifier.fillMaxWidth().padding(start = 56.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f, fill = false).clip(Corner).clickable { inviteOpen = true }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(listOfNotNull(who, dayLine(day)).joinToString(" · "), fontSize = 15.sp, color = if (day?.holdByDriver == true) Palette.Sunday else Palette.TextSoft,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text("  같이 갈 사람", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, maxLines = 1)
+            }
+        }
+        // 7장 2: "오늘 이 차로 가요" — the trip gets my car and me as driver; the car app then shows it.
+        val e = event
+        when {
+            e?.carId != null -> Text(if (e.driverUid == me) "내 차로 가요 · 운전자 나" else "차 정해짐 · 운전자 ${vm.nameOf(e.driverUid)}",
+                color = Palette.TextStrong, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 56.dp, bottom = 4.dp).clip(Corner).clickable(enabled = e.driverUid == me) { vm.useMyCar(null) }.padding(vertical = 4.dp))
+            myCarId != null -> Text("오늘 이 차로 가요", color = Palette.Navy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 56.dp, bottom = 4.dp).clip(Corner).clickable { vm.useMyCar(myCarId) }.padding(vertical = 4.dp))
+        }
+        Spacer(Modifier.height(6.dp))
         // P-c: the "decide together" tools, visible instead of hidden in ⋮.
         if (!locked) Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (sharedTrip) {
@@ -385,7 +391,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                 items(removed, key = { "removed-" + it.id }) { stop ->
                     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "${vm.whoDid(stop.updatedBy)} ${stop.place.name}를(을) 뺐어요",
+                            "${vm.whoDid(stop.updatedBy)} ${com.htb.carplan.shared.text.Josa.eul(stop.place.name)} 뺐어요",
                             fontSize = 16.sp, color = Palette.TextSoft, textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f),
                         )
                         if (!locked) TextButton(onClick = { vm.restore(stop.id) }) { Text("되살리기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }
@@ -525,13 +531,14 @@ private fun TimelineStop(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
                     if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 15.sp, color = Palette.TextSoft) }
-                    if (!locked && onAskChat != null) TextButton(onClick = onAskChat, modifier = Modifier.padding(top = 8.dp)) { Text("채팅에 물어보기", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
-                    else if (locked && record != null) Spacer(Modifier.height(8.dp))
+                    // 디자인 평가 2026-11-04: one quiet action per stop when folded; 채팅에 묻기 is in the opened stop.
+                    if (locked && record != null) Spacer(Modifier.height(8.dp))
                 }
             } else {
                 if (!locked) CommentComposer(onSend = onSendComment, startOpen = true)
                 Row {
                     if (!locked) TextButton(onClick = onOpen) { Text("장소·시간·메모 고치기", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                    if (!locked && onAskChat != null) TextButton(onClick = onAskChat) { Text("채팅에 물어보기", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                     TextButton(onClick = { open = false }) { Text("접기", fontSize = 15.sp, color = Palette.TextSoft) }
                 }
             }

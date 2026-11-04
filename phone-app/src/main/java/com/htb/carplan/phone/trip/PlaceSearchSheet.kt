@@ -128,7 +128,7 @@ fun PlaceSearchSheet(
             loading = true
             val here = if (hasLocationPermission(context)) currentLocation(context) else null
             vm.recommend(c, here?.let { it.latitude to it.longitude })
-                .onSuccess { results = it; message = if (it.isEmpty()) "근처에 ${c.label}이(가) 없어요" else null }
+                .onSuccess { results = it; message = if (it.isEmpty()) "근처에 ${com.htb.carplan.shared.text.Josa.ga(c.label)} 없어요" else null }
                 .onFailure { message = it.message }
             loading = false
         }
