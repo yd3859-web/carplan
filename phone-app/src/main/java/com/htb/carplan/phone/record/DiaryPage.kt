@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -104,9 +105,16 @@ fun DiaryPage(
     val next = book.pages.getOrNull(index + 1)?.first
     val nameOf: (String?) -> String = { uid -> if (uid == vm.me()) "나" else names[uid]?.ifBlank { null } ?: "일행" }
     val pts = records.filter { it.place.lat != 0.0 || it.place.lng != 0.0 }
-    // The place being read now: the last one whose dot has landed (list item i + 1 = record i).
-    val current by remember(state, records) {
-        derivedStateOf { records.indices.lastOrNull { progressNow(state, it + 1) > DOT_AT } ?: -1 }
+    val coords = pts.map { it.place.lat to it.place.lng }
+    val roads by produceState<List<List<Pair<Double, Double>>>>(coords.zipWithNext().map { (a, b) -> listOf(a, b) }, page) { value = vm.roads(page, coords) }
+    // Between two places: a stretch of rail you scroll through while the car drives (about a third of the screen).
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val zoneH = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.32f).dp
+    val zonePx = with(density) { zoneH.toPx() }
+    // Where the car is in the day, from the scroll: parked at a place, or part-way along a road.
+    val trip by remember(state, records, roads, zonePx) { derivedStateOf { journeyNow(state, records, pts, roads, zonePx) } }
+    val legKm = remember(roads, pts, records) {
+        pts.zipWithNext().mapIndexed { k, (a, _) -> records.indexOf(a) to lengthOf(roads.getOrNull(k).orEmpty()) }.toMap()
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Background).statusBarsPadding()) {
@@ -114,20 +122,17 @@ fun DiaryPage(
         val viewH = maxHeight
         Column(Modifier.fillMaxSize()) {
             TopBar(page, d, book, prev, next, state, onBack, onPage)
+            if (!wide && pts.isNotEmpty()) JourneyMap(trip, pts, records, roads, Modifier.fillMaxWidth().height(220.dp).padding(horizontal = 20.dp, vertical = 8.dp))
             Row(Modifier.fillMaxSize()) {
                 if (wide && pts.isNotEmpty()) {
                     Box(Modifier.weight(1f).fillMaxHeight().padding(start = 20.dp, top = 8.dp, bottom = 20.dp)) {
-                        RouteMap(pts, records, current, Modifier.fillMaxSize().clip(Corner))
+                        JourneyMap(trip, pts, records, roads, Modifier.fillMaxSize())
                     }
                 }
                 LazyColumn(Modifier.weight(1f).fillMaxHeight(), state = state, horizontalAlignment = Alignment.CenterHorizontally) {
                     item(key = "head") {
                         Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp)) {
                             Header(page, d, book, records, names, vm)
-                            if (!wide && pts.isNotEmpty()) {
-                                Spacer(Modifier.height(16.dp))
-                                RouteMap(pts, records, current, Modifier.fillMaxWidth().height(200.dp).clip(Corner))
-                            }
                             Spacer(Modifier.height(28.dp))
                         }
                     }
@@ -135,7 +140,9 @@ fun DiaryPage(
                         StoryStop(
                             number = i + 1, r = r, next = records.getOrNull(i + 1), first = i == 0,
                             said = comments.filter { r.stopId != null && it.stopId == r.stopId }, nameOf = nameOf,
-                            progress = rememberProgress(state, i + 1), minHeight = viewH * 0.62f,
+                            progress = rememberProgress(state, i + 1),
+                            travel = remember(state, i, zonePx) { derivedStateOf { travelNow(state, i + 1, zonePx) } },
+                            zoneH = if (i < records.lastIndex) zoneH else 24.dp, legMeters = legKm[i],
                             onPhoto = { at -> viewing = r.photoUrls to at },
                         )
                     }
@@ -195,22 +202,116 @@ private fun Header(page: DiaryDay, d: LocalDate, book: DiaryBook, records: List<
     Text("아래로 내리며 하루를 따라가 보세요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 18.dp))
 }
 
-/** The day's route: grey all the way, blue as far as you've read, the place being read in ink. */
+/** Where the diary's car is: parked at place [at] (index in pts), or on road [leg] (pts leg → leg + 1) at [f]. */
+private data class Journey(
+    val at: Int?, val leg: Int?, val f: Float,
+    val pos: Pair<Double, Double>?, val bearing: Double,
+    /** Road behind the car (all legs done + the part of this one). */
+    val driven: List<Pair<Double, Double>>,
+    val drivenMeters: Double, val legMeters: Double, val stops: Int,
+)
+
+private fun lengthOf(line: List<Pair<Double, Double>>) =
+    line.zipWithNext().sumOf { (a, b) -> com.htb.carplan.shared.calendar.RouteMath.metersBetween(a.first, a.second, b.first, b.second) }
+
+/** The point [f] of the way along [line], its heading, and the line up to there. */
+private fun along(line: List<Pair<Double, Double>>, f: Float): Triple<Pair<Double, Double>, Double, List<Pair<Double, Double>>> {
+    val total = lengthOf(line)
+    if (line.size < 2 || total <= 0.0) return Triple(line.first(), 0.0, listOf(line.first()))
+    var left = total * f
+    val out = mutableListOf(line.first())
+    for ((a, b) in line.zipWithNext()) {
+        val seg = com.htb.carplan.shared.calendar.RouteMath.metersBetween(a.first, a.second, b.first, b.second)
+        val heading = Math.toDegrees(kotlin.math.atan2((b.second - a.second) * kotlin.math.cos(Math.toRadians(a.first)), b.first - a.first))
+        if (left <= seg || b == line.last()) {
+            val t = if (seg > 0) (left / seg).coerceIn(0.0, 1.0) else 1.0
+            val p = (a.first + (b.first - a.first) * t) to (a.second + (b.second - a.second) * t)
+            out += p
+            return Triple(p, heading, out)
+        }
+        left -= seg; out += b
+    }
+    return Triple(line.last(), 0.0, line)
+}
+
+/**
+ * The scroll as a drive: leg k (pts k → k + 1) is driven while place k's drive stretch scrolls past the reading
+ * line; the car pulls in as place k + 1's dot lands. Before that the car is parked (a ring), reading the place.
+ */
+private fun journeyNow(state: LazyListState, records: List<Record>, pts: List<Record>, roads: List<List<Pair<Double, Double>>>, zonePx: Float): Journey {
+    if (pts.isEmpty()) return Journey(null, null, 0f, null, 0.0, emptyList(), 0.0, 0.0, 0)
+    val item = pts.map { records.indexOf(it) + 1 }
+    val fs = (0 until pts.size - 1).map { k -> travelNow(state, item[k], zonePx) }
+    val arrived = pts.indices.count { progressNow(state, item[it]) > DOT_AT }
+    val k = fs.indexOfLast { it > 0f }
+    val done = (0 until maxOf(k, 0)).flatMap { roads.getOrNull(it).orEmpty() }
+    val doneM = (0 until maxOf(k, 0)).sumOf { lengthOf(roads.getOrNull(it).orEmpty()) }
+    if (k < 0 || fs[k] >= 1f) {
+        // Parked: at the furthest place reached (or still at the start).
+        val at = if (k < 0) 0 else k + 1
+        val full = (0 until at).flatMap { roads.getOrNull(it).orEmpty() }
+        val m = (0 until at).sumOf { lengthOf(roads.getOrNull(it).orEmpty()) }
+        return Journey(at, null, 0f, pts[at].place.lat to pts[at].place.lng, 0.0, full, m, 0.0, arrived)
+    }
+    val road = roads.getOrNull(k) ?: listOf(pts[k].place.lat to pts[k].place.lng, pts[k + 1].place.lat to pts[k + 1].place.lng)
+    val legM = lengthOf(road)
+    val (pos, heading, part) = along(road, fs[k])
+    return Journey(null, k, fs[k], pos, heading, done + part, doneM + legM * fs[k], legM, arrived)
+}
+
+/**
+ * The day as a moving map (정원 2026-11-04 "흑백 지도에 경로만이면 재미없다 — 움직이면서 어디서 섰고 얼마나 갔는지"):
+ * the car drives the real road as you scroll, the road behind it turns blue, a ring spreads where it is parked, and
+ * the card says where it stopped and for how long, or how far along the drive it is — with today's distance counting.
+ */
 @Composable
-private fun RouteMap(pts: List<Record>, records: List<Record>, current: Int, modifier: Modifier) {
-    val all = pts.map { it.place.lat to it.place.lng }
-    val upTo = if (current < 0) 0 else pts.count { records.indexOf(it) <= current }
-    SimpleMap(
-        centerLat = all.first().first, centerLng = all.first().second, zoom = 13,
-        markers = pts.mapIndexed { i, r ->
-            MapMarker(r.place.lat, r.place.lng, if (i < upTo) "${records.indexOf(r) + 1}" else "",
-                if (records.indexOf(r) == current) MapMarker.Kind.PICKUP else MapMarker.Kind.STOP)
-        },
-        passed = all,
-        path = all.take(upTo),
-        fit = if (all.size >= 2) all else emptyList(),
-        modifier = modifier,
-    )
+private fun JourneyMap(j: Journey, pts: List<Record>, records: List<Record>, roads: List<List<Pair<Double, Double>>>, modifier: Modifier) {
+    val all = roads.flatten().ifEmpty { pts.map { it.place.lat to it.place.lng } }
+    val reached = j.at ?: j.leg ?: 0
+    Box(modifier.clip(Corner)) {
+        SimpleMap(
+            centerLat = pts.first().place.lat, centerLng = pts.first().place.lng, zoom = 13,
+            markers = pts.mapIndexed { i, r ->
+                MapMarker(r.place.lat, r.place.lng, if (i <= reached) "${records.indexOf(r) + 1}" else "",
+                    if (i <= reached) MapMarker.Kind.PICKUP else MapMarker.Kind.STOP)
+            } + listOfNotNull(j.pos?.takeIf { j.leg != null }?.let { MapMarker(it.first, it.second, "", MapMarker.Kind.CAR, j.bearing) }),
+            passed = all,
+            path = j.driven,
+            fit = if (all.size >= 2) all else emptyList(),
+            bottomInset = 0.3f,
+            pulse = if (j.at != null) j.pos else null,
+            modifier = Modifier.fillMaxSize(),
+        )
+        JourneyCard(j, pts, records, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp))
+    }
+}
+
+@Composable
+private fun JourneyCard(j: Journey, pts: List<Record>, records: List<Record>, modifier: Modifier) {
+    val km by animateFloatAsState((j.drivenMeters / 1000).toFloat(), label = "km")
+    Column(modifier.background(Palette.Background, Corner).border(1.dp, Palette.SheetEdge, Corner).padding(horizontal = 14.dp, vertical = 12.dp)) {
+        if (j.leg != null) {
+            val a = pts[j.leg]; val b = pts[j.leg + 1]
+            Text("이동 중", fontSize = 14.sp, color = Palette.TextSoft)
+            Text("${a.place.name.ifBlank { "출발" }} → ${b.place.name.ifBlank { "다음 곳" }}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1)
+            Row(Modifier.padding(top = 8.dp).fillMaxWidth().height(4.dp).background(Palette.Line, Corner)) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(j.f.coerceIn(0.01f, 1f)).background(Palette.Teal, Corner))
+            }
+            val drive = moveLine(a, b)
+            Text("%.1f / %.1fkm".format(j.legMeters * j.f / 1000, j.legMeters / 1000) + (drive?.let { "  ·  $it" } ?: ""),
+                fontSize = 14.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 6.dp))
+        } else if (j.at != null) {
+            val r = pts[j.at]
+            val stay = r.arrivedAt?.toDate()?.time?.let { a -> r.leftAt?.toDate()?.time?.let { hours(it - a) } }
+            val from = r.arrivedAt?.toDate()?.time?.let(::clock)
+            val to = r.leftAt?.toDate()?.time?.let(::clock)
+            Text(if (j.stops == 0) "출발" else "정차 · ${records.indexOf(r) + 1}번째", fontSize = 14.sp, color = Palette.TextSoft)
+            Text(r.place.name.ifBlank { "이름 없는 곳" }, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1)
+            Text(listOfNotNull(from?.let { f -> if (to != null) "$f – $to" else "$f 도착" }, stay).joinToString("  ·  "),
+                fontSize = 14.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text("오늘 %.1fkm 달림  ·  %d곳 들름".format(km, j.stops), fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+    }
 }
 
 private val RailX = 18.dp
@@ -222,9 +323,21 @@ private fun progressNow(state: LazyListState, itemIndex: Int): Float {
     val info = state.layoutInfo
     val it = info.visibleItemsInfo.firstOrNull { it.index == itemIndex }
         ?: return if (itemIndex < state.firstVisibleItemIndex) 1f else 0f
-    val start = info.viewportEndOffset * 0.92f          // starts when its top comes onto the lower screen
-    val span = minOf(it.size.toFloat(), info.viewportEndOffset * 0.62f)
+    val start = info.viewportEndOffset * 0.75f          // starts when its top comes up to the lower quarter
+    val span = minOf(it.size.toFloat(), info.viewportEndOffset * 0.55f)
     return ((start - it.offset) / span).coerceIn(0f, 1f)
+}
+
+/** The reading line: where the eye is. A drive is done when its stretch has gone up past it (next dot lands here). */
+private const val READ_LINE = 0.66f
+
+/** How far the drive stretch at the bottom of item [itemIndex] (height [zonePx]) has passed the reading line. */
+private fun travelNow(state: LazyListState, itemIndex: Int, zonePx: Float): Float {
+    val info = state.layoutInfo
+    val it = info.visibleItemsInfo.firstOrNull { it.index == itemIndex }
+        ?: return if (itemIndex < state.firstVisibleItemIndex) 1f else 0f
+    val zoneTop = it.offset + it.size - zonePx
+    return ((info.viewportEndOffset * READ_LINE - zoneTop) / zonePx).coerceIn(0f, 1f)
 }
 
 @Composable
@@ -237,7 +350,7 @@ private fun seg(p: Float, from: Float, to: Float) = ((p - from) / (to - from)).c
 @Composable
 private fun StoryStop(
     number: Int, r: Record, next: Record?, first: Boolean, said: List<Comment>, nameOf: (String?) -> String,
-    progress: State<Float>, minHeight: Dp, onPhoto: (Int) -> Unit,
+    progress: State<Float>, travel: State<Float>, zoneH: Dp, legMeters: Double?, onPhoto: (Int) -> Unit,
 ) {
     // The dot doesn't scrub: it lands with a little bounce (and a tick) once its part of the scroll is reached.
     val landed by remember { derivedStateOf { progress.value > DOT_AT } }
@@ -245,14 +358,24 @@ private fun StoryStop(
     val haptic = LocalHapticFeedback.current
     LaunchedEffect(landed) { if (landed) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
     val ink = Palette.TextStrong
+    val teal = Palette.Teal
     Row(
-        Modifier.widthIn(max = 640.dp).fillMaxWidth().heightIn(min = minHeight).padding(horizontal = 20.dp).drawBehind {
+        Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp).drawBehind {
             val p = progress.value
             val x = RailX.toPx(); val y = NodeY.toPx(); val w = 3.dp.toPx()
+            val zone = zoneH.toPx(); val zoneTop = size.height - zone
             val top = seg(p, 0f, DOT_AT)
             if (!first && top > 0f) drawLine(RailPassed, Offset(x, 0f), Offset(x, y * top), w, StrokeCap.Round)
-            val tail = seg(p, 0.62f, 1f)
-            if (tail > 0f) drawLine(RailPassed, Offset(x, y), Offset(x, y + (size.height - y) * tail), w, StrokeCap.Round)
+            // Down past the place's words and photos as they appear …
+            val down = seg(p, 0.3f, 0.75f)
+            if (down > 0f) drawLine(RailPassed, Offset(x, y), Offset(x, y + (zoneTop - y) * down), w, StrokeCap.Round)
+            // … then the drive: the rail runs on with the car at its head.
+            val t = travel.value
+            if (next != null && t > 0f) {
+                val head = zoneTop + zone * t
+                drawLine(RailPassed, Offset(x, zoneTop), Offset(x, head), w, StrokeCap.Round)
+                if (t < 1f) drawCircle(teal, 6.dp.toPx(), Offset(x, head))
+            }
         },
     ) {
         Box(Modifier.width(RailX * 2), contentAlignment = Alignment.TopCenter) {
@@ -299,9 +422,18 @@ private fun StoryStop(
                 }
                 if (small.isNotEmpty()) Text(small.joinToString("   "), fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 10.dp))
             }
-            // The drive to the next place, on the rail as it heads on.
-            Text(moveLine(r, next) ?: "", fontSize = 14.sp, color = Palette.TextSoft,
-                modifier = Modifier.graphicsLayer { alpha = seg(progress.value, 0.7f, 1f) }.padding(top = 28.dp, bottom = 28.dp))
+            // The drive to the next place: a stretch of rail with how long and how far, lit while the car is on it.
+            Box(Modifier.fillMaxWidth().height(zoneH), contentAlignment = Alignment.CenterStart) {
+                if (next != null) {
+                    val t = travel.value
+                    Column(Modifier.graphicsLayer { alpha = 0.35f + 0.65f * seg(t, 0f, 0.15f) * (1f - seg(t, 0.85f, 1f)) }) {
+                        Text("이동", fontSize = 14.sp, color = Palette.TextSoft)
+                        Text(listOfNotNull(moveLine(r, next)?.removePrefix("이동 "), legMeters?.takeIf { it > 50 }?.let { "%.1fkm".format(it / 1000) }).joinToString("  ·  ").ifBlank { "다음 곳으로" },
+                            fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                        Text("→ ${next.place.name.ifBlank { "다음 곳" }}", fontSize = 14.sp, color = Palette.TextSoft)
+                    }
+                }
+            }
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.htb.carplan.phone.ui
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,6 +59,8 @@ fun SimpleMap(
     modifier: Modifier = Modifier.fillMaxWidth().height(height).clip(Corner).border(1.dp, Palette.Line, Corner),
     /** Share of the height kept free at the bottom (a card over the map): framing [fit] uses the space above it. */
     bottomInset: Float = 0f,
+    /** A ring spreading out from this point, again and again ("stopped here" — 기록 일기). */
+    pulse: Pair<Double, Double>? = null,
 ) {
     BoxWithConstraints(modifier.background(Color(0xFFF2F2F0))) {
         val tile = 256.dp
@@ -117,6 +121,18 @@ fun SimpleMap(
                     ).border(2.dp, if (m.kind == MapMarker.Kind.ME) Palette.TextStrong else Palette.Background, CircleShape),
                 )
                 if (m.label.isNotEmpty()) Text(m.label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.offset(x = size + 2.dp, y = (-2).dp).background(Color(0xCCFFFFFF)))
+            }
+        }
+        pulse?.let { (lat, lng) ->
+            val mx = (lng + 180) / 360 * n
+            val my = (1 - ln(tan(Math.toRadians(lat)) + 1 / Math.cos(Math.toRadians(lat))) / PI) / 2 * n
+            val px = ox + (mx - (tx - 1)) * tilePx; val py = oy + (my - (ty - 1)) * tilePx
+            val ring = androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse")
+            val t by ring.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1600)), label = "pulseT")
+            val box = 64.dp
+            val boxPx = with(density) { box.toPx() }
+            androidx.compose.foundation.Canvas(Modifier.size(box).offset { androidx.compose.ui.unit.IntOffset((px - boxPx / 2).toInt(), (py - boxPx / 2).toInt()) }) {
+                drawCircle(Palette.TextStrong.copy(alpha = (1f - t) * 0.45f), radius = size.minDimension / 2 * (0.25f + 0.75f * t), style = Stroke(width = 2.dp.toPx()))
             }
         }
         Text(TILE_ATTRIBUTION, fontSize = 10.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xAAFFFFFF)))

@@ -173,6 +173,27 @@ class RecordTabViewModel : ViewModel() {
         }
     }
 
+    private val kakaoApi by lazy { com.htb.carplan.shared.net.KakaoApi(com.htb.carplan.phone.BuildConfig.KAKAO_REST_KEY) }
+    private val roadCache = mutableMapOf<String, List<List<Pair<Double, Double>>>>()
+
+    /**
+     * The road between each two places of a day, for the moving car in the diary (Kakao Mobility, once per day read,
+     * kept while the tab lives — 외부 API 한도). No key, a failure or a very long day: a straight line for that leg.
+     */
+    suspend fun roads(p: DiaryDay, pts: List<Pair<Double, Double>>): List<List<Pair<Double, Double>>> {
+        val key = p.groupId + p.eventId + p.date + pts.hashCode()
+        roadCache[key]?.let { return it }
+        val legs = pts.zipWithNext().mapIndexed { i, (a, b) ->
+            if (a == b) listOf(a, b)
+            else if (!kakaoApi.available || i >= 12) listOf(a, b)
+            else runCatching {
+                kakaoApi.route(com.htb.carplan.shared.model.Place(lat = a.first, lng = a.second), com.htb.carplan.shared.model.Place(lat = b.first, lng = b.second)).path
+            }.getOrNull()?.takeIf { it.size >= 2 }?.let { listOf(a) + it + listOf(b) } ?: listOf(a, b)
+        }
+        roadCache[key] = legs
+        return legs
+    }
+
     init { viewModelScope.launch { runCatching { sessions.ensureSession() }.onSuccess { _session.value = it } } }
 
     suspend fun summary(p: DiaryDay) = runCatching { records.daySummary(p.groupId, p.eventId, p.date) }.getOrDefault(emptyList())
