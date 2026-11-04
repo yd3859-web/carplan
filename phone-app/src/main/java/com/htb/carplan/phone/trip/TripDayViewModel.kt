@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -266,6 +267,25 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     val legs: StateFlow<Map<String, LegInfo>> = _legs.asStateFlow()
     private val legCache = HashMap<String, LegInfo>()
 
+    /**
+     * 경로 미리보기 (정원 2026-11-04): the road between each two places of the day for the map over the rail. Kakao
+     * Mobility once per pair of places (kept), a straight line without a key or on failure. Only after the stops settle
+     * (a drag fires many changes): 1.5 s quiet first.
+     */
+    private val _roads = MutableStateFlow<List<List<Pair<Double, Double>>>>(emptyList())
+    val roads: StateFlow<List<List<Pair<Double, Double>>>> = _roads.asStateFlow()
+    private val roadCache = HashMap<String, List<Pair<Double, Double>>>()
+    private suspend fun refreshRoads(list: List<Stop>) {
+        val pts = list.filterNot { it.deleted }.map { it.place }.filter { it.lat != 0.0 || it.lng != 0.0 }
+        _roads.value = pts.zipWithNext().map { (a, b) -> roadCache["${a.lat},${a.lng}>${b.lat},${b.lng}"] ?: listOf(a.lat to a.lng, b.lat to b.lng) }
+        kotlinx.coroutines.delay(1_500)
+        _roads.value = pts.zipWithNext().map { (a, b) ->
+            val key = "${a.lat},${a.lng}>${b.lat},${b.lng}"
+            roadCache[key] ?: (if (kakao.available && a != b) runCatching { kakao.route(a, b).path }.getOrNull()?.takeIf { it.size >= 2 }?.let { listOf(a.lat to a.lng) + it + listOf(b.lat to b.lng) } else null)
+                ?.also { roadCache[key] = it } ?: listOf(a.lat to a.lng, b.lat to b.lng)
+        }
+    }
+
     /** "예상 12:05" for stops without a typed time: previous time + stay + drive (Schedule). */
     val estimates: StateFlow<Map<String, String>> = combine(stops, _legs) { list, legs ->
         Schedule.estimate(list, { id -> legs[id]?.seconds })
@@ -282,6 +302,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
                 .onFailure { _error.value = it.message }
         }
         viewModelScope.launch { stops.collect { refreshLegs(it) } }
+        viewModelScope.launch { stops.collectLatest { refreshRoads(it) } }
         viewModelScope.launch { remoteStops.collect { list -> list.mapNotNull { it.updatedBy }.distinct().forEach(::loadName) } }
         viewModelScope.launch { remoteComments.collect { list -> list.map { it.uid }.distinct().forEach(::loadName) } }
         viewModelScope.launch { myGroups.collect { gs -> gs.filterNot { it.solo }.flatMap { it.memberIds }.distinct().forEach(::loadName) } }

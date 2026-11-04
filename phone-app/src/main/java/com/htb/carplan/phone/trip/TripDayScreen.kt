@@ -81,6 +81,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -323,6 +326,38 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             }
         }
 
+        // 경로 미리보기 (정원 2026-11-04): the day's route on a map over the rail. On a phone the list needs the room, so the
+        // map folds up as the list is pushed up and opens again when it is pulled down at the top.
+        val roads by vm.roads.collectAsStateWithLifecycle()
+        val hasMap = stops.any { !it.deleted && (it.place.lat != 0.0 || it.place.lng != 0.0) }
+        val mapFull = 200.dp
+        val mapFullPx = with(androidx.compose.ui.platform.LocalDensity.current) { (mapFull + 8.dp).toPx() }
+        var mapFrac by rememberSaveable { androidx.compose.runtime.mutableFloatStateOf(1f) }
+        val fold = remember(mapFullPx, hasMap) {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (!hasMap || available.y >= 0 || mapFrac <= 0f) return androidx.compose.ui.geometry.Offset.Zero
+                    val before = mapFrac
+                    mapFrac = (mapFrac + available.y / mapFullPx).coerceIn(0f, 1f)
+                    return androidx.compose.ui.geometry.Offset(0f, (mapFrac - before) * mapFullPx)
+                }
+                override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (!hasMap || available.y <= 0 || mapFrac >= 1f) return androidx.compose.ui.geometry.Offset.Zero
+                    val before = mapFrac
+                    mapFrac = (mapFrac + available.y / mapFullPx).coerceIn(0f, 1f)
+                    return androidx.compose.ui.geometry.Offset(0f, (mapFrac - before) * mapFullPx)
+                }
+            }
+        }
+        if (hasMap) {
+            if (mapFrac > 0.01f) Box(Modifier.fillMaxWidth().height((mapFull + 8.dp) * mapFrac).clipToBounds()) {
+                PlanMap(stops, roads, Modifier.fillMaxWidth().wrapContentHeight(Alignment.Bottom, unbounded = true).padding(start = 16.dp, end = 16.dp, top = 8.dp).height(mapFull))
+            }
+            // Folded: one line to bring it back (pulling down at the top does the same).
+            if (mapFrac < 0.15f) Text("지도 보기 ▾", fontSize = 14.sp, color = Palette.TextSoft,
+                modifier = Modifier.fillMaxWidth().clickable { mapFrac = 1f }.padding(horizontal = 16.dp, vertical = 6.dp))
+        }
+
         val listState = rememberLazyListState()
         val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
         val reorder = rememberReorderableLazyListState(listState) { from, to ->
@@ -333,7 +368,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         val dayAt = dates.indexOf(date)
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
+            modifier = Modifier.weight(1f).nestedScroll(fold).padding(horizontal = 16.dp)
                 .sideSwipe(date, onPrev = { dates.getOrNull(dayAt - 1)?.let(vm::showDate) }, onNext = { dates.getOrNull(dayAt + 1)?.takeIf { dayAt >= 0 }?.let(vm::showDate) }),
         ) {
             item { Spacer(Modifier.height(12.dp)) }
