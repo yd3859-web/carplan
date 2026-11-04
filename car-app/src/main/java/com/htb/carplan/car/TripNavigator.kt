@@ -651,8 +651,14 @@ class TripNavigator(
         _voice.value = VoiceState()
         val t = trip.value
         when (cmd) {
-            VoiceCommand.FUEL -> { scope.launch { voice.say(if (carState.isEv == true) "충전소를 찾을게요." else "주유소를 찾을게요.") }; fuelPlan?.let { goViaStation(it) } ?: findStation() }
-            VoiceCommand.PARKING -> { scope.launch { voice.say("근처 주차장을 찾을게요.") }; findNearby("주차장", KakaoCategory.PARKING, null) }
+            // 정원 2026-11-04: by the day's plan, not just where the car stands — fuel = cheapest along today's places,
+            // parking = around the place the car is going to now.
+            VoiceCommand.FUEL -> { scope.launch { voice.say(if (carState.isEv == true) "충전소를 찾을게요." else "오늘 갈 길에서 싼 주유소를 찾을게요.") }; fuelPlan?.let { goViaStation(it) } ?: findFuelForDay() }
+            VoiceCommand.PARKING -> {
+                val at = stepPlace()
+                scope.launch { voice.say(at?.let { "${it.name} 근처 주차장을 찾을게요." } ?: "근처 주차장을 찾을게요.") }
+                findNearby("주차장", KakaoCategory.PARKING, null, near = at)
+            }
             VoiceCommand.FOOD -> { scope.launch { voice.say("근처 맛집을 찾을게요.") }; findNearby("맛집", KakaoCategory.FOOD, null) }
             VoiceCommand.WHERE -> scope.launch { voice.say(whereSentence(t)) }
             VoiceCommand.REVERT -> if (previousRoute.isNotEmpty() && _guiding.value) revertRoute() else scope.launch { voice.say("되돌릴 경로가 없어요.") }
@@ -935,6 +941,39 @@ class TripNavigator(
     }
 
     /** "응" to the station question: Opinet cheapest list (fuel car + key), else the navigation's own search. */
+    /** The place of the day the car is at or heading to now: a pickup being collected, else the next stop. */
+    private fun stepPlace(): Place? {
+        val t = trip.value ?: return null
+        return t.waitingPickups.firstOrNull()?.takeIf { _guiding.value }?.place?.takeIf { it.hasCoords() } ?: t.next?.place?.takeIf { it.hasCoords() }
+    }
+
+    /**
+     * [주유소] (정원 2026-11-04: "일정 중 최저가 주유소"): Opinet prices around the car and around each place still to go
+     * today (up to 4 calls), cheapest first, each saying which place it is near. EV: chargers around the next place.
+     * No trip / no Opinet key: the stations near the car, as before.
+     */
+    private fun findFuelForDay() {
+        val t = trip.value
+        val ev = carState.isEv == true
+        val ahead = t?.remaining.orEmpty().map { it.place }.filter { it.hasCoords() }.take(3)
+        if (ev) { findNearby("충전소", null, "전기차 충전소", near = stepPlace()); return }
+        if (ahead.isEmpty() || !opinet.available) { findStation(); return }
+        router.requestCurrentLocation()
+        scope.launch {
+            delay(600)
+            val points = listOfNotNull(lastLocation?.let { "지금 자리" to Place(name = "지금 자리", lat = it.first, lng = it.second) }) + ahead.map { it.name to it }
+            val found = points.flatMap { (label, p) ->
+                runCatching { opinet.around(p.lat, p.lng) }.getOrElse { emptyList() }.filter { it.meters <= 3_000 }.map { label to it }
+            }.distinctBy { it.second.id }.sortedBy { it.second.price }.take(5)
+            if (found.isEmpty()) { findStation(); return@launch }
+            _nearby.value = NearbyList(
+                "오늘 갈 길 최저가 주유소", NaviEntry.Kind.STATION,
+                found.map { (label, st) -> NearPlace(st.id, st.name, st.meters, st.place, st.price, where = if (label == "지금 자리") "지금 근처" else "$label 근처") },
+                "싼 순 · 고르면 경유지로 들어가고, 그다음 원래 일정으로 이어져요",
+            )
+        }
+    }
+
     private fun findStation() {
         val ev = carState.isEv == true
         router.requestCurrentLocation()
@@ -984,11 +1023,12 @@ class TripNavigator(
      * possible (no key, no position, nothing found) does the navigation's own search open — then the way back is the
      * carplan icon in the bar below.
      */
-    private fun findNearby(what: String, category: KakaoCategory?, keyword: String?) {
+    private fun findNearby(what: String, category: KakaoCategory?, keyword: String?, near: Place? = null) {
         router.requestCurrentLocation()
         scope.launch {
             delay(600) // let the location answer arrive
-            val loc = lastLocation
+            // Around [near] (the place of this step of the day) when given, else around the car.
+            val loc = near?.takeIf { it.hasCoords() }?.let { it.lat to it.lng } ?: lastLocation
             val found = if (loc == null || !kakao.available) null else runCatching {
                 (if (category != null) kakao.searchCategory(category, loc.first, loc.second, radiusMeters = 3000, size = 5)
                 else kakao.searchKeyword(keyword!!, near = loc, size = 5))
@@ -998,7 +1038,8 @@ class TripNavigator(
             }.getOrNull()
             if (found.isNullOrEmpty()) { if (what == "충전소") router.openChargers() else router.search(what); return@launch }
             val kind = if (what == "주유소" || what == "충전소") NaviEntry.Kind.STATION else NaviEntry.Kind.EXTRA
-            _nearby.value = NearbyList("가까운 $what", kind, found, "고르면 다음 경유지로 들어가요 · 내비 화면은 [내비 보기]로")
+            _nearby.value = NearbyList(near?.takeIf { it.hasCoords() }?.let { "${it.name} 근처 $what" } ?: "가까운 $what", kind, found,
+                if (near != null) "${near.name}에서 가까운 순 · 고르면 그곳 대신 먼저 들러요" else "고르면 다음 경유지로 들어가요 · 내비 화면은 [내비 보기]로")
         }
     }
 
