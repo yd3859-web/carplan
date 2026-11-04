@@ -61,6 +61,8 @@ fun SimpleMap(
     bottomInset: Float = 0f,
     /** A ring spreading out from this point, again and again ("stopped here" — 기록 일기). */
     pulse: Pair<Double, Double>? = null,
+    /** Told the centre and zoom actually drawn (after [fit]) — a zoomable map starts its own view from it. */
+    onView: ((Double, Double, Int) -> Unit)? = null,
 ) {
     BoxWithConstraints(modifier.background(Color(0xFFF2F2F0))) {
         val tile = 256.dp
@@ -69,6 +71,7 @@ fun SimpleMap(
         val tilePx = with(density) { tile.toPx() }
         val freeH = hPx * (1 - bottomInset)
         val (cLat, cLng, z) = if (fit.size >= 2) fitView(fit, wPx / tilePx, freeH / tilePx) else Triple(centerLat, centerLng, zoom)
+        onView?.let { cb -> androidx.compose.runtime.SideEffect { cb(cLat, cLng, z) } }
         val n = 2.0.pow(z)
         val cx = (cLng + 180) / 360 * n
         // With a card at the bottom, the framed points sit in the middle of the space above it.

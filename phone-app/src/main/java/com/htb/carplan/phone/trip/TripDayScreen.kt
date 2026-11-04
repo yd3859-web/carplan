@@ -343,7 +343,10 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         // 경로 미리보기 (정원 2026-11-04): the day's route on a map over the rail. On a phone the list needs the room, so the
         // map folds up as the list is pushed up and opens again when it is pulled down at the top.
         val roads by vm.roads.collectAsStateWithLifecycle()
-        val hasMap = stops.any { !it.deleted && (it.place.lat != 0.0 || it.place.lng != 0.0) }
+        // 픽업 자리 are part of the day's way (정원 2026-11-04: "픽업하는 사람 위치를 경로에도 자동 추가"): on the map first,
+        // and a line above the stops. The car already drives to them first (11장).
+        val waitingPicks = pickups.filter { it.status == com.htb.carplan.shared.model.PickupStatus.WAITING }.sortedBy { it.order }
+        val hasMap = waitingPicks.any { it.place.lat != 0.0 } || stops.any { !it.deleted && (it.place.lat != 0.0 || it.place.lng != 0.0) }
         val mapFull = 200.dp
         val mapFullPx = with(androidx.compose.ui.platform.LocalDensity.current) { (mapFull + 8.dp).toPx() }
         var mapFrac by rememberSaveable { androidx.compose.runtime.mutableFloatStateOf(1f) }
@@ -365,7 +368,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         }
         if (hasMap) {
             if (mapFrac > 0.01f) Box(Modifier.fillMaxWidth().height((mapFull + 8.dp) * mapFrac).clipToBounds()) {
-                PlanMap(stops, roads, Modifier.fillMaxWidth().wrapContentHeight(Alignment.Bottom, unbounded = true).padding(start = 16.dp, end = 16.dp, top = 8.dp).height(mapFull))
+                PlanMap(stops, roads, Modifier.fillMaxWidth().wrapContentHeight(Alignment.Bottom, unbounded = true).padding(start = 16.dp, end = 16.dp, top = 8.dp).height(mapFull),
+                    pickups = waitingPicks.map { it.name to it.place })
             }
             // Folded: one line to bring it back (pulling down at the top does the same).
             if (mapFrac < 0.15f) Text("지도 보기 ▾", fontSize = 14.sp, color = Palette.TextSoft,
@@ -386,6 +390,15 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                 .sideSwipe(date, onPrev = { dates.getOrNull(dayAt - 1)?.let(vm::showDate) }, onNext = { dates.getOrNull(dayAt + 1)?.takeIf { dayAt >= 0 }?.let(vm::showDate) }),
         ) {
             item { Spacer(Modifier.height(12.dp)) }
+            if (waitingPicks.isNotEmpty()) item(key = "pickups") {
+                Row(Modifier.fillMaxWidth().clip(Corner).clickable { pickupOpen = true }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("픽업", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Palette.Background,
+                        modifier = Modifier.background(Palette.TextStrong, Corner).padding(horizontal = 8.dp, vertical = 3.dp))
+                    Text("  먼저 태우러 가요 · " + waitingPicks.joinToString(" → ") { "${it.name.ifBlank { "일행" }} ${it.place.name}" },
+                        fontSize = 15.sp, color = Palette.TextStrong, maxLines = 2, modifier = Modifier.weight(1f))
+                }
+                HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(bottom = 8.dp))
+            }
             // Q55: the car's 주유하기 (today only) — after its stop, or before the next place when it is "now".
             val fuel = day?.fuelNote?.takeIf { date == java.time.LocalDate.now().toString() }
             val fuelBefore = fuel?.takeIf { it.afterStopId == null || stops.none { s -> s.id == it.afterStopId } }?.let { stops.firstOrNull { !it.visited }?.id }

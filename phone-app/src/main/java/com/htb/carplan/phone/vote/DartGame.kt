@@ -23,6 +23,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.clickable
+import com.htb.carplan.phone.trip.kindLine
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -265,8 +267,9 @@ fun DartGame(
                                     else -> list.forEach { p ->
                                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                             Column(Modifier.weight(1f)) {
-                                                Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-                                                Text(listOfNotNull(memoBadge(vm, p), p.address).joinToString("  ·  "), fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
+                                                Text(p.name + "  평점·메뉴 ›", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong,
+                                                    modifier = Modifier.clickable { com.htb.carplan.phone.trip.openPlacePage(context, p) })
+                                                Text(listOfNotNull(memoBadge(vm, p), p.kindLine(), p.address.ifBlank { null }).joinToString("  ·  "), fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
                                             }
                                             // 묶음 4: not sure → put it to a vote with the others.
                                             if (onPick != null) TextButton(onClick = { onPick(p) }) { Text("이걸로", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) }

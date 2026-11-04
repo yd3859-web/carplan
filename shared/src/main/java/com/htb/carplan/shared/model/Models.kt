@@ -17,7 +17,14 @@ data class Place(
     val lng: Double = 0.0,
     val address: String = "",
     val kakaoId: String? = null,
-)
+    /** Kakao 업종, e.g. "음식점 > 한식 > 국밥" (추천 목록에 보여 줌, 2026-11-04). Empty for places not from Kakao. */
+    val category: String = "",
+    val phone: String = "",
+) {
+    /** The Kakao Map page of the place — 평점·메뉴·사진·리뷰 are there (the API gives none of them). */
+    @get:com.google.firebase.firestore.Exclude
+    val kakaoUrl: String? get() = kakaoId?.let { "https://place.map.kakao.com/$it" }
+}
 
 // ---------- People & cars ----------
 

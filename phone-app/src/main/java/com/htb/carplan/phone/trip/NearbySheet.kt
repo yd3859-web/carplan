@@ -2,6 +2,7 @@ package com.htb.carplan.phone.trip
 
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,12 +79,15 @@ fun NearbySheet(stop: Stop, vm: TripDayViewModel, canAdd: Boolean, onDismiss: ()
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${i + 1}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 12.dp))
                             Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Tap the name: the Kakao Map page — 평점·메뉴·사진·리뷰 (the API has none of them).
+                                Row(Modifier.clickable { openPlacePage(context, p) }, verticalAlignment = Alignment.CenterVertically) {
                                     Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                                    Text("  평점·메뉴 ›", fontSize = 13.sp, color = Palette.TextSoft)
                                     PlaceRank.badge(p, memos)?.let { Text("  $it", fontSize = 14.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold) }
                                 }
-                                Text(listOfNotNull(m?.let { if (it < 1000) "${it}m" else "%.1fkm".format(it / 1000.0) }, p.address.ifBlank { null }).joinToString("  ·  "),
-                                    fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
+                                Text(listOfNotNull(p.kindLine(), m?.let { if (it < 1000) "${it}m" else "%.1fkm".format(it / 1000.0) }, p.phone.ifBlank { null }).joinToString("  ·  "),
+                                    fontSize = 14.sp, color = Palette.ChipText, maxLines = 1)
+                                if (p.address.isNotBlank()) Text(p.address, fontSize = 13.sp, color = Palette.TextSoft, maxLines = 1)
                             }
                             TextButton(onClick = {
                                 val uri = android.net.Uri.parse("geo:${p.lat},${p.lng}?q=${p.lat},${p.lng}(${android.net.Uri.encode(p.name)})")

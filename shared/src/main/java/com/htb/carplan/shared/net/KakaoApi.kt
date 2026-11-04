@@ -132,5 +132,7 @@ class KakaoApi(private val restKey: String) {
         lng = getString("x").toDouble(),
         address = optString("road_address_name").ifBlank { optString("address_name") },
         kakaoId = optString("id").ifBlank { null },
+        category = optString("category_name"),
+        phone = optString("phone"),
     )
 }

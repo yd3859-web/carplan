@@ -220,6 +220,7 @@ private fun PlaceRow(p: Place, badge: String? = null, onClick: () -> Unit) {
             // Q58: my groups' memory of this place, small and quiet.
             badge?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 8.dp).border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
         }
+        p.kindLine()?.let { Text(it + if (p.phone.isNotBlank()) "  ·  ${p.phone}" else "", fontSize = 14.sp, color = Palette.ChipText) }
         if (p.address.isNotBlank()) Text(p.address, fontSize = 15.sp, color = Palette.TextSoft)
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))
     }
