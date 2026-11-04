@@ -123,6 +123,9 @@ fun QuickAddSheet(
     var memo by remember { mutableStateOf<String?>(null) }
     val checklist = remember { mutableStateListOf<String>() }
     var categoryId by remember { mutableStateOf(fixedCategoryId ?: BuiltInCategory.OTHER.id) }
+    // QA 2026-11-04 ("바다여행"이 다른 일정으로 저장됨): a title that reads like a trip picks 여행 by itself, until the
+    // user picks a kind by hand.
+    var categoryPicked by remember { mutableStateOf(fixedCategoryId != null) }
     var place by remember { mutableStateOf<Place?>(null) }
     var pickingPlace by remember { mutableStateOf(false) }
     // A안: no idea where yet → [다트]: throw, pick a place there, it lands in this window.
@@ -173,7 +176,10 @@ fun QuickAddSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextField(
                     value = title,
-                    onValueChange = { title = it },
+                    onValueChange = {
+                        title = it
+                        if (!categoryPicked) categoryId = if (looksLikeTrip(it)) BuiltInCategory.TRIP.id else BuiltInCategory.OTHER.id
+                    },
                     placeholder = { Text(if (isTrip) "어디로 떠나요? (여행 이름)" else "무슨 일정이에요?", fontSize = 26.sp, fontWeight = FontWeight.Bold) },
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold),
                     singleLine = true,
@@ -191,6 +197,8 @@ fun QuickAddSheet(
             }
 
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // The kind first: it decides what the rest of the row is (여행 = places one by one on the next screen).
+                if (fixedCategoryId == null) CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
                 if (!isTrip) Chip(Icons.Filled.Place, place?.name ?: "장소", active = place != null) { pickingPlace = true }
                 if (dartGroupId != null) Chip(com.htb.carplan.phone.ui.DartIcon, if (isTrip) firstStop?.let { "첫 칸 " + it.name } ?: "다트로 정하기" else "다트", active = isTrip && firstStop != null) { darting = true }
                 Box {
@@ -215,7 +223,6 @@ fun QuickAddSheet(
                 }
                 Chip(Icons.Filled.Edit, null, active = memo != null) { memo = if (memo == null) "" else memo }
                 if (!isTrip) Chip(Icons.AutoMirrored.Filled.List, null, active = checklist.isNotEmpty()) { checklist.add("") }
-                if (fixedCategoryId == null) CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
                 if (isTrip && fixedCategoryId == null && groups.isNotEmpty()) Box {
                     // 같이 갈 사람: 나만 or a 묶음 (자주 타는 사람). Single friends are invited on the next screen.
                     val g = groups.firstOrNull { it.id == groupId }
@@ -304,7 +311,7 @@ fun QuickAddSheet(
         CategorySheet(
             selectedId = categoryId,
             custom = categories,
-            onPick = { categoryId = it; categorySheet = false },
+            onPick = { categoryId = it; categoryPicked = true; categorySheet = false },
             onAddCategory = onAddCategory,
             onDismiss = { categorySheet = false },
         )
@@ -362,3 +369,7 @@ private fun dateLabel(start: LocalDate, end: LocalDate, time: String?, repeat: R
 
 private fun LocalDate.toMillis() = atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
 private fun Long.toLocalDate(): LocalDate = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
+
+/** Words that mean a trip — the title alone picks 여행 (still changeable). */
+private fun looksLikeTrip(title: String): Boolean =
+    listOf("여행", "캠핑", "드라이브", "나들이", "투어", "trip", "travel").any { title.contains(it, ignoreCase = true) }

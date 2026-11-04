@@ -166,13 +166,17 @@ fun EventEditSheet(
         onPick = { categoryId = it; categorySheet = false },
         onAddCategory = onAddCategory, onDismiss = { categorySheet = false },
     )
-    if (confirmDelete) AlertDialog(
-        onDismissRequest = { confirmDelete = false },
-        title = { Text("이 일정을 지울까요?") },
-        text = { Text(e.title) },
-        confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("지우기", color = Palette.Sunday) } },
-        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
-    )
+    // Our centre window, not the round system alert (디자인 규칙 4dp, QA 2026-11-04).
+    if (confirmDelete) CenterSheet(onDismiss = { confirmDelete = false }) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            Text(if (isTrip) "이 여행을 지울까요?" else "이 일정을 지울까요?", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text("${e.title} · 지운 뒤 잠깐 [되살리기]가 떠요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp, bottom = 16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { confirmDelete = false }, shape = Corner, border = BorderStroke(1.dp, Palette.Line), modifier = Modifier.weight(1f).height(48.dp)) { Text("취소", color = Palette.TextStrong) }
+                Button(onClick = { confirmDelete = false; onDelete() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Sunday), modifier = Modifier.weight(1f).height(48.dp)) { Text("지우기", fontWeight = FontWeight.SemiBold) }
+            }
+        }
+    }
 }
 
 @Composable

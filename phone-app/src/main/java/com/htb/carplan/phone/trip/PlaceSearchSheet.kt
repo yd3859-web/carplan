@@ -99,6 +99,8 @@ fun PlaceSearchSheet(
     initialQuery: String = "",
     onPick: (Place) -> Unit,
     onDismiss: () -> Unit,
+    /** Adding several places in a row (QA 2026-11-04): the window stays open and these show "넣음". null = pick one. */
+    added: Set<String>? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -144,7 +146,9 @@ fun PlaceSearchSheet(
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.imePadding().height(520.dp)) {
-            Text("장소 고르기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(bottom = 12.dp))
+            Text(if (added == null) "장소 고르기" else "장소 넣기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(bottom = if (added == null) 12.dp else 2.dp))
+            if (added != null) Text(if (added.isEmpty()) "누르면 바로 칸으로 들어가요 · 여러 곳 골라도 돼요" else "${added.size}곳 넣었어요 · 더 고르거나 닫아요",
+                fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 10.dp))
             TextField(
                 value = query,
                 onValueChange = { query = it },
@@ -188,7 +192,7 @@ fun PlaceSearchSheet(
 
             LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
                 items(com.htb.carplan.shared.calendar.PlaceRank.rank(results, memos), key = { it.kakaoId ?: it.name + it.lat }) { p ->
-                    PlaceRow(p, com.htb.carplan.shared.calendar.PlaceRank.badge(p, memos)) { onPick(p) }
+                    PlaceRow(p, if (added != null && (p.kakaoId ?: p.name) in added) "넣음" else com.htb.carplan.shared.calendar.PlaceRank.badge(p, memos)) { onPick(p) }
                 }
             }
 
@@ -197,6 +201,11 @@ fun PlaceSearchSheet(
                     Text(if (hasKey) "\"${query.trim()}\" 이름만으로 넣기" else "\"${query.trim()}\" 넣기", color = Palette.Navy, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
                 }
             }
+            // Adding several: a clear way out (QA 2026-11-04 — the window had no button and tapping outside missed easily).
+            if (added != null) androidx.compose.material3.Button(
+                onClick = onDismiss, shape = Corner, colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Palette.Navy),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(52.dp),
+            ) { Text(if (added.isEmpty()) "닫기" else "다 넣었어요", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
 }

@@ -187,6 +187,18 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     var chatSeen by remember(ref.groupId) { mutableStateOf(0L) }
     val sharedTrip = (group?.memberIds?.size ?: 0) > 1
     var tripInfoOpen by remember { mutableStateOf(false) }
+    var chatHint by remember { mutableStateOf(false) }
+    if (chatHint) com.htb.carplan.phone.ui.CenterSheet(onDismiss = { chatHint = false }) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            Text("여행 채팅", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text("같이 갈 사람을 초대하면 이 여행의 채팅방이 생겨요. 장소·투표·다트를 채팅에서 바로 나누고, 칸이 바뀌면 채팅에 알려 줘요.",
+                fontSize = 16.sp, color = Palette.TextSoft, lineHeight = 23.sp, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp))
+            Button(onClick = { chatHint = false; inviteOpen = true }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy), modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Text("같이 갈 사람 초대하기", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            TextButton(onClick = { chatHint = false }, modifier = Modifier.align(Alignment.End)) { Text("닫기", color = Palette.TextSoft) }
+        }
+    }
     var nearbyFor by remember { mutableStateOf<com.htb.carplan.shared.model.Stop?>(null) }
     nearbyFor?.let { s -> NearbySheet(s, vm, canAdd = !locked, onDismiss = { nearbyFor = null }) }
     if (tripInfoOpen) event?.let { ev ->
@@ -295,11 +307,13 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         Spacer(Modifier.height(6.dp))
         // P-c: the "decide together" tools, visible instead of hidden in ⋮.
         if (!locked) Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The chat is always the first chip (QA 2026-11-04: "채팅방 들어가는 게 어딨는지 모르겠다" — it only showed on
+            // shared trips). Alone, it says how a trip gets its chat room.
             if (sharedTrip) {
                 LaunchedEffect(ref.groupId, chatOpen) { chatSeen = ChatSeen.get(context, ref.groupId) }
                 val unread = ChatSeen.unread(chatLines, me, chatSeen)
                 ToolChip(if (unread == 0) "채팅" else "채팅 · 새 글 $unread") { chatOpen = true }
-            }
+            } else ToolChip("채팅") { chatHint = true }
             ToolChip(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") { pickupOpen = true }
             ToolChip("투표") { voteOpen = true }
             ToolChip("다트 · 동네 뽑기") { dartOpen = true }
@@ -461,9 +475,9 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
 
         HorizontalDivider(color = Palette.Line)
         if (!locked) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
+            // Hidden below 3 places: nothing to sort (QA 2026-11-04).
+            if (stops.count { !it.deleted && it.place.hasCoords() } >= 3) OutlinedButton(
                 onClick = vm::sortShortest,
-                enabled = stops.count { it.place.hasCoords() } >= 3,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = Corner,
                 border = BorderStroke(1.dp, Palette.Line),
@@ -477,9 +491,13 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         }
     }
 
+    // 장소 추가 = pick and it is in (QA 2026-11-04: 3 taps a place and the window closed each time). Time and memo are set
+    // on the stop afterwards (tap the time / the card).
     if (adding) {
-        StopEditSheet(vm, existing = null, onSave = { p, t, m -> vm.addStop(p, t, m); adding = false }, onDismiss = { adding = false },
-            onVote = { p -> voteSeed = p; adding = false; voteOpen = true })
+        var addedKeys by remember { mutableStateOf(setOf<String>()) }
+        PlaceSearchSheet(vm = vm, added = addedKeys,
+            onPick = { p -> val k = p.kakaoId ?: p.name; if (k !in addedKeys) { vm.addStop(p, null, ""); addedKeys = addedKeys + k } },
+            onDismiss = { adding = false })
     }
     editing?.let { stop ->
         StopEditSheet(vm, existing = stop, onSave = { p, t, m -> vm.updateStop(stop.id, p, t, m); editing = null }, onDismiss = { editing = null },
@@ -489,7 +507,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placeQuery = ""; placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null; voteSeeds = emptyList() }, seed = voteSeed, seeds = voteSeeds)
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
-    if (chatOpen) ChatScreen(
+    if (chatOpen) com.htb.carplan.phone.ui.BackScreen(onBack = { chatOpen = false; ChatSeen.mark(context, ref.groupId) }) { closeChat -> ChatScreen(
         groupId = ref.groupId, eventId = ref.eventId, date = date, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,
         actions = ChatActions(
             addStop = if (locked) null else ({ p, memo -> vm.addStop(p, null, memo) }),
@@ -502,8 +520,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             showDay = { d -> chatOpen = false; ChatSeen.mark(context, ref.groupId); if (d != null && d in dates) vm.showDate(d) },
             exportDay = { d -> chatOpen = false; ChatSeen.mark(context, ref.groupId); if (d != null && d in dates) vm.showDate(d); exportMenu = true },
         ),
-        onDismiss = { chatOpen = false; ChatSeen.mark(context, ref.groupId) },
-    )
+        onDismiss = closeChat,
+    ) }
     placePicker?.let { cb -> PlaceSearchSheet(vm = vm, initialQuery = placeQuery, onPick = { cb(it); placePicker = null; placeQuery = "" }, onDismiss = { placePicker = null; placeQuery = "" }) }
     noteFor?.let { r ->
         NoteDialog(initial = r.note, onSave = { vm.setNote(r.id, it); noteFor = null }, onDismiss = { noteFor = null })

@@ -103,6 +103,8 @@ fun AppRoot() {
                     Tab.SETTINGS -> SettingsTab()
                 }
                 }
+                // "지웠어요 · 되살리기" after deleting an event or trip, over whatever tab is showing.
+                com.htb.carplan.phone.calendar.DeletedBar(Modifier.align(Alignment.BottomCenter))
             }
         }
         TabBar(selected = tab, onSelect = { if (it == tab) tapAgain++ else tab = it })

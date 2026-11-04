@@ -119,8 +119,10 @@ fun ChatScreen(
     val talkedPlaces = lines.drop(lastVote + 1).filter { it.kind == ChatKind.PLACE || it.kind == ChatKind.DART }
         .mapNotNull { it.place }.distinctBy { it.name }.takeLast(5)
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN) {
+    // A screen over the trip (BackScreen in TripDayScreen), not a separate window: back closes the chat and only the chat
+    // (QA 2026-11-04: as a Dialog the first back did nothing and the second closed the trip too).
+    Box(Modifier.fillMaxSize()) {
+        run {
             Column(Modifier.fillMaxSize().background(Palette.Background).systemBarsPadding().imePadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }

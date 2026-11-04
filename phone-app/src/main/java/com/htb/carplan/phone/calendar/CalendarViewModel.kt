@@ -215,7 +215,11 @@ class CalendarViewModel : ViewModel() {
     }
 
     fun deleteEvent(item: com.htb.carplan.shared.data.CalendarEvent) {
-        viewModelScope.launch { runCatching { calendar.setEventDeleted(item.groupId, item.event.id, true) }.onFailure { _error.value = it.message } }
+        viewModelScope.launch {
+            runCatching { calendar.setEventDeleted(item.groupId, item.event.id, true) }
+                .onSuccess { JustDeleted.item.value = JustDeleted.Item(item.groupId, item.event.id, item.event.title) }
+                .onFailure { _error.value = it.message }
+        }
     }
 
     /** An ordinary event → a trip (its place the first stop); [onDone] then opens the trip's day. */

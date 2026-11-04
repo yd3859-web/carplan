@@ -48,6 +48,8 @@ fun NearbySheet(stop: Stop, vm: TripDayViewModel, canAdd: Boolean, onDismiss: ()
     var list by remember(category) { mutableStateOf<List<Place>?>(null) }
     var message by remember(category) { mutableStateOf<String?>(null) }
     var added by remember { mutableStateOf(setOf<String>()) }
+    // Several picks go in one after another in the order pressed (QA 2026-11-04: they used to land in reverse).
+    var after by remember { mutableStateOf(stop.id) }
     var memos by remember { mutableStateOf<Map<String, com.htb.carplan.shared.model.PlaceMemo>>(emptyMap()) }
     LaunchedEffect(Unit) { memos = runCatching { vm.memos() }.getOrDefault(emptyMap()) }
     LaunchedEffect(category) {
@@ -88,7 +90,7 @@ fun NearbySheet(stop: Stop, vm: TripDayViewModel, canAdd: Boolean, onDismiss: ()
                                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                             }) { Text("지도", fontSize = 15.sp, color = Palette.TextSoft) }
                             if (canAdd) OutlinedButton(
-                                onClick = { vm.addStopAfter(p, stop.id, category.label); added = added + key },
+                                onClick = { vm.addStopAfter(p, after, category.label) { id -> after = id }; added = added + key },
                                 enabled = key !in added, shape = Corner, border = BorderStroke(1.dp, Palette.Line),
                             ) { Text(if (key in added) "넣었어요" else "다음 칸으로", fontSize = 15.sp, color = if (key in added) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
                         }

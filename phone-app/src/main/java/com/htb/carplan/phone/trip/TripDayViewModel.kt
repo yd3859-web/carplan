@@ -338,7 +338,10 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         com.htb.carplan.shared.data.CalendarRepository().updateEvent(groupId, eventId, title, categoryId, start.toString(), end.toString(), allDay, time, place)
     }
 
-    fun deleteTrip() = write { com.htb.carplan.shared.data.CalendarRepository().setEventDeleted(groupId, eventId, true) }
+    fun deleteTrip() = write {
+        com.htb.carplan.shared.data.CalendarRepository().setEventDeleted(groupId, eventId, true)
+        com.htb.carplan.phone.calendar.JustDeleted.item.value = com.htb.carplan.phone.calendar.JustDeleted.Item(groupId, eventId, event.value?.title.orEmpty())
+    }
 
     fun addStop(place: Place, time: String?, memo: String) = write {
         trips.addStop(groupId, eventId, _date.value, place, time, memo, me())
@@ -361,8 +364,9 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     }
 
     /** A recommended place goes in right after [afterId] (not at the end of the day). */
-    fun addStopAfter(place: Place, afterId: String, memo: String) = write {
+    fun addStopAfter(place: Place, afterId: String, memo: String, onAdded: (String) -> Unit = {}) = write {
         val newId = trips.addStop(groupId, eventId, _date.value, place, null, memo, me())
+        onAdded(newId)
         val ids = stops.value.filterNot { it.deleted }.map { it.id }.filter { it != newId }.toMutableList()
         val at = ids.indexOf(afterId)
         if (at >= 0) { ids.add(at + 1, newId); trips.reorder(groupId, eventId, _date.value, ids, me()) }
