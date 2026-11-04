@@ -428,7 +428,9 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     if (chatOpen) ChatScreen(
         groupId = ref.groupId, eventId = ref.eventId, date = date, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,
         actions = ChatActions(
-            addStop = if (locked) null else ({ p -> vm.addStop(p, null, "채팅") }),
+            addStop = if (locked) null else ({ p, memo -> vm.addStop(p, null, memo) }),
+            inDay = { p -> stops.any { !it.deleted && ((p.kakaoId != null && it.place.kakaoId == p.kakaoId) ||
+                (it.place.name == p.name && kotlin.math.abs(it.place.lat - p.lat) < 0.0005 && kotlin.math.abs(it.place.lng - p.lng) < 0.0005)) } },
             pickPlace = { q, cb -> placeQuery = q; placePicker = cb },
             openVote = { seeds -> voteSeeds = seeds; voteOpen = true },
             openDart = { dartOpen = true },

@@ -71,7 +71,9 @@ object ChatSeen {
 /** What the chat can ask the trip screen to do — 우리 앱 기능을 채팅에서 바로 (A안 2026-11-03). */
 class ChatActions(
     /** null while the trip is locked (운전자 폰 주행 중). */
-    val addStop: ((Place) -> Unit)?,
+    val addStop: ((Place, memo: String) -> Unit)?,
+    /** True when this place is already a live stop of the day shown — then [칸으로] reads "일정에 있어요". */
+    val inDay: (Place) -> Boolean = { false },
     /** Open the place search (optionally with words already typed) and hand back the pick. */
     val pickPlace: (query: String, onPick: (Place) -> Unit) -> Unit,
     /** Open a vote, with these places as the first candidates (empty = blank vote / see the votes). */
@@ -138,8 +140,12 @@ fun ChatScreen(
                             onFindPlace = { actions.pickPlace(m.text) { p -> postPlace(p) } },
                         )
                         else CardLine(
-                            m, nameOf = { if (it == me) "나" else nameOf(it) }, mine = m.uid == me, added = m.id in added,
-                            onAdd = if (actions.addStop != null && m.place != null && m.kind != ChatKind.ARRIVED) ({ actions.addStop.invoke(m.place!!); added = added + m.id }) else null,
+                            m, nameOf = { if (it == me) "나" else nameOf(it) }, mine = m.uid == me,
+                            added = m.id in added || (m.place?.let(actions.inDay) == true),
+                            onAdd = if (actions.addStop != null && m.place != null && m.kind != ChatKind.ARRIVED) ({
+                                val memo = when (m.kind) { ChatKind.DART -> "다트"; ChatKind.VOTE_CLOSED -> "투표"; else -> "채팅" }
+                                actions.addStop.invoke(m.place!!, memo); added = added + m.id
+                            }) else null,
                             actions = actions,
                         )
                     }
@@ -281,7 +287,7 @@ private fun CardLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean,
                 else -> {}
             }
             if (onAdd != null && (m.kind == ChatKind.DART || m.kind == ChatKind.PLACE || m.kind == ChatKind.VOTE_CLOSED)) {
-                CardButton(if (added) "칸으로 넣었어요" else "칸으로", enabled = !added, onClick = onAdd)
+                CardButton(if (added) "일정에 있어요" else "칸으로", enabled = !added, onClick = onAdd)
             }
             if (m.place != null && (m.kind == ChatKind.DART || m.kind == ChatKind.PLACE)) CardButton("투표 후보로") { actions.openVote(listOf(m.place!!)) }
         }
