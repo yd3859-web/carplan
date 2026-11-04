@@ -151,7 +151,6 @@ private fun RecordMonth(coverOf: suspend (RecordDay) -> String?, month: java.tim
             OutlinedButton(onClick = { onMonth(month.minusMonths(1)) }, shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.heightIn(min = 76.dp).width(96.dp)) { Text("‹", color = c.ink, fontSize = 28.sp) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("${month.monthValue}월 기록", color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                if (!compact) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp)
             }
             OutlinedButton(onClick = { onMonth(month.plusMonths(1)) }, enabled = month < java.time.YearMonth.from(today), shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.heightIn(min = 76.dp).width(96.dp)) { Text("›", color = c.ink, fontSize = 28.sp) }
         }
@@ -172,14 +171,15 @@ private fun RecordMonth(coverOf: suspend (RecordDay) -> String?, month: java.tim
                             val d = month.atDay(dn)
                             val here = byDate[d].orEmpty()
                             val on = d == picked
-                            val bg by carColor(if (on) c.ink else c.bg, "recCell")
-                            val fg by carColor(if (on) c.onInk else if (here.isEmpty()) c.soft else c.ink, "recText")
+                            // The chosen day is framed, not filled (디자인 평가 2026-11-04: an ink fill hid the day's trip name).
+                            val bg = c.bg
+                            val fg by carColor(if (here.isEmpty()) c.soft else c.ink, "recText")
                             // An album: a day with a photo shows it; the chosen day gets a thick ink frame.
                             val cover by androidx.compose.runtime.produceState<String?>(null, here) { value = here.firstNotNullOfOrNull { coverOf(it) } }
                             if (cover != null) Photo(cover!!, Modifier.fillMaxSize())
                             Column(
                                 Modifier.fillMaxSize().background(if (cover != null && !on) androidx.compose.ui.graphics.Color.Transparent else bg, Corner)
-                                    .then(if (on && cover != null) Modifier.border(4.dp, c.ink, Corner) else if (d == today && !on) Modifier.border(2.dp, c.ink, Corner) else Modifier)
+                                    .then(if (on) Modifier.border(4.dp, c.ink, Corner) else if (d == today) Modifier.border(2.dp, c.line, Corner) else Modifier)
                                     .clickable(enabled = here.isNotEmpty()) { onPick(d) }.padding(if (compact) 4.dp else 6.dp),
                             ) {
                                 // On a photo the number sits on a small white tab so it stays readable.
@@ -225,24 +225,39 @@ private fun DayTimeline(vm: CarHomeViewModel, date: LocalDate, rds: List<RecordD
         loaded.filter { !anyRecords || !it.second.isNullOrEmpty() }.forEachIndexed { ti, (rd, recs, comments) ->
             if (ti > 0) HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
             val list = recs.orEmpty()
-            Text(rd.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            // A diary page, like the phone's (디자인 평가 2026-11-04): the big date first, then the trip.
+            if (ti == 0) Row(verticalAlignment = Alignment.Bottom) {
+                Text("${date.dayOfMonth}", color = c.ink, fontSize = 64.sp, fontWeight = FontWeight.Black, lineHeight = 64.sp)
+                Column(Modifier.padding(start = 14.dp, bottom = 8.dp)) {
+                    Text("${date.year}년 ${date.monthValue}월", color = c.soft, fontSize = 20.sp)
+                    Text(date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.KOREAN), color = c.ink, fontSize = 24.sp)
+                }
+            }
+            Text(if (rd.eventId.startsWith("log-")) "일상" else rd.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
             Text(
-                listOfNotNull(dayText(date), list.size.takeIf { it > 0 }?.let { "${it}곳" }, list.sumOf { it.photoUrls.size }.takeIf { it > 0 }?.let { "사진 ${it}장" }).joinToString("  ·  "),
-                color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 16.dp),
+                listOfNotNull(list.map { it.place.name }.distinct().size.takeIf { it > 0 }?.let { "${it}곳" }, list.sumOf { it.photoUrls.size }.takeIf { it > 0 }?.let { "사진 ${it}장" }).joinToString("  ·  ").ifBlank { dayText(date) },
+                color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 20.dp),
             )
             when {
                 recs == null -> Text("불러오는 중", color = c.soft, fontSize = 24.sp)
-                list.isEmpty() -> Text("기록 칸이 없어요", color = c.soft, fontSize = 24.sp)
-                else -> list.forEachIndexed { i, r -> RailEntry(r, list.getOrNull(i + 1), first = i == 0, comments = comments[r.stopId].orEmpty()) }
+                list.isEmpty() -> Text("이 여행엔 남긴 곳이 아직 없어요", color = c.soft, fontSize = 24.sp)
+                else -> {
+                    list.forEachIndexed { i, r -> RailEntry(r, list.getOrNull(i + 1), first = i == 0, comments = comments[r.stopId].orEmpty(), number = i + 1) }
+                    val start = list.firstNotNullOfOrNull { it.arrivedAt }?.toDate()?.time
+                    val end = list.last().let { it.leftAt ?: it.arrivedAt }?.toDate()?.time
+                    val span = if (start != null && end != null && end - start >= 60_000) ((end - start) / 60_000).let { m -> if (m >= 60) "${m / 60}시간${if (m % 60 > 0) " ${m % 60}분" else ""}" else "${m}분" } else null
+                    Text(listOfNotNull("하루 끝", "${list.map { it.place.name }.distinct().size}곳", span).joinToString(" · "),
+                        color = c.ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 48.dp, top = 4.dp))
+                }
             }
         }
-        Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 24.dp, bottom = 12.dp))
+        Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 28.dp, bottom = 12.dp))
     }
 }
 
 /** A stop on the rail with what was left there: photos, my line (big), the group's comments; the facts small. */
 @Composable
-private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<StopComment>) {
+private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<StopComment>, number: Int) {
     val c = LocalCarColors.current
     val hm = remember { SimpleDateFormat("HH:mm", Locale.KOREA) }
     val arrived = r.arrivedAt?.toDate()
@@ -260,8 +275,9 @@ private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<S
             },
             contentAlignment = Alignment.TopCenter,
         ) {
-            Box(Modifier.padding(top = 8.dp).size(24.dp).clip(CircleShape).background(passed), contentAlignment = Alignment.Center) {
-                Text("✓", color = androidx.compose.ui.graphics.Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            // Numbered like the phone diary: the order of the day, not just "done".
+            Box(Modifier.padding(top = 4.dp).size(34.dp).clip(CircleShape).background(c.ink), contentAlignment = Alignment.Center) {
+                Text("$number", color = c.onInk, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
         }
         // Time on the left, small — the moment matters less than what was left there.
