@@ -1,26 +1,27 @@
 package com.htb.carplan.phone.record
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,12 +32,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,8 +54,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,17 +71,18 @@ import com.htb.carplan.phone.ui.SimpleMap
 import com.htb.carplan.phone.ui.speechBubble
 import com.htb.carplan.shared.model.Comment
 import com.htb.carplan.shared.model.Record
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
 
 /**
- * 14장 기록 탭 — 읽는 일기 한 장 (정원 2026-11-04: "레일이 한 칸씩 나오면서 어디 갔는지, 그때 코멘트와 사진, 내리면
- * 이어지는 듯이"). The day's rail is drawn as you read: scrolling a place into view grows the line down to it, its
- * dot lands, then the place, the photos and what people said appear, and the line heads on toward the next place.
- * A place already shown stays put when you scroll back. [이어 쓰기] opens the editing rail.
+ * 14장 기록 탭 — 읽는 일기 한 장 (정원 2026-11-04: "바로 전체가 보이는 게 아니라 스크롤할수록 하나씩 이어지게").
+ * Scrollytelling, like Polarsteps' step pages or the scroll-drawn timelines on the web: **the scroll is the clock**.
+ * How far a place has come up the screen decides how much of it is drawn — the rail grows down to it, the dot lands
+ * (with a tick), the place and time, then the big photo, the line someone wrote and the comments, then the rail heads
+ * on toward the next place. Scroll back and it rewinds. Each place takes most of a screen, so a day is read one place
+ * at a time. The map shows the route read so far and the place being read: beside the story on a wide screen, at the
+ * top on a phone.
  */
 @Composable
 fun DiaryPage(
@@ -90,162 +97,196 @@ fun DiaryPage(
     val comments by produceState<List<Comment>>(emptyList(), page) { value = vm.comments(page) }
     val names by vm.names.collectAsStateWithLifecycle()
     val state = rememberLazyListState()
-    // Items whose entrance already played (by index in the list).
-    val seen = remember(page) { mutableSetOf<Int>() }
-    // The places play one after another: an item starts only once the one above it has finished.
-    val finished = remember(page) { androidx.compose.runtime.mutableIntStateOf(0) }
     var viewing by remember { mutableStateOf<Pair<List<String>, Int>?>(null) }
     val d = LocalDate.parse(page.date)
     val index = book.pages.indexOfFirst { it.first.date == page.date }
     val prev = book.pages.getOrNull(index - 1)?.first
     val next = book.pages.getOrNull(index + 1)?.first
+    val nameOf: (String?) -> String = { uid -> if (uid == vm.me()) "나" else names[uid]?.ifBlank { null } ?: "일행" }
+    val pts = records.filter { it.place.lat != 0.0 || it.place.lng != 0.0 }
+    // The place being read now: the last one whose dot has landed (list item i + 1 = record i).
+    val current by remember(state, records) {
+        derivedStateOf { records.indices.lastOrNull { progressNow(state, it + 1) > DOT_AT } ?: -1 }
+    }
 
-    Box(Modifier.fillMaxSize().background(Palette.Background)) {
-        LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), state = state) {
-            item(key = "head") {
-                Column(Modifier.padding(horizontal = 20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                        IconButton(onClick = onBack, modifier = Modifier.padding(start = 0.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
-                        Spacer(Modifier.weight(1f))
-                        if (book.pages.size > 1) {
-                            Text("‹", fontSize = 26.sp, color = if (prev != null) Palette.TextStrong else Palette.Line,
-                                modifier = Modifier.clip(Corner).clickable(enabled = prev != null) { prev?.let(onPage) }.padding(horizontal = 14.dp, vertical = 4.dp))
-                            Text("${page.dayNo}일차", fontSize = 15.sp, color = Palette.TextSoft)
-                            Text("›", fontSize = 26.sp, color = if (next != null) Palette.TextStrong else Palette.Line,
-                                modifier = Modifier.clip(Corner).clickable(enabled = next != null) { next?.let(onPage) }.padding(horizontal = 14.dp, vertical = 4.dp))
+    BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Background).statusBarsPadding()) {
+        val wide = maxWidth >= 840.dp
+        val viewH = maxHeight
+        Column(Modifier.fillMaxSize()) {
+            TopBar(page, d, book, prev, next, state, onBack, onPage)
+            Row(Modifier.fillMaxSize()) {
+                if (wide && pts.isNotEmpty()) {
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(start = 20.dp, top = 8.dp, bottom = 20.dp)) {
+                        RouteMap(pts, records, current, Modifier.fillMaxSize().clip(Corner))
+                    }
+                }
+                LazyColumn(Modifier.weight(1f).fillMaxHeight(), state = state, horizontalAlignment = Alignment.CenterHorizontally) {
+                    item(key = "head") {
+                        Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp)) {
+                            Header(page, d, book, records, names, vm)
+                            if (!wide && pts.isNotEmpty()) {
+                                Spacer(Modifier.height(16.dp))
+                                RouteMap(pts, records, current, Modifier.fillMaxWidth().height(200.dp).clip(Corner))
+                            }
+                            Spacer(Modifier.height(28.dp))
                         }
                     }
-                    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
-                        Text("${d.dayOfMonth}", fontSize = 56.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong, lineHeight = 56.sp)
-                        Column(Modifier.padding(start = 12.dp, bottom = 8.dp)) {
-                            Text("${d.year}년 ${d.monthValue}월", fontSize = 15.sp, color = Palette.TextSoft)
-                            Text(d.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.KOREAN), fontSize = 17.sp, color = Palette.TextStrong)
-                        }
-                    }
-                    Text(if (page.isLog) "일상" else page.title.ifBlank { "여행" }, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 12.dp))
-                    val with = book.memberIds.filter { it != vm.me() }.map { names[it]?.ifBlank { null } ?: "일행" }.distinct()
-                    val photos = records.sumOf { it.photoUrls.size }
-                    Text(buildList {
-                        add("${records.map { it.place.name }.distinct().size}곳")
-                        if (photos > 0) add("사진 ${photos}장")
-                        if (with.isNotEmpty()) add("함께 · " + with.joinToString("·"))
-                    }.joinToString("  ·  "), fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 2.dp))
-                    val pts = records.filter { it.place.lat != 0.0 || it.place.lng != 0.0 }
-                    if (pts.isNotEmpty()) {
-                        Spacer(Modifier.height(16.dp))
-                        SimpleMap(
-                            centerLat = pts.first().place.lat, centerLng = pts.first().place.lng, zoom = 13,
-                            markers = pts.mapIndexed { i, r -> MapMarker(r.place.lat, r.place.lng, "${i + 1}", MapMarker.Kind.STOP) },
-                            path = pts.map { it.place.lat to it.place.lng },
-                            fit = if (pts.size >= 2) pts.map { it.place.lat to it.place.lng } else emptyList(),
-                            height = 200.dp,
+                    itemsIndexed(records, key = { _, r -> r.id.ifBlank { r.place.name } }) { i, r ->
+                        StoryStop(
+                            number = i + 1, r = r, next = records.getOrNull(i + 1), first = i == 0,
+                            said = comments.filter { r.stopId != null && it.stopId == r.stopId }, nameOf = nameOf,
+                            progress = rememberProgress(state, i + 1), minHeight = viewH * 0.62f,
+                            onPhoto = { at -> viewing = r.photoUrls to at },
                         )
                     }
-                    Spacer(Modifier.height(24.dp))
+                    item(key = "end") {
+                        StoryEnd(records, rememberProgress(state, records.size + 1), next, onNext = { next?.let(onPage) }, onEdit = onEdit)
+                        // Room under the end, so the last places can come all the way up the screen.
+                        Spacer(Modifier.height(viewH * 0.45f))
+                    }
                 }
-            }
-            itemsIndexed(records, key = { _, r -> r.id.ifBlank { r.place.name } }) { i, r ->
-                StoryStop(
-                    number = i + 1, r = r, next = records.getOrNull(i + 1), first = i == 0,
-                    said = comments.filter { r.stopId != null && it.stopId == r.stopId },
-                    nameOf = { uid -> if (uid == vm.me()) "나" else names[uid]?.ifBlank { null } ?: "일행" },
-                    state = state, itemIndex = i + 1, seen = seen, finished = finished,
-                    onPhoto = { at -> viewing = r.photoUrls to at },
-                )
-            }
-            item(key = "end") {
-                StoryEnd(records, state, itemIndex = records.size + 1, seen = seen, finished = finished, next = next, onNext = { next?.let(onPage) }, onEdit = onEdit)
             }
         }
     }
     viewing?.let { (urls, at) -> PhotoViewer(urls, at) { viewing = null } }
 }
 
-private val RailX = 18.dp
-private val NodeY = 14.dp
-
-/**
- * This item's turn: the one above has finished, or it has gone off the top (flung past — then it must not hold the
- * rest back). Returns (turn, catchingUp): catching up = the item is already high on screen, so it plays quicker.
- */
+/** Pinned: back, and once the big date has scrolled away, the date and title in one line; 일차 ‹ ›. */
 @Composable
-private fun myTurn(state: LazyListState, itemIndex: Int, finished: androidx.compose.runtime.MutableIntState): Pair<Boolean, Boolean> {
-    val t by remember(state, itemIndex) {
-        derivedStateOf {
-            val info = state.layoutInfo
-            val me = info.visibleItemsInfo.firstOrNull { it.index == itemIndex }
-            val visible = me != null && (me.offset < info.viewportEndOffset * 0.82f || !state.canScrollForward)
-            val turn = visible && (finished.intValue >= itemIndex - 1 || state.firstVisibleItemIndex >= itemIndex)
-            turn to (me != null && me.offset < info.viewportEndOffset * 0.4f)
+private fun TopBar(page: DiaryDay, d: LocalDate, book: DiaryBook, prev: DiaryDay?, next: DiaryDay?, state: LazyListState, onBack: () -> Unit, onPage: (DiaryDay) -> Unit) {
+    val small by remember(state) { derivedStateOf { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 160 } }
+    val a by animateFloatAsState(if (small) 1f else 0f, label = "topTitle")
+    Column {
+        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "뒤로", tint = Palette.TextStrong) }
+            Text("${d.monthValue}월 ${d.dayOfMonth}일 · " + (if (page.isLog) "일상" else page.title.ifBlank { "여행" }),
+                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, maxLines = 1,
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = a })
+            if (book.pages.size > 1) {
+                Text("‹", fontSize = 26.sp, color = if (prev != null) Palette.TextStrong else Palette.Line,
+                    modifier = Modifier.clip(Corner).clickable(enabled = prev != null) { prev?.let(onPage) }.padding(horizontal = 14.dp, vertical = 4.dp))
+                Text("${page.dayNo}일차", fontSize = 15.sp, color = Palette.TextSoft)
+                Text("›", fontSize = 26.sp, color = if (next != null) Palette.TextStrong else Palette.Line,
+                    modifier = Modifier.clip(Corner).clickable(enabled = next != null) { next?.let(onPage) }.padding(horizontal = 14.dp, vertical = 4.dp))
+            }
+        }
+        HorizontalDivider(color = Palette.Line.copy(alpha = a))
+    }
+}
+
+@Composable
+private fun Header(page: DiaryDay, d: LocalDate, book: DiaryBook, records: List<Record>, names: Map<String, String>, vm: RecordTabViewModel) {
+    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 4.dp)) {
+        Text("${d.dayOfMonth}", fontSize = 64.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong, lineHeight = 64.sp)
+        Column(Modifier.padding(start = 12.dp, bottom = 10.dp)) {
+            Text("${d.year}년 ${d.monthValue}월", fontSize = 15.sp, color = Palette.TextSoft)
+            Text(d.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.KOREAN), fontSize = 17.sp, color = Palette.TextStrong)
         }
     }
-    return t
+    Text(if (page.isLog) "일상" else page.title.ifBlank { "여행" }, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 12.dp))
+    val with = book.memberIds.filter { it != vm.me() }.map { names[it]?.ifBlank { null } ?: "일행" }.distinct()
+    val photos = records.sumOf { it.photoUrls.size }
+    Text(buildList {
+        if (book.totalDays > 1) add("${page.dayNo}일차")
+        add("${records.map { it.place.name }.distinct().size}곳")
+        if (photos > 0) add("사진 ${photos}장")
+        if (with.isNotEmpty()) add("함께 · " + with.joinToString("·"))
+    }.joinToString("  ·  "), fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 4.dp))
+    Text("아래로 내리며 하루를 따라가 보세요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 18.dp))
 }
+
+/** The day's route: grey all the way, blue as far as you've read, the place being read in ink. */
+@Composable
+private fun RouteMap(pts: List<Record>, records: List<Record>, current: Int, modifier: Modifier) {
+    val all = pts.map { it.place.lat to it.place.lng }
+    val upTo = if (current < 0) 0 else pts.count { records.indexOf(it) <= current }
+    SimpleMap(
+        centerLat = all.first().first, centerLng = all.first().second, zoom = 13,
+        markers = pts.mapIndexed { i, r ->
+            MapMarker(r.place.lat, r.place.lng, if (i < upTo) "${records.indexOf(r) + 1}" else "",
+                if (records.indexOf(r) == current) MapMarker.Kind.PICKUP else MapMarker.Kind.STOP)
+        },
+        passed = all,
+        path = all.take(upTo),
+        fit = if (all.size >= 2) all else emptyList(),
+        modifier = modifier,
+    )
+}
+
+private val RailX = 18.dp
+private val NodeY = 14.dp
+private const val DOT_AT = 0.16f
+
+/** 0 = the place is still below the screen, 1 = it has come all the way up; between = how much of it is drawn. */
+private fun progressNow(state: LazyListState, itemIndex: Int): Float {
+    val info = state.layoutInfo
+    val it = info.visibleItemsInfo.firstOrNull { it.index == itemIndex }
+        ?: return if (itemIndex < state.firstVisibleItemIndex) 1f else 0f
+    val start = info.viewportEndOffset * 0.92f          // starts when its top comes onto the lower screen
+    val span = minOf(it.size.toFloat(), info.viewportEndOffset * 0.62f)
+    return ((start - it.offset) / span).coerceIn(0f, 1f)
+}
+
+@Composable
+private fun rememberProgress(state: LazyListState, itemIndex: Int): State<Float> =
+    remember(state, itemIndex) { derivedStateOf { progressNow(state, itemIndex) } }
+
+/** Part [from]..[to] of the progress, as 0..1. */
+private fun seg(p: Float, from: Float, to: Float) = ((p - from) / (to - from)).coerceIn(0f, 1f)
 
 @Composable
 private fun StoryStop(
     number: Int, r: Record, next: Record?, first: Boolean, said: List<Comment>, nameOf: (String?) -> String,
-    state: LazyListState, itemIndex: Int, seen: MutableSet<Int>, finished: androidx.compose.runtime.MutableIntState, onPhoto: (Int) -> Unit,
+    progress: State<Float>, minHeight: Dp, onPhoto: (Int) -> Unit,
 ) {
-    val done = itemIndex in seen
-    val line = remember { Animatable(if (done) 1f else 0f) }   // the rail coming down to this place
-    val dot = remember { Animatable(if (done) 1f else 0f) }    // the dot landing
-    val body = remember { Animatable(if (done) 1f else 0f) }   // place name and time
-    val extra = remember { Animatable(if (done) 1f else 0f) }  // photos, the line someone wrote, comments
-    val tail = remember { Animatable(if (done) 1f else 0f) }   // the rail heading on to the next place
-    val (show, quick) = myTurn(state, itemIndex, finished)
-    LaunchedEffect(show) {
-        if (!show || itemIndex in seen) return@LaunchedEffect
-        seen += itemIndex
-        val k = if (quick) 0.45f else 1f
-        fun ms(v: Int) = (v * k).toInt()
-        // Scrolled away mid-way (the item left composition): the next one must not wait for it.
-        try {
-            coroutineScope {
-                if (!first) line.animateTo(1f, tween(ms(260), easing = FastOutSlowInEasing)) else line.snapTo(1f)
-                launch { dot.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow)) }
-                body.animateTo(1f, tween(ms(240)))
-                extra.animateTo(1f, tween(ms(300)))
-                tail.animateTo(1f, tween(ms(420), easing = FastOutSlowInEasing))
-            }
-        } finally { finished.intValue = maxOf(finished.intValue, itemIndex) }
-    }
+    // The dot doesn't scrub: it lands with a little bounce (and a tick) once its part of the scroll is reached.
+    val landed by remember { derivedStateOf { progress.value > DOT_AT } }
+    val dot by animateFloatAsState(if (landed) 1f else 0f, spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMediumLow), label = "dot")
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(landed) { if (landed) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
     val ink = Palette.TextStrong
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp).drawBehind {
+        Modifier.widthIn(max = 640.dp).fillMaxWidth().heightIn(min = minHeight).padding(horizontal = 20.dp).drawBehind {
+            val p = progress.value
             val x = RailX.toPx(); val y = NodeY.toPx(); val w = 3.dp.toPx()
-            if (!first && line.value > 0f) drawLine(RailPassed, Offset(x, 0f), Offset(x, y * line.value), w, StrokeCap.Round)
-            if (tail.value > 0f) drawLine(RailPassed, Offset(x, y), Offset(x, y + (size.height - y) * tail.value), w, StrokeCap.Round)
+            val top = seg(p, 0f, DOT_AT)
+            if (!first && top > 0f) drawLine(RailPassed, Offset(x, 0f), Offset(x, y * top), w, StrokeCap.Round)
+            val tail = seg(p, 0.62f, 1f)
+            if (tail > 0f) drawLine(RailPassed, Offset(x, y), Offset(x, y + (size.height - y) * tail), w, StrokeCap.Round)
         },
     ) {
         Box(Modifier.width(RailX * 2), contentAlignment = Alignment.TopCenter) {
             Box(
                 Modifier.padding(top = NodeY - 13.dp).size(26.dp)
-                    .graphicsLayer { scaleX = dot.value; scaleY = dot.value; alpha = dot.value.coerceIn(0f, 1f) }
+                    .graphicsLayer { scaleX = dot; scaleY = dot; alpha = dot.coerceIn(0f, 1f) }
                     .clip(CircleShape).background(ink),
                 contentAlignment = Alignment.Center,
             ) { Text("$number", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
-        Column(Modifier.weight(1f).padding(start = 10.dp, bottom = 8.dp)) {
-            Column(Modifier.graphicsLayer { alpha = body.value; translationY = (1f - body.value) * 18.dp.toPx() }) {
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+            Column(Modifier.graphicsLayer { val b = seg(progress.value, 0.14f, 0.34f); alpha = b; translationY = (1f - b) * 22.dp.toPx() }) {
                 Text(timeLine(r), fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 3.dp))
-                Text(r.place.name.ifBlank { "이름 없는 곳" }, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 2.dp))
+                Text(r.place.name.ifBlank { "이름 없는 곳" }, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 2.dp))
+                if (r.place.address.isNotBlank()) Text(r.place.address, fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
                 if (r.unplanned) Text("계획에 없던 곳", fontSize = 14.sp, color = Palette.TextSoft)
             }
-            Column(Modifier.graphicsLayer { alpha = extra.value; translationY = (1f - extra.value) * 24.dp.toPx() }) {
-                if (r.photoUrls.isNotEmpty()) {
+            if (r.photoUrls.isNotEmpty()) {
+                // The photo rises a little slower than the words (parallax), then settles.
+                Column(Modifier.graphicsLayer { val e = seg(progress.value, 0.26f, 0.52f); alpha = e; translationY = (1f - e) * 48.dp.toPx(); scaleX = 0.96f + 0.04f * e; scaleY = scaleX }) {
                     coil3.compose.AsyncImage(
                         model = r.photoUrls.first(), contentDescription = "사진 크게 보기", contentScale = ContentScale.Crop,
-                        modifier = Modifier.padding(top = 12.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(Corner).clickable { onPhoto(0) },
+                        modifier = Modifier.padding(top = 14.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(Corner).clickable { onPhoto(0) },
                     )
                     if (r.photoUrls.size > 1) LazyRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         itemsIndexed(r.photoUrls.drop(1)) { j, url ->
                             coil3.compose.AsyncImage(model = url, contentDescription = "사진 크게 보기", contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(88.dp).clip(Corner).clickable { onPhoto(j + 1) })
+                                modifier = Modifier.size(96.dp).clip(Corner).clickable { onPhoto(j + 1) })
                         }
                     }
                 }
-                if (r.note.isNotBlank()) Text("“${r.note}”", fontSize = 19.sp, color = Palette.TextStrong, lineHeight = 27.sp, modifier = Modifier.padding(top = 12.dp))
+            }
+            Column(Modifier.graphicsLayer { val e = seg(progress.value, 0.4f, 0.62f); alpha = e; translationY = (1f - e) * 26.dp.toPx() }) {
+                if (r.note.isNotBlank()) Text("“${r.note}”", fontSize = 20.sp, color = Palette.TextStrong, lineHeight = 29.sp, modifier = Modifier.padding(top = 14.dp))
                 said.forEach { c ->
                     Row(Modifier.padding(top = 8.dp).speechBubble().padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Text(nameOf(c.uid), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
@@ -259,20 +300,17 @@ private fun StoryStop(
                 if (small.isNotEmpty()) Text(small.joinToString("   "), fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 10.dp))
             }
             // The drive to the next place, on the rail as it heads on.
-            val move = moveLine(r, next)
-            Text(move ?: "", fontSize = 14.sp, color = Palette.TextSoft,
-                modifier = Modifier.graphicsLayer { alpha = tail.value }.padding(top = 22.dp, bottom = 18.dp))
+            Text(moveLine(r, next) ?: "", fontSize = 14.sp, color = Palette.TextSoft,
+                modifier = Modifier.graphicsLayer { alpha = seg(progress.value, 0.7f, 1f) }.padding(top = 28.dp, bottom = 28.dp))
         }
     }
 }
 
 @Composable
-private fun StoryEnd(records: List<Record>, state: LazyListState, itemIndex: Int, seen: MutableSet<Int>, finished: androidx.compose.runtime.MutableIntState, next: DiaryDay?, onNext: () -> Unit, onEdit: () -> Unit) {
-    val done = itemIndex in seen
-    val a = remember { Animatable(if (done) 1f else 0f) }
-    val show = myTurn(state, itemIndex, finished).first
-    LaunchedEffect(show) { if (show && itemIndex !in seen) { seen += itemIndex; a.animateTo(1f, tween(300)) } }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().graphicsLayer { alpha = a.value; translationY = (1f - a.value) * 18.dp.toPx() }) {
+private fun StoryEnd(records: List<Record>, progress: State<Float>, next: DiaryDay?, onNext: () -> Unit, onEdit: () -> Unit) {
+    Column(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp).graphicsLayer {
+        val a = seg(progress.value, 0f, 0.3f); alpha = a; translationY = (1f - a) * 18.dp.toPx()
+    }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(RailX * 2), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(14.dp).clip(CircleShape).background(RailPassed))
@@ -281,9 +319,9 @@ private fun StoryEnd(records: List<Record>, state: LazyListState, itemIndex: Int
             val last = records.lastOrNull()?.let { it.leftAt ?: it.arrivedAt }
             val span = if (first != null && last != null) hours(last.toDate().time - first.toDate().time) else null
             Text(if (records.isEmpty()) "아직 남긴 곳이 없어요" else "하루 끝 · ${records.map { it.place.name }.distinct().size}곳" + (span?.let { " · $it" } ?: ""),
-                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(start = 10.dp))
+                fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(start = 10.dp))
         }
-        Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 28.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onEdit, shape = Corner, modifier = Modifier.weight(1f).height(52.dp)) {
                 Text("이어 쓰기 · 사진 넣기", fontSize = 16.sp, color = Palette.TextStrong)
             }

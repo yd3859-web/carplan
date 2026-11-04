@@ -2,11 +2,13 @@ package com.htb.carplan.phone.record
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -62,6 +64,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 
 /** 14장 기록 탭: days that have (or can have) records — trips and "일상 기록" days, newest first. */
@@ -140,6 +143,36 @@ class RecordTabViewModel : ViewModel() {
         runCatching { kotlinx.coroutines.withTimeout(8_000) { trips.observeDayComments(p.groupId, p.eventId, p.date).first() } }
             .getOrDefault(emptyList()).also { cs -> cs.map { it.uid }.distinct().forEach(::loadName) }
 
+    /**
+     * 시험용 (debug, "기록" 제목 길게): every record that has a line but no photo gets one or two of the sample photos,
+     * so the diary can be seen with pictures. Says how many went in, or the first error.
+     */
+    fun fillSamplePhotos(context: android.content.Context) {
+        val bs = books.value ?: return
+        viewModelScope.launch {
+            val photos = runCatching { context.assets.list("demo").orEmpty().sorted().map { n -> context.assets.open("demo/$n").use { it.readBytes() } } }.getOrDefault(emptyList())
+            if (photos.isEmpty()) { message.value = "사진 파일이 없는 빌드예요"; return@launch }
+            var turn = 0; var added = 0; var error: String? = null; var storageRefused = false
+            message.value = "사진 넣는 중…"
+            for (b in bs) for ((p, recs) in b.pages) for (r in recs.filter { it.photoUrls.isEmpty() && it.note.isNotBlank() }) {
+                repeat(if (r.note.length > 14) 2 else 1) {
+                    val n = turn++
+                    runCatching {
+                        if (storageRefused) error("storage") else records.addPhoto(p.groupId, p.eventId, p.date, r.id, photos[n % photos.size])
+                    }.recoverCatching {
+                        // Storage refused (rules can't read Firestore yet): a sample picture from the web, test data only.
+                        storageRefused = true
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            .document("${FirestorePaths.records(p.groupId, p.eventId, p.date)}/${r.id}")
+                            .update("photoUrls", com.google.firebase.firestore.FieldValue.arrayUnion("https://picsum.photos/seed/carplan${r.id.take(6)}$n/1200/900"))
+                            .await()
+                    }.onSuccess { added++ }.onFailure { if (error == null) error = it.message }
+                }
+            }
+            message.value = if (added > 0) "사진 ${added}장 넣었어요" + (if (storageRefused) " (Storage가 막혀 웹 샘플 사진)" else "") + " · 탭을 다시 열면 보여요" else "못 넣었어요 · ${error ?: "넣을 칸이 없어요"}"
+        }
+    }
+
     init { viewModelScope.launch { runCatching { sessions.ensureSession() }.onSuccess { _session.value = it } } }
 
     suspend fun summary(p: DiaryDay) = runCatching { records.daySummary(p.groupId, p.eventId, p.date) }.getOrDefault(emptyList())
@@ -172,6 +205,7 @@ data class DiaryBook(
     val places get() = pages.flatMap { (_, rs) -> rs.map { it.place.name.ifBlank { "이름 없는 곳" } } }.distinct()
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun RecordTab(vm: RecordTabViewModel = viewModel()) {
     val days by vm.days.collectAsStateWithLifecycle()
@@ -189,13 +223,17 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
             .map { ce -> DiaryDay(ce.groupId, ce.event.id, today.toString(), ce.event.title, ce.event.id.startsWith("log-"),
                 dayNo = (today.toEpochDay() - LocalDate.parse(ce.event.startDate).toEpochDay()).toInt() + 1) }
     }
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Column(Modifier.padding(horizontal = 20.dp)) {
-            Text("기록", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 16.dp))
+    // A reading column: on a wide screen the diary stays book-width in the middle.
+    Column(Modifier.fillMaxSize().statusBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 20.dp)) {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            Text("기록", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong,
+                modifier = Modifier.padding(top = 16.dp).then(
+                    if (com.htb.carplan.phone.BuildConfig.DEBUG) Modifier.combinedClickable(onClick = {}, onLongClick = { vm.fillSamplePhotos(ctx) }) else Modifier))
             Text("다녀온 날을 한 장씩 모아 둬요", fontSize = 15.sp, color = Palette.TextSoft)
             message?.let { Text(it, color = Palette.Sunday, fontSize = 15.sp) }
         }
-        LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp), state = list) {
+        LazyColumn(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 20.dp), state = list) {
             item { TodayPage(today, todayPages, vm) { ref -> open = ref } }
             val bs = books
             if (bs == null) item { Text("기록을 펼치는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 28.dp)) }

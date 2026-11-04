@@ -41,6 +41,8 @@ android {
         }
     }
 
+    // 기록 탭 [시험 사진 채우기] (debug only) uses the car's sample landscapes — one copy in the repo.
+    sourceSets.getByName("debug").assets.srcDir("../car-app/src/debug/assets")
     buildTypes {
         release {
             isMinifyEnabled = false
