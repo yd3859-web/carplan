@@ -16,17 +16,26 @@ object InviteInbox {
 
     fun clear() { _code.value = null }
 
-    /** 17장: a tapped push wants a trip day opened — carplan://trip/{groupId}/{eventId}/{date}. */
+    /** 17장: a tapped push wants a trip day opened — carplan://trip/{groupId}/{eventId}/{date}[?parking={stopId}]. The 4th
+     *  item is the stop to find parking around ("주차장 찾아봐 주세요" push), or "" for none. */
     private val _openTrip = MutableStateFlow<List<String>?>(null)
     val openTrip: StateFlow<List<String>?> = _openTrip
 
     fun offerTrip(uri: String?) {
-        val m = Regex("carplan://trip/([^/]+)/([^/]+)/([0-9-]+)").find(uri ?: return) ?: return
-        _openTrip.value = listOf(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+        val m = Regex("carplan://trip/([^/?]+)/([^/?]+)/([0-9-]+)(?:\\?parking=([^&]+))?").find(uri ?: return) ?: return
+        _openTrip.value = listOf(m.groupValues[1], m.groupValues[2], m.groupValues[3], m.groupValues.getOrElse(4) { "" })
     }
 
     fun clearTrip() { _openTrip.value = null }
 
     /** Straight to a trip day (after joining an event's own group by its QR·link). */
-    fun showTrip(groupId: String, eventId: String, date: String) { _openTrip.value = listOf(groupId, eventId, date) }
+    fun showTrip(groupId: String, eventId: String, date: String) { _openTrip.value = listOf(groupId, eventId, date, "") }
+
+    /** A push tapped while the app was in the background: the system shows it itself and hands its data as extras. */
+    fun offerPushExtras(extras: android.os.Bundle?) {
+        val g = extras?.getString("groupId") ?: return
+        val e = extras.getString("eventId") ?: return
+        val d = extras.getString("date") ?: return
+        offerTrip("carplan://trip/$g/$e/$d" + (extras.getString("stopId")?.takeIf { extras.getString("kind") == "parking" }?.let { "?parking=$it" } ?: ""))
+    }
 }

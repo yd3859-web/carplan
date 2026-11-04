@@ -131,17 +131,17 @@ private val NODE = 26.dp
 private val LocalTripVm = androidx.compose.runtime.staticCompositionLocalOf<TripDayViewModel?> { null }
 
 @Composable
-fun TripDayScreen(start: TripRef, onBack: () -> Unit) {
+fun TripDayScreen(start: TripRef, onBack: () -> Unit, parkingStopId: String? = null) {
     var ref0 by remember(start) { mutableStateOf(start) }
     val vm0: TripDayViewModel = viewModel(key = ref0.groupId + ref0.eventId, factory = tripVmFactory(ref0))
     // A full screen slides in from the right (same as the car).
     com.htb.carplan.phone.ui.Enter(com.htb.carplan.phone.ui.Entry.SCREEN) {
-        androidx.compose.runtime.CompositionLocalProvider(LocalTripVm provides vm0) { TripDayBody(ref0, vm0, onRefChange = { ref0 = it }, onBack = onBack) }
+        androidx.compose.runtime.CompositionLocalProvider(LocalTripVm provides vm0) { TripDayBody(ref0, vm0, onRefChange = { ref0 = it }, onBack = onBack, parkingStopId = parkingStopId) }
     }
 }
 
 @Composable
-private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRef) -> Unit, onBack: () -> Unit) {
+private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRef) -> Unit, onBack: () -> Unit, parkingStopId: String? = null) {
     // The first invite moves the event to its own group (A안); the screen follows it there.
     LaunchedEffect(vm) { vm.movedTo.collect { gid -> if (gid != null) onRefChange(ref.copy(groupId = gid, date = vm.date.value)) } }
     var inviteOpen by rememberSaveable { mutableStateOf(false) }
@@ -183,6 +183,14 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         .collectAsStateWithLifecycle(emptyList())
     var chatSeen by remember(ref.groupId) { mutableStateOf(0L) }
     val sharedTrip = (group?.memberIds?.size ?: 0) > 1
+    // 12장 주차장 찾기: opened by the push (once), or by the [주차장] chip.
+    var parkingAround by rememberSaveable { mutableStateOf<String?>(null) }
+    var parkingShown by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(parkingStopId, stops.isNotEmpty()) { if (parkingStopId != null && !parkingShown && stops.isNotEmpty()) { parkingShown = true; parkingAround = parkingStopId } }
+    parkingAround?.let { sid ->
+        val target = stops.firstOrNull { it.id == sid }?.place
+        if (target != null) ParkingSheet(target, ref.groupId, ref.eventId, date, me, shareToChat = sharedTrip, onDismiss = { parkingAround = null })
+    }
     // 내보내기 메뉴 — the chat's [하루 카드 만들기] opens it too.
     var exportMenu by remember { mutableStateOf(false) }
     var placeQuery by remember { mutableStateOf("") }
@@ -280,6 +288,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             ToolChip(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") { pickupOpen = true }
             ToolChip("투표") { voteOpen = true }
             ToolChip("다트 · 동네 뽑기") { dartOpen = true }
+            // 12장: parking around the next place — also what the "주차장 찾아봐 주세요" push opens.
+            if (stops.any { !it.visited && !it.deleted }) ToolChip("주차장") { parkingAround = (stops.firstOrNull { it.id == day?.parkingHintStopId && !it.visited } ?: stops.first { !it.visited && !it.deleted }).id }
         }
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             dates.forEachIndexed { i, d -> DateTab(d, i + 1, selected = d == date) { vm.showDate(d) } }

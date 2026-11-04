@@ -46,7 +46,10 @@ class CarplanMessagingService : FirebaseMessagingService() {
             // Tapping opens the app on the trip the push is about (handled like an invite link: carplan://trip/...).
             val intent = Intent(context, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                data["groupId"]?.let { g -> setData(android.net.Uri.parse("carplan://trip/$g/${data["eventId"] ?: ""}/${data["date"] ?: ""}")) }
+                data["groupId"]?.let { g ->
+                    val parking = data["stopId"]?.takeIf { data["kind"] == "parking" }?.let { "?parking=$it" } ?: ""
+                    setData(android.net.Uri.parse("carplan://trip/$g/${data["eventId"] ?: ""}/${data["date"] ?: ""}$parking"))
+                }
             }
             val pi = PendingIntent.getActivity(context, body.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val n = NotificationCompat.Builder(context, CHANNEL)

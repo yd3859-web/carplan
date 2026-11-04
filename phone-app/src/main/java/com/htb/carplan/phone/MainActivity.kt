@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
         }
         InviteInbox.offer(intent?.dataString)
         InviteInbox.offerTrip(intent?.dataString)
+        if (intent?.dataString == null) InviteInbox.offerPushExtras(intent?.extras)
         com.htb.carplan.phone.push.TripLive.start(this)
         setContent {
             CarplanTheme { AppRoot() }
@@ -37,5 +38,6 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         InviteInbox.offer(intent.dataString)
         InviteInbox.offerTrip(intent.dataString)
+        if (intent.dataString == null) InviteInbox.offerPushExtras(intent.extras)
     }
 }

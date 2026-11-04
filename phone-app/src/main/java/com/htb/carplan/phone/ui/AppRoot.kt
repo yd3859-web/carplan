@@ -108,7 +108,7 @@ fun AppRoot() {
         TabBar(selected = tab, onSelect = { if (it == tab) tapAgain++ else tab = it })
     }
     // 17장: the push's trip day over the tabs, until the user goes back.
-    pushTrip?.let { (g, e, d) -> BackScreen(onBack = { InviteInbox.clearTrip() }) { back -> TripDayScreen(TripRef(g, e, d), onBack = back) } }
+    pushTrip?.let { t -> BackScreen(onBack = { InviteInbox.clearTrip() }) { back -> TripDayScreen(TripRef(t[0], t[1], t[2]), onBack = back, parkingStopId = t.getOrNull(3)?.ifBlank { null }) } }
     }
     // An invite (link, QR, code) can arrive on any tab (1장 4): ask, then land in the group.
     JoinDialog(groupVm) { joined -> groupVm.landAfterJoin(joined) { tab = Tab.GROUP } }

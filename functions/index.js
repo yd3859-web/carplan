@@ -105,7 +105,8 @@ exports.onParkingHint = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}
   const { gid, eid, date } = event.params;
   const [ev, stop] = await Promise.all([db.doc(`groups/${gid}/events/${eid}`).get(), db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${stopId}`).get()]);
   const tokens = await groupTokens(gid, ev.get("driverUid"));
-  await push(tokens, "주차장 찾아봐 주세요", `${stop.get("place")?.name || "다음 장소"} 도착 5분 전이에요`, { groupId: gid, eventId: eid, date });
+  // kind/stopId: tapping it opens the phone's 주차장 찾기 around that stop, nearest first (정원 2026-11-04).
+  await push(tokens, "주차장 찾아봐 주세요", `${stop.get("place")?.name || "다음 장소"} 도착 5분 전이에요 · 눌러서 근처 주차장 보기`, { groupId: gid, eventId: eid, date, kind: "parking", stopId });
 });
 
 // 차량 관리 시기 → 차 주인 (매일 09:00 KST, 7일 안 예정)
