@@ -467,7 +467,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             }
             if (!locked) item(key = "add") {
                 Column {
-                    AddNode(empty = stops.isEmpty()) { adding = true }
+                    // One [장소 추가] only — the bottom button (정원 2026-11-04: the rail's own "+ 장소 추가" doubled it).
+                    if (stops.isEmpty()) Text("아래 [장소 추가]로 첫 장소를 넣어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = RAIL_W, top = 8.dp, bottom = 4.dp))
                     TextButton(onClick = { manualRecord = true }, modifier = Modifier.padding(start = RAIL_W)) { Text("기록 칸 직접 추가 (차 없이 세운 곳)", color = Palette.TextSoft, fontSize = 15.sp) }
                 }
             }
@@ -934,26 +935,6 @@ private fun LegLabel(leg: LegInfo?, driving: Boolean) {
     )
 }
 
-/** The empty node at the end of the rail: the one tap that adds a place. */
-@Composable
-private fun AddNode(empty: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.width(RAIL_W).fillMaxHeight().drawBehind {
-                if (!empty) {
-                    val x = size.width / 2
-                    drawLine(Palette.Line, Offset(x, 0f), Offset(x, size.height / 2), 3.dp.toPx(), StrokeCap.Round, PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 7.dp.toPx()), 0f))
-                }
-            },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.size(NODE).clip(CircleShape).background(Palette.Background).border(2.dp, Palette.Navy, CircleShape), contentAlignment = Alignment.Center) {
-                Text("+", color = Palette.Navy, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        Text(if (empty) "첫 장소 추가" else "장소 추가", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy, modifier = Modifier.padding(vertical = 14.dp))
-    }
-}
 
 /** "○○님이 방금 수정" (Q07): someone else touched this stop in the last 5 minutes. */
 private fun recentEditor(stop: Stop, me: String?, nameOf: (String?) -> String): String? {
