@@ -393,11 +393,20 @@ fun RowScope.CarVehicle(vm: CarHomeViewModel) {
                         dueDays == 0L -> "오늘" to true
                         else -> "${dueDays}일 남음" to false
                     }
-                    Text(soon, color = if (warn) c.warn else c.ink, fontSize = 24.sp, fontWeight = if (warn) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(horizontal = 16.dp))
-                    if (item != MaintenanceItem.INSURANCE) OutlinedButton(
-                        onClick = { vm.logCare(item) }, shape = Corner, border = BorderStroke(1.dp, c.line),
-                        modifier = Modifier.heightIn(min = 76.dp).width(if (compact) 120.dp else 140.dp),
-                    ) { Text("했어요", color = c.ink, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                    Text(soon, color = if (warn) c.warn else if (dueDays == null) c.soft else c.ink, fontSize = 24.sp, fontWeight = if (warn) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(horizontal = 16.dp))
+                    // 디자인 평가 2026-11-04: nine identical [했어요] said nothing — the ones due within a week are filled.
+                    val urgent = warn || (dueDays != null && dueDays <= 7)
+                    if (item != MaintenanceItem.INSURANCE) {
+                        if (urgent) androidx.compose.material3.Button(
+                            onClick = { vm.logCare(item) }, shape = Corner,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
+                            modifier = Modifier.heightIn(min = 76.dp).width(if (compact) 120.dp else 140.dp),
+                        ) { Text("했어요", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                        else OutlinedButton(
+                            onClick = { vm.logCare(item) }, shape = Corner, border = BorderStroke(1.dp, c.line),
+                            modifier = Modifier.heightIn(min = 76.dp).width(if (compact) 120.dp else 140.dp),
+                        ) { Text("했어요", color = c.ink, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                    }
                 }
                 HorizontalDivider(color = c.line)
             }

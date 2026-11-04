@@ -4,6 +4,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -109,7 +111,17 @@ private fun NamesPart(hasTrip: Boolean, members: List<String>, friends: List<Str
             Names("오늘 같이 가는 사람", members, empty = if (LocalCompact.current) "아직 없어요 · 위 QR을 찍으면 들어와요" else "아직 없어요 · 왼쪽 QR을 찍으면 들어와요")
             HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
         }
-        Names("친구", friends, empty = "아직 없어요 · 여행 없는 날 QR을 찍으면 친구가 돼요")
+        Names("친구", friends, empty = "아직 없어요")
+        // Nobody yet (디자인 평가 2026-11-04: the column sat empty): how it goes, in three steps.
+        if (friends.isEmpty() && members.isEmpty()) Column(Modifier.padding(top = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            (if (hasTrip) listOf("[이 여행 QR 띄우기]를 눌러요", "폰 카메라로 찍고 [참여하기]를 눌러요", "같이 칸을 보고 고칠 수 있어요")
+            else listOf("폰 카메라로 QR을 찍어요", "열린 화면에서 [친구 맺기]를 눌러요", "다음 일정부터 폰에서 이름만 눌러 초대해요")).forEachIndexed { i, t ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${i + 1}", color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier.width(44.dp))
+                    Text(t, color = c.ink, fontSize = 26.sp)
+                }
+            }
+        }
         Text("자주 타는 사람 묶음·초대·코멘트는 폰에서 해요", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 24.dp))
     }
 }

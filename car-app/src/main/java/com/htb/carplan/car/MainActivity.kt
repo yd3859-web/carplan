@@ -524,6 +524,13 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     Text(who, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
+            // Parked, the rest of the day at a glance (디자인 평가 2026-11-04: the panel was empty under the next place).
+            trip?.remaining?.takeIf { !guiding && it.size > 1 && pickupFirst == null }?.let { rest ->
+                HorizontalDivider(color = Line, modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))
+                Text("오늘 남은 곳 ${rest.size}곳", color = Soft, fontSize = 20.sp)
+                Text(rest.drop(1).joinToString(" → ") { it.place.name }, color = Ink, fontSize = 26.sp, maxLines = 2, modifier = Modifier.padding(top = 4.dp))
+                rest.last().time?.let { Text("마지막 $it", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp)) }
+            }
             // While driving, the one after: what comes once this stop is done.
             trip?.remaining?.getOrNull(1)?.takeIf { guiding }?.let { after ->
                 HorizontalDivider(color = Line, modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))

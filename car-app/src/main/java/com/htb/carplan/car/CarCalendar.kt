@@ -245,17 +245,18 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                                 // What the user registered shows, repeating ones too; the 시연 메뉴 test commute doesn't (정원 2026-10-31).
                                 val dayEvents = byDay[d].orEmpty()
                                 val isPicked = d == picked
-                                // The chosen day fades to ink instead of flipping (정원 2026-10-31: 부드럽게).
-                                val cellBg by carColor(if (isPicked) c.ink else c.bg, "cellBg")
-                                val onCell by carColor(if (isPicked) c.onInk else c.ink, "cellText")
+                                // The chosen day gets a thick frame, the same as the 기록 tab (디자인 평가 2026-11-04: one look for
+                                // "chosen" across the car), fading in (정원 2026-10-31: 부드럽게); today a thin one.
+                                val frame by carColor(if (isPicked) c.ink else if (d == today) c.soft else c.bg, "cellFrame")
+                                val onCell = c.ink
                                 Column(
                                     Modifier.fillMaxSize()
-                                        .background(cellBg, Corner)
-                                        .then(if (d == today && !isPicked) Modifier.border(2.dp, c.ink, Corner) else Modifier)
+                                        .background(c.bg, Corner)
+                                        .border(if (isPicked) 4.dp else 2.dp, frame, Corner)
                                         .clickable { onPick(d) }
                                         .padding(if (compact) 4.dp else 8.dp),
                                 ) {
-                                    Text("$n", color = if (isPicked) onCell else if (col == 0) c.warn else onCell, fontSize = 24.sp, fontWeight = if (d == today) FontWeight.Bold else FontWeight.Normal)
+                                    Text("$n", color = if (col == 0) c.warn else onCell, fontSize = 24.sp, fontWeight = if (d == today || isPicked) FontWeight.Bold else FontWeight.Normal)
                                     // Up to three events as "colour bar + name"; the rest as "+n".
                                     // Half screen: a cell is too narrow for names — one colour bar per event, the names are below.
                                     if (compact) dayEvents.take(3).forEach { e ->
@@ -266,7 +267,7 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                                             Text(e.event.title, color = onCell, fontSize = 20.sp, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, modifier = Modifier.padding(start = 6.dp))
                                         }
                                     }
-                                    if (dayEvents.size > 3) Text("+${dayEvents.size - 3}", color = if (isPicked) c.onInk else c.soft, fontSize = 20.sp)
+                                    if (dayEvents.size > 3) Text("+${dayEvents.size - 3}", color = c.soft, fontSize = 20.sp)
                                 }
                             }
                         }
