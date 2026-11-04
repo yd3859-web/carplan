@@ -69,6 +69,8 @@ fun DayRoutePanel(
     tripComments: Map<String, List<Comment>> = emptyMap(),
     tripDays: Map<String, TripDay?> = emptyMap(),
     onOpenTrip: (CalendarEvent) -> Unit = {},
+    /** Tap an ordinary event → 일정 고치기. */
+    onEditEvent: (CalendarEvent) -> Unit = {},
 ) {
     val ordered = events.sortedWith(compareBy({ !it.event.allDay }, { it.event.startTime ?: "" }))
     val trips = ordered.filter { it.event.categoryId == BuiltInCategory.TRIP.id }
@@ -93,11 +95,11 @@ fun DayRoutePanel(
             }
             if (allDay.isNotEmpty()) item {
                 Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    allDay.forEach { AllDayRow(it, categories) }
+                    allDay.forEach { AllDayRow(it, categories, Modifier.clickable { onEditEvent(it) }) }
                 }
             }
             itemsIndexed(route, key = { _, it -> it.groupId + it.event.id }) { i, item ->
-                RouteStop(item, categories, isFirst = i == 0, isLast = i == route.lastIndex, drive = i > 0 && route[i - 1].event.place != null && item.event.place != null)
+                RouteStop(item, categories, isFirst = i == 0, isLast = i == route.lastIndex, drive = i > 0 && route[i - 1].event.place != null && item.event.place != null, modifier = Modifier.clickable { onEditEvent(item) })
             }
         }
         Button(
@@ -156,9 +158,9 @@ private fun TripRail(trip: CalendarEvent, stops: List<Stop>, comments: List<Comm
 }
 
 @Composable
-private fun AllDayRow(item: CalendarEvent, categories: List<CustomCategory>) {
+private fun AllDayRow(item: CalendarEvent, categories: List<CustomCategory>, modifier: Modifier = Modifier) {
     val color = argb(CategoryColors.of(item.event.categoryId, categories))
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.width(3.dp).height(16.dp).background(color))
         Spacer(Modifier.width(8.dp))
         Text(item.event.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
@@ -168,9 +170,9 @@ private fun AllDayRow(item: CalendarEvent, categories: List<CustomCategory>) {
 
 /** A plain event on the rail: node + time + title (+ place). The rail is dotted when the car drives between places. */
 @Composable
-private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isFirst: Boolean, isLast: Boolean, drive: Boolean) {
+private fun RouteStop(item: CalendarEvent, categories: List<CustomCategory>, isFirst: Boolean, isLast: Boolean, drive: Boolean, modifier: Modifier = Modifier) {
     val e = item.event
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(
             Modifier.width(RAIL_W).fillMaxHeight().railLine(NODE / 2 + 2.dp, drawAbove = !isFirst, abovePassed = false, belowFill = 0f, drawBelow = !isLast),
             contentAlignment = Alignment.TopCenter,

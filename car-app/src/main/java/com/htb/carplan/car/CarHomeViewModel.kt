@@ -209,6 +209,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun seedDemo() { val d = demo() ?: return; viewModelScope.launch { runCatching { d.run() }.onFailure { _error.value = it.message; navigator.notify("채우다 멈췄어요 · ${it.message?.take(40)}") } } }
     fun seedMoreDemo() { val d = demo() ?: return; viewModelScope.launch { runCatching { d.runMore() }.onFailure { _error.value = it.message; navigator.notify("채우다 멈췄어요 · ${it.message?.take(40)}") } } }
+    fun bringInPhone(code: String) { val d = demo() ?: return; viewModelScope.launch { runCatching { d.bringIn(code) }.onFailure { _error.value = it.message; navigator.notify("못 넣었어요 · ${it.message?.take(40)}") } } }
     fun clearDemo() { val d = demo() ?: return; viewModelScope.launch { runCatching { d.clear() }.onFailure { _error.value = it.message } } }
 
     // 20장 디버그 메뉴
@@ -508,6 +509,23 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun askNow() = navigator.askNow()
     val tripsToday = navigator.tripsToday
     fun chooseTrip(groupId: String, eventId: String) = navigator.chooseTrip(groupId, eventId)
+
+    /** 차 캘린더에서 일정 → 여행으로 바꾸기 (정원 2026-11-04): its place becomes the first stop; today's opens on 오늘. */
+    fun convertToTrip(item: CalendarEvent) {
+        val owner = ownerUid ?: return
+        viewModelScope.launch {
+            runCatching { calendar.convertToTrip(item.groupId, item.event, owner) }
+                .onSuccess {
+                    navigator.notify("${item.event.title} → 여행으로 바꿨어요 · 칸은 폰이나 그날 [칸 편집]에서 더 넣어요")
+                    if (item.event.startDate == LocalDate.now().toString()) chooseTrip(item.groupId, item.event.id)
+                }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
+    fun deleteEvent(item: CalendarEvent) {
+        viewModelScope.launch { runCatching { calendar.setEventDeleted(item.groupId, item.event.id, true) }.onSuccess { navigator.notify("${item.event.title} 지웠어요") }.onFailure { _error.value = it.message } }
+    }
     val voiceState: StateFlow<VoiceState> = navigator.voiceState
     fun listen() = navigator.listenForCommand()
     fun runCommand(c: VoiceCommand) = navigator.runCommand(c)

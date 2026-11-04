@@ -239,6 +239,24 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         say("더 채웠어요 · 여행 10개, 일상 10칸" + if (sample > 0) " · 사진은 웹 샘플 ${sample}장(Storage 막힘)" else "")
     }
 
+    /**
+     * 시연 메뉴 [폰 계정 넣기] (2026-11-04: 에뮬 폰 앱을 다시 깔아 새 익명 계정이 된 뒤): the phone account with this friend
+     * code becomes the owner's friend and a member of every shared group the owner is in, so it sees the trips and
+     * records again. Runs with the car's rights (the owner's) — no admin access.
+     */
+    suspend fun bringIn(code: String) {
+        // Only the two people may write a friendship (18장 규칙), not the car: look the account up and put it in the groups.
+        val uid = runCatching {
+            FirebaseFirestore.getInstance().collection(FirestorePaths.USERS).whereEqualTo("friendCode", Codes.normalize(code)).limit(1).get().await().documents.firstOrNull()?.id
+        }.getOrNull() ?: run { say("그 친구 코드를 못 찾았어요"); return }
+        val mine = runCatching { FirebaseFirestore.getInstance().collection(FirestorePaths.GROUPS).whereArrayContains("memberIds", ownerUid).get().await().documents }
+            .getOrElse { say("그룹을 못 읽었어요 · ${it.message?.take(30)}"); return }
+            .filter { it.getBoolean("solo") != true }
+        var n = 0
+        mine.forEach { g -> if (uid !in (g.get("memberIds") as? List<*>).orEmpty()) runCatching { groups.invite(g.id, uid) }.onSuccess { n++ } }
+        say("폰 계정을 그룹 ${n}개에 넣었어요")
+    }
+
     /** Takes away what [run] made: events soft-deleted (as everywhere in the app), the made groups left behind. */
     suspend fun clear() {
         prefs.getStringSet("events", emptySet()).orEmpty().forEach { key ->

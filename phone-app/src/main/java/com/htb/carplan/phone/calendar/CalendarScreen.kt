@@ -109,6 +109,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val lastGroupId by vm.lastGroupId.collectAsStateWithLifecycle()
     val commute by vm.commuteSuggestion.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<com.htb.carplan.shared.data.CalendarEvent?>(null) }
     var carLinkOpen by remember { mutableStateOf(false) }
     if (carLinkOpen) com.htb.carplan.phone.ui.CarLinkSheet(onDismiss = { carLinkOpen = false })
     var quickAddDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -174,6 +175,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                     tripComments = tripComments,
                     tripDays = tripDays,
                     onOpenTrip = { openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
+                    onEditEvent = { editing = it },
                 )
             }
         }
@@ -191,8 +193,19 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 tripComments = tripComments,
                 tripDays = tripDays,
                 onOpenTrip = { daySheetOpen = false; openTrip = TripRef(it.groupId, it.event.id, selected.toString()) },
+                onEditEvent = { editing = it },
             )
         }
+    }
+    // 일정 고치기 (정원 2026-11-04) — and [여행으로 바꾸기] opens the new trip's first day for more places.
+    editing?.let { item ->
+        EventEditSheet(
+            item = item, categories = categories, onAddCategory = vm::addCategory,
+            onSave = { t, c, st, en, ad, tm, pl -> editing = null; vm.updateEvent(item, t, c, st, en, ad, tm, pl) },
+            onMakeTrip = { editing = null; daySheetOpen = false; vm.convertToTrip(item) { openTrip = TripRef(item.groupId, item.event.id, item.event.startDate) } },
+            onDelete = { editing = null; vm.deleteEvent(item) },
+            onDismiss = { editing = null },
+        )
     }
 
     quickAddDate?.let { date ->

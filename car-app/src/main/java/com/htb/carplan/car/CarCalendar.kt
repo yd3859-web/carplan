@@ -287,6 +287,8 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
     val events by vm.monthEvents.collectAsStateWithLifecycle()
     val categories by vm.categories.collectAsStateWithLifecycle()
     val today = LocalDate.now()
+    var acting by remember { mutableStateOf<com.htb.carplan.shared.data.CalendarEvent?>(null) }
+    acting?.let { item -> EventActions(item, onTrip = { acting = null; vm.convertToTrip(item) }, onDelete = { acting = null; vm.deleteEvent(item) }, onDismiss = { acting = null }) }
     Column(modifier) {
         Text("${picked.monthValue}월 ${picked.dayOfMonth}일 (${picked.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})", color = c.ink, fontSize = if (compact) 28.sp else 32.sp, fontWeight = FontWeight.Bold)
         // Each half of the fade draws its own day (the old day fades out while the new one fades in).
@@ -297,7 +299,8 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
             dayEvents.forEach { item ->
                 val e = item.event
                 val kind = CategoryColors.label(e.categoryId, categories)
-                Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Tap = what can be done with it (여행으로 바꾸기 · 지우기), 정원 2026-11-04.
+                Row(Modifier.fillMaxWidth().clickable { acting = item }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.padding(end = 12.dp).width(6.dp).height(56.dp).background(Color(CategoryColors.of(e.categoryId, categories))))
                     Text(e.startTime ?: "종일", color = c.soft, fontSize = 24.sp, modifier = Modifier.width(96.dp))
                     Column(Modifier.weight(1f)) {
@@ -320,5 +323,31 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
             colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk),
         ) { Text("이 날 일정 추가", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
     
+    }
+}
+
+/** An event's two actions on the car (parked): make it a trip with many places, or take it away. Details are on the phone. */
+@Composable
+private fun EventActions(item: com.htb.carplan.shared.data.CalendarEvent, onTrip: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    val c = LocalCarColors.current
+    val isTrip = item.event.categoryId == BuiltInCategory.TRIP.id
+    var sure by remember { mutableStateOf(false) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        CarEnter(Entry.SHEET) {
+            Column(Modifier.width(720.dp).background(c.sheet, Corner).border(1.dp, c.sheetEdge, Corner).padding(32.dp)) {
+                Text(item.event.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(if (isTrip) "여행 · 칸은 그날 [칸 편집]이나 폰에서" else "이 일정을 여행으로 바꾸면 장소를 여러 곳 넣을 수 있어요", color = c.soft, fontSize = 22.sp, modifier = Modifier.padding(top = 6.dp, bottom = 20.dp))
+                if (!isTrip) Button(onClick = onTrip, modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp), shape = Corner,
+                    colors = ButtonDefaults.buttonColors(containerColor = c.ink, contentColor = c.onInk)) { Text("여행으로 바꾸기", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = { if (sure) onDelete() else sure = true }, modifier = Modifier.weight(1f).heightIn(min = 76.dp), shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
+                        Text(if (sure) "정말 지우기" else "지우기", color = c.warn, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 76.dp), shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, c.line)) {
+                        Text("닫기", color = c.ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }

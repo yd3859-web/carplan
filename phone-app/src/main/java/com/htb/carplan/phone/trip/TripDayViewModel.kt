@@ -312,6 +312,13 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
 
     // ---------- editing ----------
 
+    /** 여행 정보 고치기: title and dates (and anything else the edit sheet sends). */
+    fun updateEventInfo(title: String, categoryId: String, start: java.time.LocalDate, end: java.time.LocalDate, allDay: Boolean, time: String?, place: Place?) = write {
+        com.htb.carplan.shared.data.CalendarRepository().updateEvent(groupId, eventId, title, categoryId, start.toString(), end.toString(), allDay, time, place)
+    }
+
+    fun deleteTrip() = write { com.htb.carplan.shared.data.CalendarRepository().setEventDeleted(groupId, eventId, true) }
+
     fun addStop(place: Place, time: String?, memo: String) = write {
         trips.addStop(groupId, eventId, _date.value, place, time, memo, me())
     }

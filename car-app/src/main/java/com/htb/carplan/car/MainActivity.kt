@@ -1194,6 +1194,13 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                     TextButton(onClick = { vm.seedMoreDemo(); onDismiss() }) { Text("여행 기록 더 채우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.clearDemo(); onDismiss() }) { Text("데모 지우기", fontSize = 20.sp, color = Ink) }
                 }
+                // A phone account (its 친구 코드 from 설정) into all of the owner's shared groups — e.g. after reinstalling the phone app.
+                var phoneCode by remember { mutableStateOf("") }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.OutlinedTextField(phoneCode, { phoneCode = it.uppercase().take(8) }, singleLine = true, modifier = Modifier.width(220.dp),
+                        placeholder = { Text("폰 친구 코드", fontSize = 20.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, color = Ink))
+                    TextButton(onClick = { vm.bringInPhone(phoneCode); onDismiss() }, enabled = phoneCode.length >= 4) { Text("폰 계정 넣기", fontSize = 20.sp, color = Ink) }
+                }
                 Text("출근: 매일 반복·장소 회사, 오늘 남은 여행이 없을 때 \"회사로 갈까요?\" / 픽업: 백현동에서 기다리는 일행, 시뮬이 먼저 태우러 감", fontSize = 20.sp, color = Soft)
                 HorizontalDivider(color = Line)
                 val split by vm.previewSplit.collectAsStateWithLifecycle()

@@ -206,6 +206,27 @@ class CalendarViewModel : ViewModel() {
      * Every event goes to the solo group for now (4장 adds picking a group for trips).
      * [onAdded] gets the group and event id so a trip can open its first day right away.
      */
+    /** 일정 고치기 (EventEditSheet). */
+    fun updateEvent(item: com.htb.carplan.shared.data.CalendarEvent, title: String, categoryId: String, start: java.time.LocalDate, end: java.time.LocalDate, allDay: Boolean, time: String?, place: com.htb.carplan.shared.model.Place?) {
+        viewModelScope.launch {
+            runCatching { calendar.updateEvent(item.groupId, item.event.id, title, categoryId, start.toString(), end.toString(), allDay, time, place) }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
+    fun deleteEvent(item: com.htb.carplan.shared.data.CalendarEvent) {
+        viewModelScope.launch { runCatching { calendar.setEventDeleted(item.groupId, item.event.id, true) }.onFailure { _error.value = it.message } }
+    }
+
+    /** An ordinary event → a trip (its place the first stop); [onDone] then opens the trip's day. */
+    fun convertToTrip(item: com.htb.carplan.shared.data.CalendarEvent, onDone: () -> Unit) {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            runCatching { calendar.convertToTrip(item.groupId, item.event, s.uid) }
+                .onSuccess { onDone() }.onFailure { _error.value = it.message }
+        }
+    }
+
     fun addEvent(event: Event, groupId: String? = null, firstStop: com.htb.carplan.shared.model.Place? = null, onAdded: (groupId: String, eventId: String) -> Unit = { _, _ -> }) {
         val s = _session.value ?: return
         val gid = groupId ?: s.soloGroupId

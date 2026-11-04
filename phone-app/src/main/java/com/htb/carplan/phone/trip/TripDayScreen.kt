@@ -183,6 +183,14 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         .collectAsStateWithLifecycle(emptyList())
     var chatSeen by remember(ref.groupId) { mutableStateOf(0L) }
     val sharedTrip = (group?.memberIds?.size ?: 0) > 1
+    var tripInfoOpen by remember { mutableStateOf(false) }
+    if (tripInfoOpen) event?.let { ev ->
+        com.htb.carplan.phone.calendar.EventEditSheet(
+            item = com.htb.carplan.shared.data.CalendarEvent(ref.groupId, ev), categories = emptyList(), onAddCategory = { _, _, _ -> },
+            onSave = { t, c, st, en, ad, tm, pl -> tripInfoOpen = false; vm.updateEventInfo(t, c, st, en, ad, tm, pl) },
+            onMakeTrip = {}, onDelete = { tripInfoOpen = false; vm.deleteTrip(); onBack() }, onDismiss = { tripInfoOpen = false },
+        )
+    }
     // 12장 주차장 찾기: opened by the push (once), or by the [주차장] chip.
     var parkingAround by rememberSaveable { mutableStateOf<String?>(null) }
     var parkingShown by rememberSaveable { mutableStateOf(false) }
@@ -242,6 +250,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                 IconButton(onClick = { exportMenu = true }, enabled = exporting == null) { Icon(Icons.Filled.MoreVert, "더보기", tint = Palette.TextStrong) }
                 exporting?.let { Text(it, fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomCenter)) }
                 androidx.compose.material3.DropdownMenu(exportMenu, onDismissRequest = { exportMenu = false }) {
+                    // 여행 정보 고치기 (정원 2026-11-04): 제목·날짜.
+                    androidx.compose.material3.DropdownMenuItem({ Text("여행 정보 고치기") }, onClick = { exportMenu = false; tripInfoOpen = true })
                     if (records.isEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보낼 기록이 아직 없어요", color = Palette.TextSoft) }, onClick = { exportMenu = false })
                     if (records.isNotEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보내기 · 이미지 1장") }, onClick = {
                         exportMenu = false

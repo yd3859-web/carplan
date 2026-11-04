@@ -51,6 +51,31 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
     suspend fun addEvent(groupId: String, event: Event): String =
         db.collection(FirestorePaths.events(groupId)).add(event).await().id
 
+    /**
+     * 일정 고치기 (정원 2026-11-04: 캘린더에 등록한 일정을 고칠 방법이 없었음): title, category, dates, time and place of
+     * an existing event. Fields not named stay as they are.
+     */
+    suspend fun updateEvent(groupId: String, eventId: String, title: String, categoryId: String, startDate: String, endDate: String, allDay: Boolean, startTime: String?, place: com.htb.carplan.shared.model.Place?) {
+        db.document(FirestorePaths.event(groupId, eventId)).update(mapOf(
+            "title" to title.trim(), "categoryId" to categoryId, "startDate" to startDate, "endDate" to maxOf(startDate, endDate),
+            "allDay" to allDay, "startTime" to if (allDay) null else startTime, "place" to place,
+        )).await()
+    }
+
+    /**
+     * An ordinary event becomes a trip (정원 2026-11-04: "바다여행"을 다른 일정으로 등록해 경유지를 못 넣었음): category 여행,
+     * all-day, and its place — if it had one — becomes the first stop of the first day, so more places can follow.
+     */
+    suspend fun convertToTrip(groupId: String, event: com.htb.carplan.shared.model.Event, byUid: String) {
+        db.document(FirestorePaths.event(groupId, event.id)).update(mapOf(
+            "categoryId" to com.htb.carplan.shared.model.BuiltInCategory.TRIP.id, "allDay" to true, "startTime" to null,
+            "endDate" to maxOf(event.startDate, event.endDate.ifBlank { event.startDate }),
+        )).await()
+        event.place?.takeIf { it.name.isNotBlank() || it.lat != 0.0 }?.let { p ->
+            TripRepository(db).addStop(groupId, event.id, event.startDate, p, event.startTime, "", byUid)
+        }
+    }
+
     /** Soft delete (the calendar hides `deleted` events; nothing is erased). */
     suspend fun setEventDeleted(groupId: String, eventId: String, deleted: Boolean) {
         db.document(FirestorePaths.event(groupId, eventId)).update("deleted", deleted).await()
