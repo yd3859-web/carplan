@@ -411,8 +411,19 @@ private fun DotMapBoard(
         val reveal = remember { Animatable(if (hideMap) 0f else 1f) }
         LaunchedEffect(stuck != null, hideMap) { if (stuck != null || !hideMap) reveal.animateTo(1f, tween(700)) else reveal.snapTo(0f) }
 
-        // The dart never lands outside the range (정원 2026-11-03): 내 위치 = inside the km circle,
-        // 지역 = inside that 시·도, 전국 = on land. A throw that would go out lands on the edge / the nearest 동네 inside.
+        // Out of range = a miss (정원 2026-11-04, 폰 다트와 같게): not a pick — it says so and the dart comes back.
+        var missed by remember { mutableStateOf(false) }
+        val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+        val warnColor = LocalCarColors.current.warn; val cBg = LocalCarColors.current.bg
+        fun inRange(t: Offset): Boolean {
+            if (near != null) {
+                val c = toScreen(near.first, near.second)
+                return (t - c).getDistance() <= (near.third / 111.0 * camK.value).toFloat()
+            }
+            val (la, lo) = toGeo(t)
+            val anyNear = Regions.nearest(la, lo, Regions.all) ?: return false
+            return RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < 0.06 * 0.06 && (areaSido == null || anyNear.sido == areaSido)
+        }
         fun keepInside(t: Offset): Offset {
             if (near != null) {
                 val c = toScreen(near.first, near.second)
@@ -556,16 +567,22 @@ private fun DotMapBoard(
                 val t = impact.value
                 listOf(0f, 0.12f, 0.24f).forEachIndexed { i, delay ->
                     val k = ((t - delay) / (1f - delay)).coerceIn(0f, 1f)
-                    if (k > 0f && k < 1f) drawCircle(cTeal.copy(alpha = (1f - k) * (0.85f - i * 0.2f)), k * (240 - i * 50).dp.toPx(), sp, style = Stroke((5 - i).dp.toPx()))
+                    if (k > 0f && k < 1f) drawCircle((if (missed) cSoft else cTeal).copy(alpha = (1f - k) * (0.85f - i * 0.2f)), k * (240 - i * 50).dp.toPx(), sp, style = Stroke((5 - i).dp.toPx()))
                 }
                 val burst = (t / 0.45f).coerceIn(0f, 1f)
-                if (burst < 1f) for (a in 0 until 10) {
+                if (burst < 1f && !missed) for (a in 0 until 10) {
                     val ang = Math.toRadians(a * 36.0 + 18.0)
                     val dir = Offset(kotlin.math.cos(ang).toFloat(), kotlin.math.sin(ang).toFloat())
                     val r0 = (12 + 50 * burst).dp.toPx(); val r1 = (28 + 90 * burst).dp.toPx()
                     drawLine(ink.copy(alpha = 1f - burst), sp + dir * r0, sp + dir * r1, 4.dp.toPx(), StrokeCap.Round)
                 }
                 if (t < 0.18f) drawCircle(ink.copy(alpha = 0.35f * (1f - t / 0.18f)), 32.dp.toPx(), sp)
+            }
+            if (missed && stuck != null) {
+                val m = measurer.measure("범위 밖이에요 · 다시 던져요", androidx.compose.ui.text.TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold, color = warnColor))
+                val at = Offset(w / 2 - m.size.width / 2f, boardH * 0.12f)
+                drawRect(cBg.copy(alpha = 0.92f), at - Offset(16.dp.toPx(), 10.dp.toPx()), androidx.compose.ui.geometry.Size(m.size.width + 32.dp.toPx(), m.size.height + 20.dp.toPx()))
+                drawText(m, topLeft = at)
             }
             if (reveal.value < 1f) {
                 val m = measurer.measure("지도를 가렸어요 · 꽂히면 보여요", androidx.compose.ui.text.TextStyle(fontSize = 24.sp, fontWeight = FontWeight.Bold, color = ink.copy(alpha = 0.45f * (1f - reveal.value))))
@@ -598,9 +615,15 @@ private fun DotMapBoard(
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
                             )
                             // Released from where it was drawn back: the dart snaps forward out of the band.
-                            throwTo(keepInside(target), 560, from = launchAt + back)
-                            val (lat, lng) = toGeo(target)
-                            onLanded(lat, lng)
+                            val ok = inRange(target)
+                            missed = !ok
+                            throwTo(target, 560, from = launchAt + back)
+                            if (ok) { val (lat, lng) = toGeo(target); onLanded(lat, lng) }
+                            else {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                kotlinx.coroutines.delay(1300)
+                                stuck = null; flightTo = null; fly.snapTo(0f); missed = false
+                            }
                         }
                     },
                 )
