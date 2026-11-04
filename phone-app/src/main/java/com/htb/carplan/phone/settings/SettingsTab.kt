@@ -141,18 +141,18 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("일정 알림", fontSize = 17.sp, color = Palette.TextStrong)
-                Text("일정에 [알림]을 넣으면 그 시간에 폰이 알려 줘요 (2주 안의 일정)", fontSize = 15.sp, color = Palette.TextSoft)
+                Text("일정에 넣은 [알림] 시간에 폰이 알려 줘요", fontSize = 15.sp, color = Palette.TextSoft)
             }
             Switch(reminders, onCheckedChange = { on -> reminders = on; Reminders.setEnabled(context, on, upcoming) },
                 colors = SwitchDefaults.colors(checkedTrackColor = Palette.Navy, checkedThumbColor = Palette.Background))
         }
-        Text("같이 가는 사람 알림(칸 뺌·투표·도착·픽업)은 서버에서 보내요. 차가 가는 중엔 동승자 폰에 \"차가 가는 중\" 알림이 떠 있어요. 폰의 알림 권한이 꺼져 있으면 시스템 설정에서 켜 주세요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
+        Text("투표·도착·픽업 같은 일행 알림은 늘 와요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
 
         Section("캘린더")
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("구글 캘린더 같이 보기", fontSize = 17.sp, color = Palette.TextStrong)
-                Text("구글 일정이 \"구글\" 카테고리로 같이 보여요. 읽기만 하고, 우리 일정을 구글로 보내진 않아요.", fontSize = 15.sp, color = Palette.TextSoft)
+                Text("구글 일정을 읽어서 같이 보여 줘요 (보내진 않아요)", fontSize = 15.sp, color = Palette.TextSoft)
                 googleStatus?.let { Text(it, fontSize = 15.sp, color = Palette.Sunday) }
             }
             Switch(googleCal, onCheckedChange = { on -> if (on) turnOnGoogle() else { googleCal = false; GoogleCalendar.setEnabled(context, false) } },
@@ -167,7 +167,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
         else {
             SettingRow("연결된 차", if (c.ownerUid == session?.uid) "내 차 (차주)" else "다른 사람 차")
             Text("주유·충전 알림 기준", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 8.dp))
-            Text("연료(배터리)가 이 아래이거나 오늘 일정에 모자라면 차와 폰의 하루 일정에 \"주유하기\" 칸이 생겨요. 모자라는지는 남은 길 + 30km로 계산해요.", fontSize = 15.sp, color = Palette.TextSoft)
+            Text("이 아래거나 오늘 갈 길에 모자라면 \"주유하기\" 칸이 생겨요", fontSize = 15.sp, color = Palette.TextSoft)
             Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(10, 15, 20, 30).forEach { p ->
                     val on = c.fuelAlertPercent == p
@@ -189,7 +189,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("앱")
         SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
-        Text("캘린더에 쓴 일정이 차를 움직인다 · Pleos Connect 공모전", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp, bottom = 32.dp))
+        Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp, bottom = 32.dp))
     }
 
     if (renaming) RenameSheet(me?.name.orEmpty(), onDone = { vm.rename(it); renaming = false }, onDismiss = { renaming = false })

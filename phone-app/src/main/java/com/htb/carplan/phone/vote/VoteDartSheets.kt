@@ -131,7 +131,7 @@ private fun VoteCard(v: Vote, me: String?, members: Int, isOwner: Boolean, nameO
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(v.question, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            Text(if (open) "${v.ballots.size}/$members 투표" else "마감", fontSize = 15.sp, color = if (open) Palette.TextStrong else Palette.TextSoft)
+            Text(if (open) "${v.ballots.size}/$members 투표" else "마감됨", fontSize = 15.sp, color = if (open) Palette.TextStrong else Palette.TextSoft)
         }
         v.options.forEachIndexed { i, o ->
             val won = i in v.winners

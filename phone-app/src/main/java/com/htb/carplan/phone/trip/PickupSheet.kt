@@ -137,6 +137,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             }
             HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(vertical = 10.dp))
             Text("픽업 순서", fontSize = 15.sp, color = Palette.TextSoft)
+            if (pickups.isEmpty()) Text("아직 태우러 갈 사람이 없어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
             pickups.forEachIndexed { i, p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${i + 1}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 10.dp))

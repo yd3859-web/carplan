@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -102,7 +103,7 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
             Text("같이 탈 사람", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             // One [+]: add a friend · scan the car QR · join by code · a new 묶음 (자주 타는 사람).
             Box {
-                IconButton(onClick = { plus = true }, modifier = Modifier.background(Palette.Navy, Corner)) { Icon(Icons.Filled.Add, "추가", tint = androidx.compose.ui.graphics.Color.White) }
+                IconButton(onClick = { plus = true }, modifier = Modifier.border(1.dp, Palette.SheetEdge, Corner)) { Icon(Icons.Filled.Add, "추가", tint = Palette.TextStrong) }
                 DropdownMenu(plus, onDismissRequest = { plus = false }) {
                     DropdownMenuItem({ Text("친구 추가 (코드)") }, onClick = { plus = false; addingFriend = true })
                     DropdownMenuItem({ Text("QR 찍기 (차·친구)") }, onClick = { plus = false; scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false).setPrompt("차 화면이나 친구의 QR을 비춰 주세요")) })
@@ -114,7 +115,8 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
         }
         message?.let { Text(it, color = Palette.TextStrong, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
         // 초대 = 일정 (정원 2026-10-31): each event invites its own people; this tab keeps the people — 묶음 and friends.
-        val shared = groups.filter { it.isCircle }
+        // A 묶음 with nobody else in it (left over from an old car QR) says nothing: not listed (디자인 평가 2026-11-04).
+        val shared = groups.filter { it.isCircle && it.memberIds.any { m -> m != me?.uid } }
         LazyColumn(Modifier.weight(1f).padding(top = 10.dp), state = list) {
             item { SectionTitle("자주 타는 사람") }
             items(shared, key = { it.id }) { g ->

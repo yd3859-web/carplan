@@ -192,7 +192,7 @@ fun QuickAddSheet(
 
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (!isTrip) Chip(Icons.Filled.Place, place?.name ?: "장소", active = place != null) { pickingPlace = true }
-                if (dartGroupId != null) Chip(Icons.Filled.Place, if (isTrip) firstStop?.let { "첫 칸 " + it.name } ?: "다트로 정하기" else "다트", active = isTrip && firstStop != null) { darting = true }
+                if (dartGroupId != null) Chip(com.htb.carplan.phone.ui.DartIcon, if (isTrip) firstStop?.let { "첫 칸 " + it.name } ?: "다트로 정하기" else "다트", active = isTrip && firstStop != null) { darting = true }
                 Box {
                     Chip(Icons.Filled.DateRange, dateLabel(start, end, if (isTrip) null else time, if (isTrip) Repeat.NONE else repeat), active = true) { if (isTrip) rangePicker = true else dateMenu = true }
                     DropdownMenu(dateMenu, onDismissRequest = { dateMenu = false }) {

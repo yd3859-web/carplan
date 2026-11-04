@@ -154,7 +154,10 @@ class RecordTabViewModel : ViewModel() {
             if (photos.isEmpty()) { message.value = "사진 파일이 없는 빌드예요"; return@launch }
             var turn = 0; var added = 0; var error: String? = null; var storageRefused = false
             message.value = "사진 넣는 중…"
-            for (b in bs) for ((p, recs) in b.pages) for (r in recs.filter { it.photoUrls.isEmpty() && it.note.isNotBlank() }) {
+            for (b in bs) for ((p, recs) in b.pages) for (r in recs.filter { it.note.isNotBlank() && (it.photoUrls.isEmpty() || it.photoUrls.all { u -> "picsum.photos" in u }) }) {
+                // Web samples from an earlier run (Storage was refused then): swap them for real uploads when Storage works.
+                val samples = r.photoUrls.filter { "picsum.photos" in it }
+                if (samples.isNotEmpty() && storageRefused) continue
                 repeat(if (r.note.length > 14) 2 else 1) {
                     val n = turn++
                     runCatching {
@@ -167,6 +170,11 @@ class RecordTabViewModel : ViewModel() {
                             .update("photoUrls", com.google.firebase.firestore.FieldValue.arrayUnion("https://picsum.photos/seed/carplan${r.id.take(6)}$n/1200/900"))
                             .await()
                     }.onSuccess { added++ }.onFailure { if (error == null) error = it.message }
+                }
+                if (samples.isNotEmpty() && !storageRefused) runCatching {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .document("${FirestorePaths.records(p.groupId, p.eventId, p.date)}/${r.id}")
+                        .update("photoUrls", com.google.firebase.firestore.FieldValue.arrayRemove(*samples.toTypedArray())).await()
                 }
             }
             message.value = if (added > 0) "사진 ${added}장 넣었어요" + (if (storageRefused) " (Storage가 막혀 웹 샘플 사진)" else "") + " · 탭을 다시 열면 보여요" else "못 넣었어요 · ${error ?: "넣을 칸이 없어요"}"
@@ -299,6 +307,11 @@ private fun BookCard(b: DiaryBook, with: List<String>, onOpen: (DiaryDay) -> Uni
     val single = b.pages.size == 1
     val photos = b.photos
     Column(Modifier.fillMaxWidth().clickable { onOpen(if (single) first else b.pages.first().first) }.padding(vertical = 14.dp)) {
+        // No photo yet: the day's route as a small sketch, so a book without pictures still has a face.
+        if (photos.isEmpty()) {
+            val pts = b.pages.flatMap { it.second }.map { it.place }.filter { it.lat != 0.0 || it.lng != 0.0 }.map { it.lat to it.lng }
+            if (pts.size >= 2) { RouteSketch(pts, Modifier.fillMaxWidth().height(88.dp)); Spacer(Modifier.height(10.dp)) }
+        }
         photos.firstOrNull()?.let { url ->
             coil3.compose.AsyncImage(
                 model = url, contentDescription = "${b.event.title} 대표 사진", contentScale = androidx.compose.ui.layout.ContentScale.Crop,
@@ -356,7 +369,8 @@ private fun TodayPage(today: LocalDate, pages: List<DiaryDay>, vm: RecordTabView
     val chosen = loaded.firstOrNull { it.second.isNotEmpty() } ?: loaded.firstOrNull { !it.first.isLog } ?: loaded.firstOrNull()
     val page = chosen?.first ?: pages.firstOrNull { !it.isLog } ?: pages.firstOrNull()
     val recs = chosen?.second.orEmpty()
-    Column(Modifier.fillMaxWidth().padding(top = 14.dp).border(1.dp, Palette.SheetEdge, Corner).padding(18.dp)) {
+    // No box around it (sections aren't boxed): the big date and a line under it do the job (디자인 평가 2026-11-04).
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text("${today.dayOfMonth}", fontSize = 40.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
             Text("  ${today.monthValue}월 · ${today.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.KOREAN)} · 오늘", fontSize = 17.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
@@ -368,6 +382,7 @@ private fun TodayPage(today: LocalDate, pages: List<DiaryDay>, vm: RecordTabView
             modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(52.dp), shape = Corner,
             colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
         ) { Text(if (recs.isEmpty()) "오늘 쓰기" else "오늘 이어 쓰기", fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
+        HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 20.dp))
     }
 }
 
@@ -387,5 +402,23 @@ private fun DiaryBody(p: DiaryDay, recs: List<com.htb.carplan.shared.model.Recor
     if (all.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         all.take(4).forEachIndexed { i, url -> coil3.compose.AsyncImage(model = url, contentDescription = "사진 크게 보기", contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(72.dp).clip(Corner).clickable { viewing = i }) }
         if (all.size > 4) Text("+${all.size - 4}", fontSize = 15.sp, color = Palette.TextSoft)
+    }
+}
+
+/** The places of a trip as dots joined in order, fitted into the box (north up) — a cover when there is no photo. */
+@Composable
+private fun RouteSketch(pts: List<Pair<Double, Double>>, modifier: Modifier) {
+    val ink = Palette.TextStrong; val soft = Palette.SheetEdge
+    androidx.compose.foundation.Canvas(modifier) {
+        val lat0 = pts.minOf { it.first }; val lat1 = pts.maxOf { it.first }
+        val lng0 = pts.minOf { it.second }; val lng1 = pts.maxOf { it.second }
+        val k = kotlin.math.cos(Math.toRadians((lat0 + lat1) / 2))
+        val spanX = ((lng1 - lng0) * k).coerceAtLeast(1e-6); val spanY = (lat1 - lat0).coerceAtLeast(1e-6)
+        val pad = 10.dp.toPx()
+        val scale = minOf((size.width - pad * 2) / spanX, (size.height - pad * 2) / spanY).toFloat()
+        val ox = (size.width - spanX.toFloat() * scale) / 2; val oy = (size.height - spanY.toFloat() * scale) / 2
+        val xy = pts.map { (la, ln) -> androidx.compose.ui.geometry.Offset(ox + ((ln - lng0) * k).toFloat() * scale, oy + (lat1 - la).toFloat() * scale) }
+        xy.zipWithNext().forEach { (a, b) -> drawLine(soft, a, b, 3.dp.toPx(), androidx.compose.ui.graphics.StrokeCap.Round) }
+        xy.forEachIndexed { i, p -> drawCircle(if (i == 0 || i == xy.lastIndex) ink else soft, (if (i == 0 || i == xy.lastIndex) 6 else 4).dp.toPx(), p) }
     }
 }
