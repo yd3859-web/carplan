@@ -207,7 +207,7 @@ fun CarDartGame(
                         ) {
                             Text(d.resultName.split(" ").first(), fontSize = 20.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 38.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
-                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 20.sp, color = Palette.Teal, modifier = Modifier.padding(top = 2.dp))
+                            Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == vm.ownerUid) "내가 던짐" else "${vm.nameOf(d.thrownBy)}님이 던짐"}", fontSize = 20.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
                             // Q57: what is there in that 동네 — one kind at a time (one Kakao call per press), then a stop.
                             val uiScope = rememberCoroutineScope()
                             var cat by remember(d.id, d.throwCount) { mutableStateOf<KakaoCategory?>(null) }
@@ -232,7 +232,7 @@ fun CarDartGame(
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             Text(p.name, fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
-                                            Text("넣기", fontSize = 20.sp, color = Palette.Teal, fontWeight = FontWeight.Bold)
+                                            Text("넣기", fontSize = 20.sp, color = Palette.TextStrong, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -255,7 +255,7 @@ fun CarDartGame(
                             }
                         }
                     }
-                    error?.let { Text(it, color = Palette.Teal, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
+                    error?.let { Text(it, color = Palette.TextStrong, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).padding(10.dp)) }
                 }
             }
         }

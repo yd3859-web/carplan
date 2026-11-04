@@ -126,7 +126,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("내 픽업 장소", fontSize = 15.sp, color = Palette.TextSoft)
                     Text(mine?.place?.name ?: "아직 없음", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-                    mine?.let { Text(statusText(it.status, it.arrivedAt != null), fontSize = 15.sp, color = Palette.Teal) }
+                    mine?.let { Text(statusText(it.status, it.arrivedAt != null), fontSize = 15.sp, color = Palette.TextStrong) }
                 }
                 if (mine == null) Button(onClick = { searching = true }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("장소 고르기") }
                 else {
@@ -139,7 +139,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             Text("픽업 순서", fontSize = 15.sp, color = Palette.TextSoft)
             pickups.forEachIndexed { i, p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${i + 1}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(end = 10.dp))
+                    Text("${i + 1}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 10.dp))
                     Column(Modifier.weight(1f)) {
                         Text("${p.name.ifBlank { "일행" }} · ${p.place.name}", fontSize = 17.sp, color = Palette.TextStrong)
                         Text(statusText(p.status, p.arrivedAt != null), fontSize = 15.sp, color = Palette.TextSoft)

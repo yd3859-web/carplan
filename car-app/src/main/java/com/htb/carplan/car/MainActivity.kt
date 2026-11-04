@@ -204,7 +204,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         }
         var lastNotice by remember { mutableStateOf("") }
         notice?.let { lastNotice = it }
-        CarAppear(notice != null) { Text(lastNotice, color = Accent, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
+        CarAppear(notice != null) { Text(lastNotice, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
             LinkCodeScreen(car?.linkCode)
             return@Column
@@ -397,7 +397,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         }
         // Driving: the screen is view-only (바꿀 건 동승자 폰에서); the one thing left to press is the navigation.
         if (v.drivingRestricted) {
-            if (!compact) Text("주행 중 · 보기만", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            if (!compact) Text("주행 중 · 보기만", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             if (!compact) TextButton(onClick = onNavi) { Text("내비 열기", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         }
     }
@@ -1075,7 +1075,7 @@ private fun NearbyDialog(list: NearbyList, onPick: (NearPlace) -> Unit, onDismis
             list.items.forEach { p ->
                 Button(onClick = { onPick(p) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
                     Text(p.name, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
-                    p.priceWon?.let { Text("${"%,d".format(it)}원", fontSize = 26.sp, color = Accent, fontWeight = FontWeight.Bold) }
+                    p.priceWon?.let { Text("${"%,d".format(it)}원", fontSize = 26.sp, color = Ink, fontWeight = FontWeight.Bold) }
                     // On-the-way list: where along the day (the metres are from a point on the way, not the car).
                     Text("  " + (p.where ?: if (p.meters >= 1000) "%.1fkm".format(p.meters / 1000.0) else "${p.meters}m"), fontSize = 24.sp, color = Soft, maxLines = 1)
                 }
@@ -1093,7 +1093,7 @@ private fun StationDialog(stations: List<GasStation>, onPick: (GasStation) -> Un
                 stations.forEach { st ->
                     Button(onClick = { onPick(st) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
                         Text(st.name, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("${"%,d".format(st.price)}원", fontSize = 26.sp, color = Accent, fontWeight = FontWeight.Bold)
+                        Text("${"%,d".format(st.price)}원", fontSize = 26.sp, color = Ink, fontWeight = FontWeight.Bold)
                         Text("  ${if (st.meters >= 1000) "%.1fkm".format(st.meters / 1000.0) else "${st.meters}m"}", fontSize = 20.sp, color = Soft)
                     }
                 }

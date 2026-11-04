@@ -89,7 +89,7 @@ fun VoteSheet(groupId: String, eventId: String?, date: String?, nameOf: (String)
                 Text("투표", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
                 TextButton(onClick = { creating = !creating }) { Text(if (creating) "목록" else "새 투표", color = Palette.Navy) }
             }
-            message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
+            message?.let { Text(it, color = Palette.TextStrong, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
             if (creating) NewVote(onPickPlace = onPickPlace, seeds = starts) { q, opts, places -> vm.create(q, opts, places); creating = false }
             else {
                 if (votes.isEmpty()) Text("아직 투표가 없어요", color = Palette.TextSoft, fontSize = 16.sp, modifier = Modifier.padding(vertical = 10.dp))
@@ -131,12 +131,12 @@ private fun VoteCard(v: Vote, me: String?, members: Int, isOwner: Boolean, nameO
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(v.question, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
-            Text(if (open) "${v.ballots.size}/$members 투표" else "마감", fontSize = 15.sp, color = if (open) Palette.Teal else Palette.TextSoft)
+            Text(if (open) "${v.ballots.size}/$members 투표" else "마감", fontSize = 15.sp, color = if (open) Palette.TextStrong else Palette.TextSoft)
         }
         v.options.forEachIndexed { i, o ->
             val won = i in v.winners
             Row(
-                Modifier.fillMaxWidth().padding(top = 6.dp).clip(Corner).border(if (mine == i || won) 2.dp else 1.dp, if (won) Palette.Teal else if (mine == i) Palette.Navy else Palette.Line, Corner)
+                Modifier.fillMaxWidth().padding(top = 6.dp).clip(Corner).border(if (mine == i || won) 2.dp else 1.dp, if (won || mine == i) Palette.Navy else Palette.Line, Corner)
                     .clickable(enabled = open) { onCast(i) }.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

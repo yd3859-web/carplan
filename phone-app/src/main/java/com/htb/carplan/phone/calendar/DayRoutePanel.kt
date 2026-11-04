@@ -121,7 +121,7 @@ private fun TripRail(trip: CalendarEvent, stops: List<Stop>, comments: List<Comm
             Text(trip.event.title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
             Text(
                 when (day?.status) { DayStatus.DRIVING -> "가는 중 · 편집"; DayStatus.DONE -> "다녀옴 · 편집"; else -> "편집" },
-                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal,
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong,
             )
         }
         if (stops.isEmpty()) {

@@ -268,7 +268,7 @@ private fun CardLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean,
             }
             ChatKind.CHANGE -> m.lines.forEach { Text(it, fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 2.dp)) }
             ChatKind.COMMENT -> {
-                m.lines.firstOrNull()?.let { Text(it, fontSize = 15.sp, color = Palette.Teal, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
+                m.lines.firstOrNull()?.let { Text(it, fontSize = 15.sp, color = Palette.TextStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
                 Text(m.text, fontSize = 18.sp, color = Palette.TextStrong)
             }
             ChatKind.PICKUP, ChatKind.ARRIVED, ChatKind.DAY_DONE -> {

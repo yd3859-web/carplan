@@ -150,7 +150,7 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp)) {
         Text("차량", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-        message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
+        message?.let { Text(it, color = Palette.TextStrong, fontSize = 15.sp, modifier = Modifier.clickable { vm.message.value = null }) }
         if (car == null) {
             Text("차 화면에 뜬 6자리 코드를 입력하면 이 차의 호스트가 돼요.", color = Palette.TextSoft, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
             OutlinedTextField(
@@ -230,7 +230,7 @@ fun CarTab(vm: CarTabViewModel = viewModel()) {
                         dueDays < 0 -> Text("${-dueDays}일 지남", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Sunday)
                         dueDays == 0L -> Text("오늘", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Sunday)
                         else -> Column(horizontalAlignment = Alignment.End) {
-                            Text("${dueDays}일 남음", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (dueDays <= 7) Palette.Sunday else Palette.Teal)
+                            Text("${dueDays}일 남음", fontSize = 18.sp, fontWeight = if (dueDays <= 7) FontWeight.Bold else FontWeight.Normal, color = if (dueDays <= 7) Palette.Sunday else Palette.TextStrong)
                             Text(due!!.startDate.substring(5).replace('-', '/') + (due.maintenance?.dueKm?.let { " · ${"%,d".format(it.toLong())}km" } ?: ""), fontSize = 15.sp, color = Palette.TextSoft)
                         }
                     }

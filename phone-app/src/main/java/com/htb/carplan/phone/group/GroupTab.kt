@@ -112,7 +112,7 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
                 }
             }
         }
-        message?.let { Text(it, color = Palette.Teal, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
+        message?.let { Text(it, color = Palette.TextStrong, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
         // 초대 = 일정 (정원 2026-10-31): each event invites its own people; this tab keeps the people — 묶음 and friends.
         val shared = groups.filter { it.isCircle }
         LazyColumn(Modifier.weight(1f).padding(top = 10.dp), state = list) {

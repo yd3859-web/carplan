@@ -200,7 +200,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.AddPanel(vm: CarHomeV
             onClick = { add(Place(name = query.trim())) }, shape = Corner, border = BorderStroke(1.dp, c.line),
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = 76.dp),
         ) { Text("'${query.trim()}' 이름만 넣기", color = c.ink, fontSize = 24.sp, maxLines = 1) }
-        added?.let { Text("$it 넣었어요", color = c.accent, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp)) }
+        added?.let { Text("$it 넣었어요", color = c.ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp)) }
     }
 }
 

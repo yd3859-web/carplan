@@ -89,7 +89,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
             OutlinedTextField(name, { name = it.take(20) }, singleLine = true, shape = Corner, placeholder = { Text("같이 가는 사람과 차 화면에 보여요") }, modifier = Modifier.fillMaxWidth())
 
             Text("차 연결", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 18.dp, bottom = 4.dp))
-            if (linked) Text("차와 연결돼 있어요", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.Teal)
+            if (linked) Text("차와 연결돼 있어요", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
             else {
                 Text("내 차라면, 차 화면에 뜬 6자리를 넣어요. 동승자는 넘어가도 돼요", fontSize = 15.sp, color = Palette.TextSoft)
                 Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -139,7 +139,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
 @Composable
 private fun Step(n: String, title: String, sub: String) {
     Row(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        Text(n, fontSize = 20.sp, fontWeight = FontWeight.Black, color = Palette.Teal, modifier = Modifier.width(32.dp))
+        Text(n, fontSize = 20.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong, modifier = Modifier.width(32.dp))
         Column {
             Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             Text(sub, fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
