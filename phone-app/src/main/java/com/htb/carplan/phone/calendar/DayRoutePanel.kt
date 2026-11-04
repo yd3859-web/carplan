@@ -79,7 +79,8 @@ fun DayRoutePanel(
         val sub = listOfNotNull(if (date == LocalDate.now()) "오늘" else null, KoreanHolidays.nameOf(date)).joinToString(" · ")
         if (sub.isNotEmpty()) Text(sub, fontSize = 16.sp, color = Palette.TextSoft)
 
-        LazyColumn(Modifier.weight(1f).padding(top = 16.dp)) {
+        // A gap above the button so the last line never looks tucked under it (디자인 평가 2026-11-04).
+        LazyColumn(Modifier.weight(1f).padding(top = 16.dp, bottom = 12.dp)) {
             if (events.isEmpty()) item { Text("이날은 일정이 없어요", color = Palette.TextSoft, fontSize = 17.sp) }
             items(trips, key = { "trip-" + it.groupId + it.event.id }) { trip ->
                 TripRail(

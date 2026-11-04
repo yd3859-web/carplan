@@ -342,18 +342,26 @@ private fun DayCell(
     }
 }
 
-/** Dots for one-day events (accent when it has a place = the car goes there), a wrench for car care. */
+/**
+ * One-day events by name (디자인 평가 2026-11-04: dots of five colours said nothing): up to 3 short titles with their
+ * category colour, car care with a wrench, then "+n". The colour is the category's — blue stays for where the car goes.
+ */
 @Composable
 private fun DayMarks(marks: List<CalendarEvent>, hiddenBars: Int, categories: List<CustomCategory>, holiday: String?) {
-    Row(Modifier.height(MARK_AREA).padding(start = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (marks.any { it.event.categoryId == BuiltInCategory.CAR.id }) Icon(Icons.Filled.Build, "차량 관리", tint = Palette.ChipText, modifier = Modifier.size(12.dp))
-        marks.filter { it.event.categoryId != BuiltInCategory.CAR.id }.take(3).forEach {
-            val c = if (it.event.place != null) Palette.Teal else argb(CategoryColors.of(it.event.categoryId, categories))
-            Box(Modifier.size(7.dp).clip(CircleShape).background(c))
+    Column(Modifier.padding(start = 2.dp, end = 1.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (marks.isEmpty() && hiddenBars == 0 && holiday != null) Text(holiday, fontSize = 12.sp, color = Palette.Sunday, maxLines = 1, overflow = TextOverflow.Clip)
+        val shown = marks.sortedBy { it.event.categoryId == BuiltInCategory.CAR.id }.take(3)
+        shown.forEach {
+            val care = it.event.categoryId == BuiltInCategory.CAR.id
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (care) Icon(Icons.Filled.Build, "차량 관리", tint = Palette.ChipText, modifier = Modifier.size(10.dp))
+                else Box(Modifier.width(3.dp).height(12.dp).background(argb(CategoryColors.of(it.event.categoryId, categories))))
+                Text(it.event.title.ifBlank { "일정" }, fontSize = 12.sp, lineHeight = 14.sp, color = if (care) Palette.TextSoft else Palette.TextStrong,
+                    maxLines = 1, overflow = TextOverflow.Clip, modifier = Modifier.padding(start = 2.dp))
+            }
         }
-        val more = marks.size - 3 + hiddenBars
-        if (more > 0) Text("+$more", fontSize = 13.sp, color = Palette.TextSoft)
-        if (marks.isEmpty() && hiddenBars == 0 && holiday != null) Text(holiday, fontSize = 13.sp, color = Palette.Sunday, maxLines = 1, overflow = TextOverflow.Clip)
+        val more = marks.size - shown.size + hiddenBars
+        if (more > 0) Text("+$more", fontSize = 12.sp, color = Palette.TextSoft)
     }
 }
 

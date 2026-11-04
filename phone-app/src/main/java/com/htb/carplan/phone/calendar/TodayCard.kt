@@ -50,10 +50,12 @@ fun TodayCard(upcoming: List<CalendarEvent>, car: Car?, modifier: Modifier = Mod
             Text("오늘은 차로 갈 일정이 없어요", color = Palette.TextStrong, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
         }
         // P-g: no car yet → the line itself is the way in (the 6 digits), not a trip to the 차량 tab.
-        if (car == null && onConnectCar != null) Text(
-            "차 연결하기 · 차 화면의 6자리", color = Palette.Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.clickable(onClick = onConnectCar).padding(vertical = 4.dp),
-        ) else Text(
+        // Looks pressable (디자인 평가 2026-11-04: a plain line didn't read as a button).
+        if (car == null && onConnectCar != null) androidx.compose.foundation.layout.Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.OutlinedButton(onClick = onConnectCar, shape = com.htb.carplan.phone.ui.Corner,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Palette.SheetEdge)) { Text("차 연결하기", color = Palette.TextStrong, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+            Text("  차 화면의 6자리 코드로", color = Palette.TextSoft, fontSize = 15.sp)
+        } else Text(
             listOfNotNull(carLine(car), care?.let { careLine(it, today) }).joinToString("    ·    "),
             color = Palette.ChipText, fontSize = 16.sp,
         )

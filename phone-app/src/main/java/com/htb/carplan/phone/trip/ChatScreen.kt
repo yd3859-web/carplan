@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -133,8 +135,13 @@ fun ChatScreen(
                     if (lines.isEmpty()) item {
                         Text("아직 아무 말도 없어요. 아래 [+]로 장소·투표·다트를 바로 보낼 수 있어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 24.dp))
                     }
-                    items(lines, key = { it.id }) { m ->
-                        if (m.kind == ChatKind.TEXT) TextLine(
+                    itemsIndexed(lines, key = { _, it -> it.id }) { i, m ->
+                        // A new day starts with its date (디자인 평가 2026-11-04: one long list with no "when").
+                        val day = dayOf(m)
+                        if (day != null && day != lines.getOrNull(i - 1)?.let(::dayOf)) Text(day, fontSize = 14.sp, color = Palette.TextSoft,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 12.dp, bottom = 4.dp))
+                        if (m.kind in NOTICES) NoticeLine(m, nameOf = { if (it == me) "나" else nameOf(it) }, mine = m.uid == me, actions = actions)
+                        else if (m.kind == ChatKind.TEXT) TextLine(
                             m, mine = m.uid == me, nameOf = nameOf,
                             // 말풍선 길게 → 그 글로 장소 찾기 (누를 때만 검색: API 한도).
                             onFindPlace = { actions.pickPlace(m.text) { p -> postPlace(p) } },
@@ -197,6 +204,28 @@ private fun PlusItem(label: String, onClick: () -> Unit) {
         label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy,
         modifier = Modifier.border(1.dp, Palette.Line, Corner).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp),
     )
+}
+
+private fun dayOf(m: ChatMessage): String? = m.createdAt?.toDate()?.let { android.text.format.DateFormat.format("M월 d일 EEEE", it).toString() }
+
+/** What happened, not something to act on: a quiet centred line instead of a card (위계 3단계: 말 / 할 일 카드 / 알림). */
+private val NOTICES = setOf(ChatKind.CHANGE, ChatKind.COMMENT, ChatKind.PICKUP, ChatKind.ARRIVED)
+
+@Composable
+private fun NoticeLine(m: ChatMessage, nameOf: (String?) -> String, mine: Boolean, actions: ChatActions) {
+    val who = nameOf(m.uid)
+    val (head, body, link) = when (m.kind) {
+        ChatKind.CHANGE -> Triple("${who}${if (mine) "가" else "님이"} 일정을 바꿨어요", m.lines.take(3) + listOfNotNull((m.lines.size - 3).takeIf { it > 0 }?.let { "외 ${it}건" }), "레일에서 보기" to { actions.showDay(m.date) })
+        ChatKind.COMMENT -> Triple("$who · ${m.lines.firstOrNull() ?: "칸"}에 코멘트", listOf("“${m.text}”"), "레일에서 보기" to { actions.showDay(m.date) })
+        ChatKind.PICKUP -> Triple(m.text, m.lines, "픽업 보기" to { actions.openPickup() })
+        else -> Triple(m.text, m.lines, "사진·한 줄 남기기" to { actions.showDay(m.date) })
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("$head · ${hhmm(m)}", fontSize = 14.sp, color = Palette.TextSoft, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        body.forEach { Text(it, fontSize = 15.sp, color = Palette.TextStrong, textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 2) }
+        Text(link.first, fontSize = 14.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 2.dp).clip(Corner).clickable(onClick = link.second).padding(horizontal = 8.dp, vertical = 6.dp))
+    }
 }
 
 private fun hhmm(m: ChatMessage) = m.createdAt?.toDate()?.let { android.text.format.DateFormat.format("HH:mm", it).toString() } ?: ""
