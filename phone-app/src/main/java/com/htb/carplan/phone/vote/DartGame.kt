@@ -9,6 +9,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -237,6 +238,13 @@ fun DartGame(
                             Modifier.widthIn(max = 420.dp).fillMaxWidth().background(Palette.Background, Corner).border(1.dp, Palette.SheetEdge, Corner).padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
+                            // Where that is, at a glance (디자인 평가 2026-11-04): a small street map of the 동네 on top.
+                            com.htb.carplan.phone.ui.SimpleMap(
+                                centerLat = d.resultLat, centerLng = d.resultLng, zoom = 14,
+                                markers = listOf(com.htb.carplan.phone.ui.MapMarker(d.resultLat, d.resultLng, d.resultName.split(" ").last(), com.htb.carplan.phone.ui.MapMarker.Kind.PICKUP)),
+                                height = 120.dp,
+                            )
+                            Spacer(Modifier.height(10.dp))
                             Text(d.resultName.split(" ").first(), fontSize = 16.sp, color = Palette.TextSoft)
                             Text(d.resultName.split(" ").drop(1).joinToString(" "), fontSize = 30.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
                             Text("${d.throwCount}번째 다트!  ·  ${if (d.thrownBy == me) "내가 던짐" else "${nameOf(d.thrownBy)}님이 던짐"}", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
@@ -380,7 +388,7 @@ private fun DotMapBoard(
         val w = with(density) { maxWidth.toPx() }; val h = with(density) { maxHeight.toPx() }
         val boardH = h * 0.86f
         val all = Regions.all
-        val sidoLabels = remember(all.size) { all.groupBy { it.sido }.entries.sortedByDescending { it.value.size }.map { (k, v) -> Label(shortSido(k), v.map { it.lat }.average(), v.map { it.lng }.average()) } }
+        val sidoLabels = remember(all.size) { all.groupBy { it.sido }.entries.sortedWith(compareBy({ cityRank(it.key) }, { -it.value.size })).map { (k, v) -> Label(shortSido(k), v.map { it.lat }.average(), v.map { it.lng }.average()) } }
         val sggLabels = remember(all.size) { all.groupBy { it.sido + "|" + it.sigungu }.map { (_, v) -> Label(shortSgg(v.first().sigungu), v.map { it.lat }.average(), v.map { it.lng }.average(), v.first().sido) } }
         // 지역·내 위치: a map of its own (시·군·구 from the start) instead of the national map zoomed in.
         val localMap = areaSido != null || near != null
@@ -470,7 +478,7 @@ private fun DotMapBoard(
             fly.snapTo(0f); wobble.snapTo(0f); impact.snapTo(0f)
             fly.animateTo(1f, tween(ms, easing = FastOutLinearInEasing))
             stuck = toGeo(target)
-            cs.launch { impact.animateTo(1f, tween(800)) }
+            cs.launch { impact.animateTo(1f, tween(1100, easing = LinearOutSlowInEasing)) }
             wobble.snapTo(16f)
             wobble.animateTo(0f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMediumLow))
             flying = false; onFlying(false)
@@ -557,9 +565,12 @@ private fun DotMapBoard(
                 val on = l.name in poolSidos
                 val st = big.copy(color = (if (on) ink else Color(0xFFB9BEC4)).copy(alpha = (1f - detail) * mapA), fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
                 val m = measurer.measure(l.name, st)
-                // On a phone the 시·도 names crowd (서울·인천·경기): bigger areas first, a name that would overlap is left out.
-                val at = p - Offset(m.size.width / 2f, m.size.height / 2f)
-                if (fits(at, m.size)) drawText(m, topLeft = at)
+                // On a phone the 시·도 names crowd (서울·인천·경기): the big cities go first and always show; a 도 that
+                // would sit on one steps below/above/aside, and is left out only if there is no room at all.
+                val h = m.size.height.toFloat(); val wd = m.size.width.toFloat()
+                val centre = p - Offset(wd / 2f, h / 2f)
+                listOf(Offset.Zero, Offset(0f, h * 1.15f), Offset(0f, -h * 1.15f), Offset(wd * 0.75f, 0f), Offset(-wd * 0.75f, 0f))
+                    .map { centre + it }.firstOrNull { fits(it, m.size) }?.let { drawText(m, topLeft = it) }
             }
             // The dart's 동네 and its neighbours go first so they always win a crowded spot.
             val st = stuck
@@ -587,9 +598,21 @@ private fun DotMapBoard(
             // impact ripple
             val sp = stuck?.let { toScreen(it.first, it.second) }
             if (sp != null && impact.value < 1f) {
-                val r = impact.value * 140.dp.toPx()
-                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.8f), r, sp, style = Stroke(3.dp.toPx()))
-                drawCircle(Palette.Teal.copy(alpha = (1f - impact.value) * 0.35f), r * 0.55f, sp, style = Stroke(2.dp.toPx()))
+                // The hit, bigger (디자인 평가 2026-11-04): three rings one after another, a burst of short sparks,
+                // and a dark flash at the point for the first instant.
+                val t = impact.value
+                listOf(0f, 0.12f, 0.24f).forEachIndexed { i, delay ->
+                    val k = ((t - delay) / (1f - delay)).coerceIn(0f, 1f)
+                    if (k > 0f && k < 1f) drawCircle(Palette.Teal.copy(alpha = (1f - k) * (0.85f - i * 0.2f)), k * (200 - i * 40).dp.toPx(), sp, style = Stroke((4 - i).dp.toPx()))
+                }
+                val burst = (t / 0.45f).coerceIn(0f, 1f)
+                if (burst < 1f) for (a in 0 until 10) {
+                    val ang = Math.toRadians(a * 36.0 + 18.0)
+                    val dir = Offset(kotlin.math.cos(ang).toFloat(), kotlin.math.sin(ang).toFloat())
+                    val r0 = (10 + 40 * burst).dp.toPx(); val r1 = (22 + 70 * burst).dp.toPx()
+                    drawLine(ink.copy(alpha = 1f - burst), sp + dir * r0, sp + dir * r1, 3.dp.toPx(), StrokeCap.Round)
+                }
+                if (t < 0.18f) drawCircle(ink.copy(alpha = 0.35f * (1f - t / 0.18f)), 26.dp.toPx(), sp)
             }
             if (reveal.value < 1f) {
                 val m = measurer.measure("지도를 가렸어요 · 꽂히면 보여요", androidx.compose.ui.text.TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink.copy(alpha = 0.45f * (1f - reveal.value))))
@@ -685,6 +708,9 @@ private fun DotMapBoard(
         }
     }
 }
+
+/** 특별시·광역시 first (서울 must not vanish under 경기), then the rest. */
+private fun cityRank(sido: String) = listOf("서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종").indexOfFirst { sido.startsWith(it) }.let { if (it < 0) 99 else it }
 
 private fun shortSido(s: String) = when {
     s.startsWith("전남광주") -> "전남·광주"
