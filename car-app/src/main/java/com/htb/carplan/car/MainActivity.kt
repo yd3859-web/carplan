@@ -1191,6 +1191,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 // Two months of made-up use (friends, groups, past trips with records and photos); pressed again it adds missing photos.
                 FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.seedDemo(); onDismiss() }) { Text("오래 쓴 것처럼 채우기", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.seedMoreDemo(); onDismiss() }) { Text("여행 기록 더 채우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.clearDemo(); onDismiss() }) { Text("데모 지우기", fontSize = 20.sp, color = Ink) }
                 }
                 Text("출근: 매일 반복·장소 회사, 오늘 남은 여행이 없을 때 \"회사로 갈까요?\" / 픽업: 백현동에서 기다리는 일행, 시뮬이 먼저 태우러 감", fontSize = 20.sp, color = Soft)

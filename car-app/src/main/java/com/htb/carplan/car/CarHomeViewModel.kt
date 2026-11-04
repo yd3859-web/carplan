@@ -208,6 +208,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         return DemoSeed(getApplication(), u.uid, u.soloGroupId, c.id) { navigator.notify(it) }
     }
     fun seedDemo() { val d = demo() ?: return; viewModelScope.launch { runCatching { d.run() }.onFailure { _error.value = it.message; navigator.notify("채우다 멈췄어요 · ${it.message?.take(40)}") } } }
+    fun seedMoreDemo() { val d = demo() ?: return; viewModelScope.launch { runCatching { d.runMore() }.onFailure { _error.value = it.message; navigator.notify("채우다 멈췄어요 · ${it.message?.take(40)}") } } }
     fun clearDemo() { val d = demo() ?: return; viewModelScope.launch { runCatching { d.clear() }.onFailure { _error.value = it.message } } }
 
     // 20장 디버그 메뉴

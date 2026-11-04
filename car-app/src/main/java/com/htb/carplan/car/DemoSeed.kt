@@ -140,6 +140,105 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         say("다 채웠어요 · 친구 4명, 그룹 3개, 지난 여행 5개, 앞으로 일정 7개")
     }
 
+    /**
+     * 시연 메뉴 [여행 기록 더 채우기] (정원 2026-11-04: "여행 기록 같은 거 많이, 이것저것"): ten more past trips around the
+     * country (one to three days, notes, comments by the made friends, parking, 또 갈래요) and a dozen 일상 기록, in
+     * the groups [run] made. Each press adds a fresh set (remembered for [clear]). Photos go to Storage; when Storage
+     * refuses (rules not deployed), a web sample picture stands in so the diary still shows photos.
+     */
+    suspend fun runMore() {
+        if (!seeded) { say("먼저 [오래 쓴 것처럼 채우기]를 눌러 주세요"); return }
+        val db = FirebaseFirestore.getInstance()
+        val mine = runCatching { db.collection(FirestorePaths.GROUPS).whereArrayContains("memberIds", ownerUid).get().await().documents }.getOrDefault(emptyList())
+        fun byName(n: String) = mine.firstOrNull { it.getString("name") == n }?.id
+        val weekend = byName("주말 친구들"); val family = byName("가족"); val carpool = byName("출근 카풀")
+        sample = 0
+        say("여행 기록 더 넣는 중")
+        trip(weekend, "부산 2박 3일", today.minusDays(55), listOf(
+            listOf(
+                Visit(P("해운대해수욕장", 35.1587, 129.1604, "부산 해운대구 우동"), "13:00", "13:20", 90, "바다", "도착하자마자 발 담금. 물이 생각보다 따뜻", 2, listOf(0 to "파라솔 빌리는 데 2만원", 1 to "모래 진짜 곱다")),
+                Visit(P("더베이101", 35.1565, 129.1517, "부산 해운대구 동백로 52"), "18:30", "18:40", 80, "야경", "마린시티 야경 보면서 피시앤칩스", 2, listOf(1 to "여기 사진 맛집이야")),
+            ),
+            listOf(
+                Visit(P("감천문화마을", 35.0975, 129.0106, "부산 사하구 감내2로 203"), "10:00", "10:15", 110, "골목", "어린왕자 동상 줄 20분. 계단 많음", 2, listOf(0 to "편한 신발 필수")),
+                Visit(P("자갈치시장", 35.0967, 129.0305, "부산 중구 자갈치해안로 52"), "13:00", "13:10", 70, "점심", "2층에서 회 떠서 먹음", 1, parking = "자갈치 공영주차장"),
+                Visit(P("광안리해수욕장", 35.1532, 129.1186, "부산 수영구 광안해변로 219"), "20:00", "20:10", 90, "드론쇼", "드론쇼 보고 맥주 한 잔", 2, listOf(0 to "토요일 8시 드론쇼!")),
+            ),
+            listOf(
+                Visit(P("해동용궁사", 35.1883, 129.2233, "부산 기장군 기장읍 용궁길 86"), "09:30", "09:40", 60, "", "바다 옆 절. 아침이라 한산", 1),
+                Visit(P("기장시장", 35.2443, 129.2187, "부산 기장군 기장읍 읍내로 104"), "11:30", "11:35", 50, "대게", "대게 사서 집으로", 1),
+            ),
+        ))
+        trip(weekend, "전주 한옥마을", today.minusDays(68), listOf(listOf(
+            Visit(P("전주한옥마을", 35.8150, 127.1530, "전북 전주시 완산구 기린대로 99"), "11:00", "11:15", 120, "한복", "한복 빌려 입고 골목 산책", 2, listOf(1 to "한복 대여 2시간 만오천원")),
+            Visit(P("전동성당", 35.8133, 127.1494, "전북 전주시 완산구 태조로 51"), "13:30", "13:35", 30, "", "성당 앞에서 단체 사진", 1),
+            Visit(P("남부시장 야시장", 35.8117, 127.1460, "전북 전주시 완산구 풍남문1길"), "19:00", "19:10", 80, "야시장", "가맥이랑 꼬치. 사람 엄청 많음", 1, listOf(0 to "금토만 열어요"), "남부시장 주차타워 3층"),
+        )))
+        trip(family, "경주 가을 여행", today.minusDays(76), listOf(
+            listOf(
+                Visit(P("불국사", 35.7900, 129.3320, "경북 경주시 불국로 385"), "10:00", "10:20", 100, "", "다보탑 석가탑. 엄마가 제일 좋아하심", 2, listOf(0 to "단풍 조금 들었더라")),
+                Visit(P("황리단길", 35.8380, 129.2100, "경북 경주시 포석로"), "13:00", "13:15", 90, "점심", "십원빵 하나씩", 1, parking = "황남 공영주차장"),
+                Visit(P("동궁과 월지", 35.8347, 129.2266, "경북 경주시 원화로 102"), "19:00", "19:05", 60, "야경", "연못에 비친 누각. 올해 본 야경 중 최고", 2, listOf(0 to "삼각대 가져올걸")),
+            ),
+            listOf(
+                Visit(P("대릉원", 35.8384, 129.2117, "경북 경주시 황남동 31-1"), "10:00", "10:10", 60, "산책", "목련 나무 포토존", 1),
+                Visit(P("경주 보문호", 35.8430, 129.2860, "경북 경주시 보문로"), "12:00", "12:10", 70, "", "오리배 타고 마무리", 1),
+            ),
+        ))
+        trip(null, "여수 밤바다", today.minusDays(90), listOf(
+            listOf(
+                Visit(P("여수 해상케이블카", 34.7484, 127.7493, "전남 여수시 돌산읍 돌산로 3600-1"), "17:00", "17:10", 60, "케이블카", "크리스탈 캐빈 바닥이 투명해서 무서움", 1),
+                Visit(P("여수 낭만포차거리", 34.7385, 127.7342, "전남 여수시 하멜로"), "20:00", "20:05", 100, "포차", "삼합에 소주 한 잔. 노래 그대로", 2),
+            ),
+            listOf(
+                Visit(P("향일암", 34.5913, 127.8030, "전남 여수시 돌산읍 향일암로 60"), "06:30", "06:40", 70, "일출", "새벽에 올라가서 해 뜨는 거 봄", 2),
+                Visit(P("이순신광장", 34.7397, 127.7370, "전남 여수시 중앙동"), "11:00", "11:10", 50, "", "갓김치 사 옴", 1),
+            ),
+        ))
+        trip(weekend, "춘천 닭갈비", today.minusDays(34), listOf(listOf(
+            Visit(P("명동 닭갈비골목", 37.8805, 127.7270, "강원 춘천시 금강로62번길"), "12:30", "12:40", 60, "점심", "볶음밥까지 국룰", 1, listOf(1 to "2층 자리 넓어요")),
+            Visit(P("소양강 스카이워크", 37.8930, 127.7240, "강원 춘천시 영서로 2663"), "14:30", "14:35", 40, "", "유리 바닥 아래 강물", 1),
+            Visit(P("김유정역 레일바이크", 37.8180, 127.7180, "강원 춘천시 신동면 김유정로 1383"), "16:00", "16:10", 80, "레일바이크", "다리 터질 뻔. 터널 조명 예쁨", 2, listOf(0 to "예약 필수!")),
+        )))
+        trip(family, "대전 성심당 빵 투어", today.minusDays(48), listOf(listOf(
+            Visit(P("성심당 본점", 36.3277, 127.4273, "대전 중구 대종로480번길 15"), "10:30", "10:40", 50, "빵", "튀김소보로 한 박스. 줄 40분", 2, listOf(3 to "망고시루는 품절이더라")),
+            Visit(P("대전 한밭수목원", 36.3670, 127.3880, "대전 서구 둔산대로 169"), "13:00", "13:10", 70, "산책", "빵 먹으면서 수목원", 1),
+        )))
+        trip(carpool, "퇴근길 인천 차이나타운", today.minusDays(17), listOf(listOf(
+            Visit(P("인천 차이나타운", 37.4757, 126.6178, "인천 중구 차이나타운로"), "19:00", "19:15", 70, "저녁", "짜장면 원조집. 탕수육 바삭", 1, listOf(0 to "공화춘 말고 옆집도 맛있음")),
+            Visit(P("월미도", 37.4741, 126.5980, "인천 중구 월미문화로"), "20:40", "20:45", 40, "", "디스코팡팡 구경만", 1),
+        )))
+        trip(null, "단양 드라이브", today.minusDays(62), listOf(listOf(
+            Visit(P("단양 도담삼봉", 36.9993, 128.3445, "충북 단양군 매포읍 삼봉로 644-13"), "11:00", "11:10", 40, "", "강 위 봉우리 세 개", 1),
+            Visit(P("단양 만천하스카이워크", 36.9850, 128.3510, "충북 단양군 적성면 애곡리"), "13:00", "13:15", 80, "전망", "남한강이 한눈에. 바람 많이 붐", 2),
+            Visit(P("단양구경시장", 36.9847, 128.3655, "충북 단양군 단양읍 도전5길"), "15:30", "15:35", 50, "마늘", "흑마늘 닭강정 포장", 1, parking = "시장 공영주차장"),
+        )))
+        trip(weekend, "태안 꽃지 노을", today.minusDays(83), listOf(listOf(
+            Visit(P("안면도 꽃지해수욕장", 36.4970, 126.3360, "충남 태안군 안면읍 승언리"), "17:00", "17:15", 90, "노을", "할미할아비 바위 사이로 해 짐", 2, listOf(1 to "6시 10분쯤이 제일 예뻐")),
+            Visit(P("백사장항", 36.5866, 126.3150, "충남 태안군 안면읍 백사장1길"), "19:00", "19:05", 60, "저녁", "대하구이 철이라 1kg", 1),
+        )))
+        trip(family, "안동 하회마을", today.minusDays(97), listOf(listOf(
+            Visit(P("안동 하회마을", 36.5390, 128.5180, "경북 안동시 풍천면 하회종가길 40"), "10:30", "10:45", 110, "", "부용대에서 마을 내려다봄", 2, listOf(3 to "탈춤 공연 2시")),
+            Visit(P("안동 찜닭골목", 36.5655, 128.7290, "경북 안동시 번영1길"), "13:30", "13:40", 60, "점심", "찜닭 중자 두 개. 당면 추가", 1),
+        )))
+        say("일상 기록 더 넣는 중")
+        listOf(
+            Triple(1L, P("판교 현대백화점", 37.3925, 127.1120, "경기 성남시 분당구 판교역로 146"), Triple("14:00", 90, "주차 B3 F-21. 영화 보고 장보기")),
+            Triple(3L, P("정자동 카페거리", 37.3660, 127.1060, "경기 성남시 분당구 정자동"), Triple("10:30", 60, "주말 브런치")),
+            Triple(5L, P("분당 중앙공원", 37.3790, 127.1270, "경기 성남시 분당구 성남대로 550"), Triple("07:00", 50, "아침 산책 한 바퀴")),
+            Triple(8L, P("율동공원", 37.3755, 127.1500, "경기 성남시 분당구 문정로 72"), Triple("17:30", 70, "노을 보면서 호수 산책")),
+            Triple(11L, P("블루핸즈 분당점", 37.3712, 127.1180, "경기 성남시 분당구"), Triple("09:30", 40, "타이어 위치 교환")),
+            Triple(15L, P("코스트코 광명점", 37.4237, 126.8829, "경기 광명시 일직로 40"), Triple("11:00", 110, "대용량 장보기. 핫도그 필수")),
+            Triple(19L, P("백운호수", 37.3790, 127.0010, "경기 의왕시 학의동"), Triple("19:30", 60, "호수 둘레길 야경")),
+            Triple(23L, P("서울숲", 37.5444, 127.0374, "서울 성동구 뚝섬로 273"), Triple("15:00", 80, "사슴 먹이 주기")),
+            Triple(30L, P("롯데월드몰", 37.5130, 127.1028, "서울 송파구 올림픽로 300"), Triple("13:00", 120, "서울스카이 올라감. 주차 B4")),
+            Triple(38L, P("광교호수공원", 37.2830, 127.0660, "경기 수원시 영통구 광교호수로 165"), Triple("18:00", 60, "자전거 빌려 한 바퀴")),
+        ).forEach { (ago, p, t) -> daily(today.minusDays(ago), p, t.first, t.second, t.third, 1) }
+        val all = prefs.getStringSet("events", emptySet()).orEmpty() + made
+        prefs.edit().putStringSet("events", all.toSet()).apply()
+        say("더 채웠어요 · 여행 10개, 일상 10칸" + if (sample > 0) " · 사진은 웹 샘플 ${sample}장(Storage 막힘)" else "")
+    }
+
     /** Takes away what [run] made: events soft-deleted (as everywhere in the app), the made groups left behind. */
     suspend fun clear() {
         prefs.getStringSet("events", emptySet()).orEmpty().forEach { key ->
@@ -217,7 +316,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
                     place = v.p.place, stopId = ids[i], arrivedAt = stamp(date, v.arrive), leftAt = if (v.stayMin > 0) stamp(date, v.arrive, v.stayMin) else null,
                     note = v.note, createdBy = carId, parkedLat = v.p.lat, parkedLng = v.p.lng, parkingNote = v.parking,
                 ))
-                repeat(v.photos) { nextPhoto()?.let { runCatching { records.addPhoto(g, eid, ds, rid, it) } } }
+                repeat(v.photos) { addPhoto(g, eid, ds, rid) }
             }
             trips.setDayStatus(g, eid, ds, DayStatus.DONE)
         }
@@ -241,8 +340,23 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         val eid = records.ensureDailyLog(soloGroupId, ds, ownerUid)
         made += "$soloGroupId/$eid"
         val rid = records.addRecord(soloGroupId, eid, ds, Record(place = p.place, unplanned = true, arrivedAt = stamp(date, at), leftAt = stamp(date, at, stay), note = note, createdBy = carId, parkedLat = p.lat, parkedLng = p.lng, parkingNote = parking))
-        repeat(photos) { nextPhoto()?.let { runCatching { records.addPhoto(soloGroupId, eid, ds, rid, it) } } }
+        repeat(photos) { addPhoto(soloGroupId, eid, ds, rid) }
     }
 
     private fun nextPhoto(): ByteArray? = photos.takeIf { it.isNotEmpty() }?.let { it[photoTurn++ % it.size] }
+
+    /** Web sample photos used in place of Storage uploads (counted for the closing line). */
+    private var sample = 0
+    private var storageRefused = false
+
+    /** One photo on a record: uploaded when Storage takes it, else a web sample URL (test data only). */
+    private suspend fun addPhoto(g: String, e: String, d: String, rid: String) {
+        val bytes = nextPhoto()
+        if (bytes != null && !storageRefused && runCatching { records.addPhoto(g, e, d, rid, bytes) }.isSuccess) return
+        storageRefused = true
+        runCatching {
+            FirebaseFirestore.getInstance().document("${FirestorePaths.records(g, e, d)}/$rid")
+                .update("photoUrls", com.google.firebase.firestore.FieldValue.arrayUnion("https://picsum.photos/seed/carplan${rid.take(8)}${photoTurn++}/1200/900")).await()
+        }.onSuccess { sample++ }
+    }
 }
