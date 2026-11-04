@@ -443,6 +443,16 @@ class TripNavigator(
         // never asked about. Look again whenever the screen is free of questions and when guiding starts or stops.
         scope.launch { combine(_prompt, guiding) { p, _ -> p == null }.collect { free -> if (free) onCarState(carState) } }
         scope.launch { carId.filterNotNull().flatMapLatest { calendar.observeCar(it) }.catch { }.collect { fuelAlertPercent = it?.fuelAlertPercent?.toDouble() ?: LOW_FUEL_PERCENT } }
+        // The trip itself went away (deleted, moved to another day): its "갈까요?"/pickup question goes with it — it was
+        // left on screen asking about a place that no longer exists (디자인 평가 2026-11-04).
+        scope.launch {
+            trip.collect { t ->
+                if (t != null) return@collect
+                waiting.removeAll { it.first.reason in START_REASONS }
+                if (_prompt.value?.reason in START_REASONS) { askJob?.cancel(); closePrompt() }
+                askedOnStart = false
+            }
+        }
         scope.launch {
             trip.filterNotNull().collect { t ->
                 // 9장 1: ask once when the app starts and today has stops left.

@@ -448,8 +448,21 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     fuelStop = vm.fuelSuggestion.collectAsStateWithLifecycle().value?.takeIf { it.eventId == trip.eventId }, onFuelVia = vm::goViaSuggested,
                     fuelNeed = vm.fuelNeed.collectAsStateWithLifecycle().value, onFindFuel = vm::findFuelOnRoute, ask = ask, onYes = vm::go, onNo = vm::later)
             } else if (todayEvents.isEmpty()) {
-                Text("오늘은 일정이 없어요", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                Text("폰 캘린더에 일정을 넣으면 여기로 와요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 8.dp))
+                // A free day (디자인 평가 2026-11-04: "없어요" said twice over an empty screen): say it once, then the week.
+                Text("오늘은 비어 있어요", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                val ahead = (1..6L).flatMap { d -> vm.eventsOn(today.plusDays(d), week).map { today.plusDays(d) to it } }.take(5)
+                Text("이번 주", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 28.dp, bottom = 4.dp))
+                if (ahead.isEmpty()) Text("이번 주도 비어 있어요 · 폰 캘린더에 넣으면 여기로 와요", color = Soft, fontSize = 24.sp)
+                ahead.forEach { (d, item) ->
+                    val e = item.event
+                    val trip = e.categoryId == com.htb.carplan.shared.model.BuiltInCategory.TRIP.id
+                    Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (d == today.plusDays(1)) "내일" else "${d.monthValue}/${d.dayOfMonth} ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}",
+                            color = Soft, fontSize = 26.sp, modifier = Modifier.width(150.dp))
+                        Text(e.title, color = Ink, fontSize = 26.sp, fontWeight = if (trip) FontWeight.Bold else FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                        e.startTime?.let { Text("  $it", color = Soft, fontSize = 24.sp) }
+                    }
+                }
             }
             if (others.isNotEmpty() && !moving) {
                 if (trip != null) HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 22.dp))
@@ -491,12 +504,12 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text(doneLine(trip), color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
                 Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 10.dp))
             } else {
-            Text(goingLabel, color = Soft, fontSize = 20.sp)
+            Text(if (nextName == null && trip == null) "지금" else goingLabel, color = Soft, fontSize = 20.sp)
             val emptyLine = when {
                 trip != null && trip.stops.isEmpty() -> "여행에 칸이 아직 없어요"
-                else -> "오늘 갈 곳이 없어요"
+                else -> "어디로 갈까요?"
             }
-            Text(nextName ?: emptyLine, color = if (nextName != null) Accent else Soft, fontSize = 48.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
+            Text(nextName ?: emptyLine, color = if (nextName != null) Accent else Ink, fontSize = 48.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
             listOfNotNull(nextTime?.takeIf { !guiding || (live.remainSeconds == null && trip?.day?.etaNext == null) }?.let { "$it 예정" }, remainText(live, trip, guiding)).joinToString("  ·  ").takeIf { it.isNotEmpty() }?.let {
                 Text(it, color = Ink, fontSize = 26.sp, modifier = Modifier.padding(top = 6.dp))
             }
@@ -532,13 +545,18 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                     }
                 }
             }
-            later?.let { (d, item) ->
+            // The left column already lists the week on a free day.
+            later?.takeIf { trip != null || todayEvents.isNotEmpty() }?.let { (d, item) ->
                 val label = if (d == today.plusDays(1)) "내일" else "${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}"
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
             }
             // Nothing to go to: say how to get something, and offer the one action the car can do (parked).
             if (nextName == null && !guiding && !dayDone) {
-                Text(if (trip != null) "여기서 장소 칸을 넣거나, 폰에서 넣어요" else "폰에서 일정을 넣거나, 여기서 바로 만들어요", color = Soft, fontSize = 24.sp, modifier = Modifier.padding(bottom = 16.dp))
+                Text(if (trip != null) "여기서 장소 칸을 넣거나, 폰에서 넣어요" else "내비로 바로 가거나, 일정을 만들어 두세요", color = Soft, fontSize = 24.sp, modifier = Modifier.padding(bottom = 16.dp))
+                if (!restricted && trip == null) OutlinedButton(
+                    onClick = onNavi, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).heightIn(min = 76.dp), shape = Corner,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Line),
+                ) { Text("내비 열기", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
                 if (!restricted) Button(
                     onClick = if (trip != null) onEdit else onAdd, modifier = Modifier.fillMaxWidth().height(120.dp), shape = Corner,
                     colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk),
