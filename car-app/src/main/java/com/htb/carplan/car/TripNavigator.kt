@@ -324,6 +324,15 @@ class TripNavigator(
     @Volatile var simActive = false
     /** Brings carplan back in front (set by [CarRuntime]); the navigation pops up when it gets a route while idle. */
     var bringToFront: () -> Unit = {}
+    /**
+     * [출발]·[가기] (정원 2026-11-05 "네비로 넘어가서 다시 안 돌아와"): the route goes to the navigation and carplan stays on
+     * screen. 반반 cannot be forced — Pleos (ConnectWindowUtil) resets an app's launch bounds to the whole app area, 2026-11-05
+     * 에뮬 확인 — so the driver gets the ⋮ hint; already side by side, the navigation is on screen anyway.
+     */
+    private fun stayAfterStart() {
+        scope.launch { repeat(2) { delay(1_500); bringToFront() } }
+        _notice.value = "내비에 경로를 넣었어요 · 오른쪽 가장자리 ⋮를 끌면 내비와 반반으로 봐요"
+    }
 
     /** Route picked inside carplan (주유소·주차장·맛집 list): the navigation takes it, carplan comes back on top. */
     private fun routeQuietly(places: List<Place>) {
@@ -1416,7 +1425,7 @@ class TripNavigator(
             inNavi = pick.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + withCoords.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }
             router.route(inNavi.map { it.place })
             // While simulating, keep our screen in front (the route still goes to the navigation).
-            if (open && !simActive) router.openNavigation()
+            if (open && !simActive) stayAfterStart()
         }
         lastRouteSentAt = System.currentTimeMillis()
         _guiding.value = true
@@ -1455,7 +1464,7 @@ class TripNavigator(
      * leg, and arriving there says so and ends guiding (it used to stay on [안내 시작] with no sign of the drive).
      */
     fun guideTo(eventId: String, title: String, place: Place) {
-        if (place.hasCoords()) { router.route(listOf(place)); if (!simActive) router.openNavigation() } else router.search(place.name)
+        if (place.hasCoords()) { router.route(listOf(place)); if (!simActive) stayAfterStart() } else router.search(place.name)
         lastRouteSentAt = System.currentTimeMillis()
         inNavi = listOf(NaviEntry(NaviEntry.Kind.EVENT, eventId, place))
         _live.update { it.copy(remainMeters = null, remainSeconds = null, stopSeconds = null, nextName = place.name) } // not the last drive's numbers

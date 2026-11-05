@@ -1080,11 +1080,15 @@ private fun NearbyDialog(list: NearbyList, onPick: (NearPlace) -> Unit, onDismis
     CarDialog(onDismiss = onDismiss, title = list.title, buttons = { CarCloseButton(onClick = onDismiss) }) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             list.items.forEach { p ->
-                Button(onClick = { onPick(p) }, modifier = Modifier.fillMaxWidth().height(76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
-                    Text(p.name, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
-                    p.priceWon?.let { Text("${"%,d".format(it)}원", fontSize = 26.sp, color = Ink, fontWeight = FontWeight.Bold) }
-                    // On-the-way list: where along the day (the metres are from a point on the way, not the car).
-                    Text("  " + (p.where ?: if (p.meters >= 1000) "%.1fkm".format(p.meters / 1000.0) else "${p.meters}m"), fontSize = 24.sp, color = Soft, maxLines = 1)
+                val dist = if (p.meters >= 1000) "%.1fkm".format(p.meters / 1000.0) else "${p.meters}m"
+                Button(onClick = { onPick(p) }, modifier = Modifier.fillMaxWidth().height(if (p.where != null) 96.dp else 76.dp).border(1.dp, Line, Corner), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = Ink)) {
+                    // Name first, always (2026-11-05: a long "○○ 근처" squeezed the station name out); where on the day under it.
+                    Column(Modifier.weight(1f)) {
+                        Text(p.name, fontSize = 26.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        p.where?.let { Text("$dist · $it", fontSize = 20.sp, color = Soft, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
+                    }
+                    p.priceWon?.let { Text("  ${"%,d".format(it)}원", fontSize = 26.sp, color = Ink, fontWeight = FontWeight.Bold) }
+                    if (p.where == null) Text("  $dist", fontSize = 24.sp, color = Soft, maxLines = 1)
                 }
             }
             Text(list.note, fontSize = 20.sp, color = Soft)
