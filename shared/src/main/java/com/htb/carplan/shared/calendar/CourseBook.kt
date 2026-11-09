@@ -36,7 +36,7 @@ object CourseBook {
         val liked = taste.kinds.map { it.first }
         fun score(c: Course) = c.kinds.sumOf { k -> val i = liked.indexOf(k); if (i < 0) 0 else (liked.size - i).toInt() }
         return all.filter { it.region !in been && it.region !in avoid && avoid.none { a -> it.region.startsWith(a) || a.startsWith(it.word) } }
-            .sortedByDescending(::score).take(n)
+            .sortedByDescending(::score).distinctBy { it.region }.take(n)
     }
 
     /** AI 프롬프트에 끼우는 줄들: "담양군: 죽녹원 → 관방제림 → … (대나무숲…)". */

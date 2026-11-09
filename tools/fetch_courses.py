@@ -64,6 +64,9 @@ def main():
         region = region_name.get((str(c.get("areacode")), str(c.get("sigungucode"))), "").strip()
         if not region:
             continue
+        # "남구" 같은 구 단위는 어느 도시인지 알 수 없어 뺀다 (차 여행 코스는 시·군 단위가 맞다).
+        if region.endswith("구"):
+            continue
         subs = call("detailInfo2", contentId=cid, contentTypeId=25)
         places = [clean(s.get("subname")) for s in subs if clean(s.get("subname"))]
         # 괄호 꼬리표 제거: "죽녹원(전남 담양)" → "죽녹원"
@@ -75,9 +78,15 @@ def main():
         lines.append(f"{region}||{';'.join(places[:5])}|{title}")
         time.sleep(0.2)
 
-    kept = [l.rstrip("\n") for l in open(OUT, encoding="utf-8")]
+    # 손 정리 부분은 두고, 지난 TourAPI 부분은 지우고 새로 쓴다 (다시 돌려도 중복 없음).
+    MARK = "# --- TourAPI 여행코스 (fetch_courses.py) ---"
+    kept = []
+    for l in open(OUT, encoding="utf-8"):
+        if l.rstrip("\n") == MARK:
+            break
+        kept.append(l.rstrip("\n"))
     with open(OUT, "w", encoding="utf-8") as f:
-        f.write("\n".join(kept) + "\n# --- TourAPI 여행코스 (fetch_courses.py) ---\n" + "\n".join(lines) + "\n")
+        f.write("\n".join(kept) + "\n" + MARK + "\n" + "\n".join(lines) + "\n")
     print(f"{len(lines)}개 코스 추가 → {OUT}")
 
 
