@@ -93,7 +93,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             Text("픽업", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             Text(
                 when {
-                    pickups.isEmpty() -> "태우러 올 곳을 정하면 차가 출발할 때 경유지 맨 앞에 들어가요."
+                    pickups.isEmpty() -> "태우러 올 곳을 정하면 일정에 한 칸으로 들어가요. 다른 장소처럼 순서를 바꿀 수 있어요."
                     sharing && waitingForCar -> "운전자가 위치 공유를 켰어요 · 데리러 오는 동안만 차 위치가 보여요"
                     sharing -> "차가 일행을 태우러 가는 중이에요"
                     else -> "차가 태우러 출발할 때 운전자가 켜면, 오는 동안만 차 위치가 보여요"
@@ -142,16 +142,15 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                 }
             }
             HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(vertical = 10.dp))
-            Text("픽업 순서", fontSize = 15.sp, color = Palette.TextSoft)
+            // 정원 2026-11-09: pickups are slots in the day — their order is the rail's (drag, 동선 정렬), not set here.
+            Text("태우러 갈 사람 · 순서는 일정에서 끌거나 동선 정렬로", fontSize = 15.sp, color = Palette.TextSoft)
             if (pickups.isEmpty()) Text("아직 태우러 갈 사람이 없어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
-            pickups.forEachIndexed { i, p ->
+            pickups.forEach { p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${i + 1}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 10.dp))
                     Column(Modifier.weight(1f)) {
                         Text("${p.name.ifBlank { "일행" }} · ${p.place.name}", fontSize = 17.sp, color = Palette.TextStrong)
                         Text(statusText(p.status, p.arrivedAt != null), fontSize = 15.sp, color = Palette.TextSoft)
                     }
-                    if (i > 0) TextButton(onClick = { vm.setPickupOrder(pickups.map { it.uid }.toMutableList().also { l -> l.add(i - 1, l.removeAt(i)) }) }) { Text("위로", color = Palette.TextSoft, fontSize = 15.sp) }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("닫기", color = Palette.TextSoft) } }

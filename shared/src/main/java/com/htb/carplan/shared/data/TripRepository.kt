@@ -87,6 +87,43 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         }.await()
     }
 
+    /**
+     * 픽업 칸 (정원 2026-11-09): [uid]'s pickup place as an ordinary slot. Moves the existing slot's place, or puts a new
+     * one before the places still to go (after other pickups not yet reached) — the group can then drag or 동선 정렬 it.
+     */
+    suspend fun upsertPickupStop(groupId: String, eventId: String, date: String, uid: String, name: String, place: Place, byUid: String) {
+        val col = db.collection(FirestorePaths.stops(groupId, eventId, date))
+        val live = col.get().await().toObjects(Stop::class.java).filterNot { it.deleted }.sortedBy { it.order }
+        val memo = "${name.ifBlank { "일행" }} 픽업"
+        val mine = live.firstOrNull { it.pickupUid == uid }
+        if (mine != null) {
+            db.runBatch { b ->
+                b.update(col.document(mine.id), mapOf("place" to place, "memo" to memo, "updatedBy" to byUid, "updatedAt" to FieldValue.serverTimestamp()))
+                b.bumpDay(groupId, eventId, date, byUid)
+            }.await()
+            return
+        }
+        val firstAhead = live.indexOfFirst { !it.visited && it.pickupUid == null }.let { if (it < 0) live.size else it }
+        val ref = col.document()
+        val ordered = live.map { it.id }.toMutableList().apply { add(firstAhead, ref.id) }
+        db.runBatch { b ->
+            b.set(ref, Stop(order = firstAhead, place = place, memo = memo, createdBy = byUid, updatedBy = byUid, pickupUid = uid))
+            ordered.forEachIndexed { i, id -> if (id != ref.id) b.update(col.document(id), "order", i) }
+            b.bumpDay(groupId, eventId, date, byUid)
+        }.await()
+    }
+
+    /** The pickup was taken back: its slot goes too (soft delete, like any slot). */
+    suspend fun removePickupStop(groupId: String, eventId: String, date: String, uid: String, byUid: String) {
+        val col = db.collection(FirestorePaths.stops(groupId, eventId, date))
+        val mine = col.get().await().toObjects(Stop::class.java).filter { it.pickupUid == uid && !it.deleted }
+        if (mine.isEmpty()) return
+        db.runBatch { b ->
+            mine.forEach { b.update(col.document(it.id), mapOf("deleted" to true, "updatedBy" to byUid, "updatedAt" to FieldValue.serverTimestamp())) }
+            b.bumpDay(groupId, eventId, date, byUid)
+        }.await()
+    }
+
     /** Rewrites `order` for the given stop ids in list order (drag reorder or 동선 정렬). */
     suspend fun reorder(groupId: String, eventId: String, date: String, orderedIds: List<String>, byUid: String) {
         db.runBatch { batch ->

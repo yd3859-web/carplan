@@ -415,7 +415,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
     val todayEvents = vm.eventsOn(today, week)
     val others = todayEvents.filter { it.event.id != trip?.eventId }
     // 11장: while someone is still to be collected, the car is going to them, not to the first stop.
-    val pickupFirst = trip?.waitingPickups?.firstOrNull()?.takeIf { guiding }
+    val pickupFirst = trip?.nextPickup?.takeIf { guiding }
     // A place picked on the way (주차장·주유소·맛집) or a single event comes first: that is where the car is going.
     val detour by vm.detour.collectAsStateWithLifecycle()
     val nextName = detour?.takeIf { guiding }?.place?.name ?: pickupFirst?.let { "${it.name.ifBlank { "일행" }} 태우러 · ${it.place.name}" } ?: trip?.next?.place?.name ?: next?.event?.place?.name
@@ -729,7 +729,7 @@ private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopCommen
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 // The rail already names the next place (big, blue); the header only says what the day is and how far.
-                val pickupFirst = trip?.waitingPickups?.firstOrNull()?.takeIf { guiding }
+                val pickupFirst = trip?.nextPickup?.takeIf { guiding }
                 Text(pickupFirst?.let { "${it.name.ifBlank { "일행" }} 태우러 · ${it.place.name}" } ?: trip?.title ?: "오늘", color = if (pickupFirst != null) Accent else Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 val done = trip != null && trip.stops.isNotEmpty() && trip.next == null
                 val remain = remainText(live, trip, guiding)

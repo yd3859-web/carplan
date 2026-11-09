@@ -254,6 +254,11 @@ data class Stop(
     val visited: Boolean = false,
     /** Passed over on purpose ("건너뛰기", 차 음성 명령): done for the route, but not "다녀옴". */
     val skipped: Boolean = false,
+    /**
+     * 픽업 칸 (정원 2026-11-09): this slot is where member [pickupUid] waits to be picked up — an ordinary slot in the
+     * day's order (several pickups, 동선 정렬), kept in step with pickups/{uid} by [PickupRepository].
+     */
+    val pickupUid: String? = null,
 )
 
 enum class PickupStatus { WAITING, ON_BOARD, DONE }

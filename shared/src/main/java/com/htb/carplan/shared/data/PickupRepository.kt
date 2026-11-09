@@ -29,10 +29,13 @@ class PickupRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         val existing = col.document(uid).get().await().toObject(Pickup::class.java)
         val order = existing?.order ?: ((col.get().await().toObjects(Pickup::class.java).maxOfOrNull { it.order } ?: -1) + 1)
         col.document(uid).set(Pickup(place = place, order = order, status = PickupStatus.WAITING, name = name), SetOptions.merge()).await()
+        // 정원 2026-11-09: the pickup is also a slot in the day (not a separate "먼저 태우러 가요" row on top).
+        TripRepository(db).upsertPickupStop(groupId, eventId, date, uid, name, place, byUid = uid)
     }
 
     suspend fun remove(groupId: String, eventId: String, date: String, uid: String) {
         db.document("${FirestorePaths.pickups(groupId, eventId, date)}/$uid").delete().await()
+        TripRepository(db).removePickupStop(groupId, eventId, date, uid, byUid = uid)
     }
 
     /** "탔어요" (member) or the 10-minute timeout (car). */

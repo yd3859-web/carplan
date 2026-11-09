@@ -62,10 +62,19 @@ import java.time.LocalTime
 
 /** Today's trip as the car sees it: the event, its day document and the stops in route order (deleted ones removed). */
 data class TodayTrip(val groupId: String, val eventId: String, val title: String, val date: String, val stops: List<Stop>, val day: TripDay?, val pickups: List<Pickup> = emptyList()) {
-    val remaining: List<Stop> get() = stops.filterNot { it.visited }
-    /** People still to collect, in pickup order (11장): they go in front of the stops. */
+    /** Still to go: not visited, and a pickup slot only while that person still waits (탔어요 early = done). */
+    val remaining: List<Stop> get() = stops.filterNot { it.visited || (it.pickupUid != null && pickups.none { p -> p.uid == it.pickupUid && p.status == PickupStatus.WAITING }) }
+    /** People still to collect (11장): asking, sharing and ETA go by these. */
     val waitingPickups: List<Pickup> get() = pickups.filter { it.status == PickupStatus.WAITING && it.place.hasCoords() }
+    /** Waiting pickups with no slot of their own (older days): they still go in front of the stops. */
+    val frontPickups: List<Pickup> get() = waitingPickups.filter { p -> stops.none { it.pickupUid == p.uid && !it.deleted } }
     val next: Stop? get() = remaining.firstOrNull()
+    /** The pickup the car goes to first: a front one, or the next slot when it is a pickup slot. */
+    val nextPickup: Pickup? get() = frontPickups.firstOrNull() ?: next?.pickupUid?.let { u -> waitingPickups.firstOrNull { it.uid == u } }
+    /** 정원 2026-11-09: a pickup slot is driven to in its own place in the order, as a pickup (arrival = "픽업 장소예요"). */
+    fun entry(s: Stop): NaviEntry = s.pickupUid?.takeIf { u -> waitingPickups.any { it.uid == u } }?.let { NaviEntry(NaviEntry.Kind.PICKUP, it, s.place) } ?: NaviEntry(NaviEntry.Kind.STOP, s.id, s.place)
+    /** Everything still to drive to, in order: front pickups, then the slots. */
+    fun routeEntries(): List<NaviEntry> = frontPickups.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + remaining.filter { it.place.hasCoords() }.map(::entry)
     val version: Long get() = day?.version ?: 0
 }
 
@@ -953,7 +962,7 @@ class TripNavigator(
     /** The place of the day the car is at or heading to now: a pickup being collected, else the next stop. */
     private fun stepPlace(): Place? {
         val t = trip.value ?: return null
-        return t.waitingPickups.firstOrNull()?.takeIf { _guiding.value }?.place?.takeIf { it.hasCoords() } ?: t.next?.place?.takeIf { it.hasCoords() }
+        return t.frontPickups.firstOrNull()?.takeIf { _guiding.value }?.place?.takeIf { it.hasCoords() } ?: t.next?.place?.takeIf { it.hasCoords() }
     }
 
     /**
@@ -1015,8 +1024,7 @@ class TripNavigator(
         // The station goes in front; behind it the places still to go (pickups waiting, then stops not yet visited —
         // never one ticked off while the list was open). Arriving at the station ticks nothing (N1).
         val t = trip.value
-        val tail = (t?.waitingPickups.orEmpty().map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } +
-            t?.remaining.orEmpty().filter { it.place.hasCoords() }.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }).take(MAX_PLACES - 1)
+        val tail = t?.routeEntries().orEmpty().take(MAX_PLACES - 1)
         inNavi = listOf(NaviEntry(NaviEntry.Kind.STATION, st.id, st.place)) + tail
         routeQuietly(inNavi.map { it.place })
         _guiding.value = true
@@ -1061,8 +1069,7 @@ class TripNavigator(
             goViaStation(GasStation(item.id, item.name, "", item.priceWon ?: 0, item.meters, item.place)); return
         }
         val t = trip.value
-        val tail = (t?.waitingPickups.orEmpty().map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } +
-            t?.remaining.orEmpty().filter { it.place.hasCoords() }.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }).take(MAX_PLACES - 1)
+        val tail = t?.routeEntries().orEmpty().take(MAX_PLACES - 1)
         inNavi = listOf(NaviEntry(NaviEntry.Kind.EXTRA, item.id, item.place)) + tail
         routeQuietly(inNavi.map { it.place })
         _guiding.value = true
@@ -1106,7 +1113,7 @@ class TripNavigator(
         if (!isPickup || now - simEtaAt < SHARE_INTERVAL_MS) return
         simEtaAt = now
         val t = trip.value ?: return
-        val uid = t.waitingPickups.firstOrNull()?.uid ?: return
+        val uid = inNavi.firstOrNull()?.takeIf { it.kind == NaviEntry.Kind.PICKUP }?.id ?: t.nextPickup?.uid ?: return
         scope.launch { runCatching { pickupsRepo.setEta(t.groupId, t.eventId, t.date, uid, remainSeconds.toLong()) } }
     }
 
@@ -1117,12 +1124,21 @@ class TripNavigator(
         if (t.day?.parkingHintStopId != n.id) { scope.launch { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }; askParking(n) }
     }
 
+    /** A pickup slot (정원 2026-11-09) is reached like any slot: ticked, and the route topped up behind it. */
+    private suspend fun tickPickupSlot(t: TodayTrip, uid: String) {
+        val slot = t.stops.firstOrNull { it.pickupUid == uid && !it.visited } ?: return
+        val after = t.remaining.filterNot { it.id == slot.id }
+        runCatching { trips.setVisited(t.groupId, t.eventId, t.date, slot.id, true, t.stops.indexOfFirst { it.id == after.firstOrNull()?.id }.coerceAtLeast(0)) }
+        if (after.isNotEmpty() && inNavi.isEmpty()) sendRoute(t.copy(stops = t.stops.map { if (it.id == slot.id) it.copy(visited = true) else it }))
+    }
+
     /** The car reached a pickup place (what the navigation's waypoint event does on a real road). */
     fun simArrivedPickup(uid: String) {
         val t = trip.value ?: return
         inNavi = inNavi.filterNot { it.kind == NaviEntry.Kind.PICKUP && it.id == uid }
         scope.launch {
             runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, uid) }
+            tickPickupSlot(t, uid)
             val who = t.pickups.firstOrNull { it.uid == uid }?.name?.ifBlank { null } ?: "일행"
             _notice.value = "픽업 장소 도착 · $who"
             voice.say("$who 픽업 장소예요.")
@@ -1319,7 +1335,7 @@ class TripNavigator(
      */
     /** [open] = the driver just said "가기": bring the navigation forward. Refills and plan changes keep our screen in front. */
     private fun routeWithPickups(t: TodayTrip, open: Boolean = false) {
-        val waiting = t.waitingPickups
+        val waiting = t.frontPickups
         if (waiting.size < 2 || waiting.size > 4) { sendRoute(t, open = open); return }
         scope.launch {
             val ordered = bestPickupOrder(t, waiting)
@@ -1401,7 +1417,7 @@ class TripNavigator(
         }
     }
 
-    private fun sendRoute(t: TodayTrip, pickups: List<Pickup> = t.waitingPickups, open: Boolean = false) {
+    private fun sendRoute(t: TodayTrip, pickups: List<Pickup> = t.frontPickups, open: Boolean = false) {
         val pick = pickups.take(MAX_PLACES)
         val batch = t.remaining.take((MAX_PLACES - pick.size).coerceAtLeast(0))
         routedPlan = t.remaining
@@ -1422,7 +1438,7 @@ class TripNavigator(
             scope.launch { voice.say("${first.place.name}은 주소가 없어서 내비에서 찾아 주세요.") }
         } else {
             // 11장 3: pickups ride in front of the planned stops.
-            inNavi = pick.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + withCoords.map { NaviEntry(NaviEntry.Kind.STOP, it.id, it.place) }
+            inNavi = pick.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + withCoords.map(t::entry)
             router.route(inNavi.map { it.place })
             // While simulating, keep our screen in front (the route still goes to the navigation).
             if (open && !simActive) stayAfterStart()
@@ -1487,6 +1503,7 @@ class TripNavigator(
                 inNavi = inNavi.drop(1)
                 scope.launch {
                     runCatching { pickupsRepo.markArrived(t.groupId, t.eventId, t.date, first.id) }
+                    tickPickupSlot(t, first.id)
                     val who = t.pickups.firstOrNull { it.uid == first.id }?.name?.ifBlank { null } ?: "일행"
                     _notice.value = "픽업 장소 도착 · $who"
                     voice.say("$who 픽업 장소예요.")

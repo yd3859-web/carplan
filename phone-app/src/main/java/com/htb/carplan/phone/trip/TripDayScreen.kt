@@ -343,9 +343,9 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
         // 경로 미리보기 (정원 2026-11-04): the day's route on a map over the rail. On a phone the list needs the room, so the
         // map folds up as the list is pushed up and opens again when it is pulled down at the top.
         val roads by vm.roads.collectAsStateWithLifecycle()
-        // 픽업 자리 are part of the day's way (정원 2026-11-04: "픽업하는 사람 위치를 경로에도 자동 추가"): on the map first,
-        // and a line above the stops. The car already drives to them first (11장).
-        val waitingPicks = pickups.filter { it.status == com.htb.carplan.shared.model.PickupStatus.WAITING }.sortedBy { it.order }
+        // 픽업 자리 = ordinary slots in the day (정원 2026-11-09: "기존 일정들이랑 동일하게 주소가 떠 있고") — they move,
+        // sort by 동선 and go to the car in that order. Only a pickup with no slot of its own (older days) keeps the line on top.
+        val waitingPicks = pickups.filter { p -> p.status == com.htb.carplan.shared.model.PickupStatus.WAITING && stops.none { it.pickupUid == p.uid } }.sortedBy { it.order }
         val hasMap = waitingPicks.any { it.place.lat != 0.0 } || stops.any { !it.deleted && (it.place.lat != 0.0 || it.place.lng != 0.0) }
         val mapFull = 200.dp
         val mapFullPx = with(androidx.compose.ui.platform.LocalDensity.current) { (mapFull + 8.dp).toPx() }
