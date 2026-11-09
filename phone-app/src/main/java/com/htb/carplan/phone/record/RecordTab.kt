@@ -145,7 +145,9 @@ class RecordTabViewModel : ViewModel() {
 
     fun loadSuggestion(context: android.content.Context, force: Boolean = false) {
         val bs = books.value?.filterNot { it.isLog } ?: return
-        if (!force && suggest.value !is NextTripState.Idle) return
+        // 기록은 그룹마다 따로 흘러들어와서 books가 몇 번 바뀐다: 추천이 이미 떠 있거나 고르는 중일 때만 멈추고,
+        // "기록이 모자라요" 상태였다면 새로 들어온 기록으로 다시 판단한다 (2026-11-09 에뮬: 7곳인데 모자라다고 나온 버그).
+        if (!force && (suggest.value is NextTripState.Ready || suggest.value is NextTripState.Loading)) return
         if (bs.sumOf { b -> b.pages.sumOf { it.second.size } } < 3) {
             suggest.value = NextTripState.Off("기록이 세 곳쯤 쌓이면 다음 여행을 추천해 드려요"); return
         }
@@ -357,10 +359,17 @@ private fun BookCard(b: DiaryBook, with: List<String>, onOpen: (DiaryDay) -> Uni
     val single = b.pages.size == 1
     val photos = b.photos
     Column(Modifier.fillMaxWidth().clickable { onOpen(if (single) first else b.pages.first().first) }.padding(vertical = 14.dp)) {
-        // No photo yet: the day's route as a small sketch, so a book without pictures still has a face.
+        // No photo yet: the day's way on a real map (정원 2026-11-09 "흰 바탕 선 말고 지도로"), so the book still has a face.
         if (photos.isEmpty()) {
             val pts = b.pages.flatMap { it.second }.map { it.place }.filter { it.lat != 0.0 || it.lng != 0.0 }.map { it.lat to it.lng }
-            if (pts.size >= 2) { RouteSketch(pts, Modifier.fillMaxWidth().height(88.dp)); Spacer(Modifier.height(10.dp)) }
+            if (pts.size >= 2) {
+                com.htb.carplan.phone.ui.SimpleMap(
+                    centerLat = pts.first().first, centerLng = pts.first().second, zoom = 12,
+                    markers = pts.mapIndexed { i, (la, lo) -> com.htb.carplan.phone.ui.MapMarker(la, lo, "${i + 1}", com.htb.carplan.phone.ui.MapMarker.Kind.STOP) },
+                    path = pts, fit = pts, height = 150.dp,
+                )
+                Spacer(Modifier.height(10.dp))
+            }
         }
         photos.firstOrNull()?.let { url ->
             coil3.compose.AsyncImage(
@@ -455,20 +464,3 @@ private fun DiaryBody(p: DiaryDay, recs: List<com.htb.carplan.shared.model.Recor
     }
 }
 
-/** The places of a trip as dots joined in order, fitted into the box (north up) — a cover when there is no photo. */
-@Composable
-private fun RouteSketch(pts: List<Pair<Double, Double>>, modifier: Modifier) {
-    val ink = Palette.TextStrong; val soft = Palette.SheetEdge
-    androidx.compose.foundation.Canvas(modifier) {
-        val lat0 = pts.minOf { it.first }; val lat1 = pts.maxOf { it.first }
-        val lng0 = pts.minOf { it.second }; val lng1 = pts.maxOf { it.second }
-        val k = kotlin.math.cos(Math.toRadians((lat0 + lat1) / 2))
-        val spanX = ((lng1 - lng0) * k).coerceAtLeast(1e-6); val spanY = (lat1 - lat0).coerceAtLeast(1e-6)
-        val pad = 10.dp.toPx()
-        val scale = minOf((size.width - pad * 2) / spanX, (size.height - pad * 2) / spanY).toFloat()
-        val ox = (size.width - spanX.toFloat() * scale) / 2; val oy = (size.height - spanY.toFloat() * scale) / 2
-        val xy = pts.map { (la, ln) -> androidx.compose.ui.geometry.Offset(ox + ((ln - lng0) * k).toFloat() * scale, oy + (lat1 - la).toFloat() * scale) }
-        xy.zipWithNext().forEach { (a, b) -> drawLine(soft, a, b, 3.dp.toPx(), androidx.compose.ui.graphics.StrokeCap.Round) }
-        xy.forEachIndexed { i, p -> drawCircle(if (i == 0 || i == xy.lastIndex) ink else soft, (if (i == 0 || i == xy.lastIndex) 6 else 4).dp.toPx(), p) }
-    }
-}

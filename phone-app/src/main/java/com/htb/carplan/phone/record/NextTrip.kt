@@ -90,7 +90,7 @@ object NextTripLoader {
         }
         if (kakao.available && stops.size < 2) return null // 지어낸 장소 방지: 확인된 곳이 2곳은 돼야
         NextTrip(region, m["title"] as? String ?: "$region 하루", m["reason"] as? String ?: "", stops, fromAi = true, date = nextSaturday())
-    }.getOrNull()
+    }.onFailure { android.util.Log.w("NextTrip", "AI 추천 실패 — 대체 추천으로", it) }.getOrNull()
 
     /** AI 없이: 또 갈래요(없으면 마지막 기록) 근처 다시 가기 + 그 둘레 명소·맛집 한 곳씩. */
     private suspend fun fallback(books: List<DiaryBook>, kakao: KakaoApi): NextTrip? {

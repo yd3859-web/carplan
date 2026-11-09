@@ -269,7 +269,8 @@ JSON만 답할 것:
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-5-5",
-      max_tokens: 700,
+      // 모델이 답하기 전에 '생각'을 먼저 해서(기본), 생각+답이 다 들어갈 길이여야 한다 (700이면 생각만 하다 잘림 — 2026-11-09 확인).
+      max_tokens: 4000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
