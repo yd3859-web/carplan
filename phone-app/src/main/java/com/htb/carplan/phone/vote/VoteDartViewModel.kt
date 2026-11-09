@@ -113,6 +113,20 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
         message.value = "${com.htb.carplan.shared.text.Josa.eul(place.name)} 칸으로 넣었어요"
     }
 
+    /** 다트 동네의 대표 코스(기억장치)를 통째로 칸으로 (정원 2026-11-09 "다트로 지역 뽑히면 추천도"). */
+    fun addCourseAsStops(c: com.htb.carplan.shared.calendar.Course, d: Dart) = act {
+        val e = eventId ?: return@act
+        var put = 0
+        c.places.take(5).forEach { name ->
+            val p = if (com.htb.carplan.phone.trip.kakao.available)
+                runCatching { com.htb.carplan.phone.trip.kakao.searchKeyword("${c.word} $name", size = 1).firstOrNull() }.getOrNull() ?: return@forEach
+            else Place(name = name)
+            trips.addStop(groupId, e, date ?: java.time.LocalDate.now().toString(), p, null, "다트 · ${c.word} 코스", uid.value.orEmpty())
+            put++
+        }
+        message.value = if (put > 0) "${c.word} 코스 ${put}곳을 칸으로 넣었어요" else "코스 장소를 찾지 못했어요"
+    }
+
     /** The board needs the full 읍·면·동 list to frame the scope. */
     fun ensureRegions(context: Context) = loadRegionsOnce(context)
 

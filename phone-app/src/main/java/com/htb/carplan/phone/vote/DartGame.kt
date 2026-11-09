@@ -279,6 +279,24 @@ fun DartGame(
                                     }
                                 }
                             }
+                            // D7 기억장치: 뽑힌 동네에 대표 코스가 있으면 통째로 제안 (정원 2026-11-09).
+                            val course = remember(d.id, d.throwCount) {
+                                com.htb.carplan.phone.record.NextTripLoader.courses(context).firstOrNull { c -> d.resultName.split(" ").any { t -> t.startsWith(c.word) } }
+                            }
+                            if (course != null) Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                                androidx.compose.material3.HorizontalDivider(color = Palette.Line)
+                                Text("이 동네 대표 코스", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+                                Text(course.places.joinToString(" → "), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                                if (course.note.isNotBlank()) Text(course.note, fontSize = 14.sp, color = Palette.TextSoft)
+                                if (onPick == null && eventId != null) {
+                                    var coursePut by remember(d.id, d.throwCount) { mutableStateOf(false) }
+                                    OutlinedButton(
+                                        onClick = { vm.addCourseAsStops(course, d); coursePut = true }, enabled = !coursePut,
+                                        shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
+                                        modifier = Modifier.padding(top = 6.dp).fillMaxWidth().height(44.dp),
+                                    ) { Text(if (coursePut) "코스를 넣었어요" else "코스를 그대로 칸으로", fontSize = 15.sp, color = if (coursePut) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                                }
+                            }
                             if (onPick != null) OutlinedButton(
                                 onClick = { val parts = d.resultName.split(" "); onPick(com.htb.carplan.shared.model.Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName)) },
                                 shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),

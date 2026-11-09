@@ -256,12 +256,37 @@ fun NextTripBody(t: NextTrip) {
  * 추천 재료·방법은 기록 탭 카드와 같다 (booksFor → Taste → suggestTrip → 카카오 확인).
  */
 @Composable
-fun NextTripSheet(me: String, onAdd: (NextTrip) -> Unit, onDismiss: () -> Unit) {
+fun NextTripSheet(
+    me: String,
+    /** 이 여행이 이미 어느 동네면(첫 칸 주소의 시·군) 새 동네 대신 "이 동네 채우기"부터 (정원 2026-11-09). */
+    fillRegion: String? = null,
+    /** 이미 일정에 있는 장소 이름들 — 채우기 목록에서 뺀다. */
+    existingNames: Set<String> = emptySet(),
+    /** 한 곳씩 칸으로 넣기 (채우기 모드). Null이면 채우기 모드 없음. */
+    onAddOne: ((Place) -> Unit)? = null,
+    onAdd: (NextTrip) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val context = LocalContext.current
     var state by remember { mutableStateOf<NextTripState>(NextTripState.Loading) }
     var avoid by remember { mutableStateOf(listOf<String>()) }
     var turn by remember { mutableIntStateOf(0) }
-    LaunchedEffect(turn) {
+    // 0 = 이 동네 채우기(코스에서 아직 없는 곳), 1 = 새 동네 추천.
+    var mode by remember { mutableIntStateOf(if (fillRegion != null && onAddOne != null) 0 else 1) }
+    var fillPlaces by remember { mutableStateOf<List<Place>?>(null) }
+    var added by remember { mutableStateOf(setOf<String>()) }
+    if (mode == 0) LaunchedEffect(Unit) {
+        val kakao = KakaoApi(com.htb.carplan.phone.BuildConfig.KAKAO_REST_KEY)
+        val course = NextTripLoader.courses(context).firstOrNull { c -> fillRegion!! == c.region || fillRegion.startsWith(c.word) }
+        val remain = course?.places.orEmpty().filterNot { n -> existingNames.any { e -> e.contains(n) || n.contains(e) } }.take(4)
+        val found = remain.mapNotNull { name ->
+            if (kakao.available) runCatching { kakao.searchKeyword("${course!!.word} $name", size = 1).firstOrNull() }.getOrNull()
+            else Place(name = name)
+        }.filterNot { p -> existingNames.any { e -> e.contains(p.name) || p.name.contains(e) } }
+        if (found.isEmpty()) mode = 1 else fillPlaces = found
+    }
+    LaunchedEffect(mode, turn) {
+        if (mode == 0) return@LaunchedEffect
         state = NextTripState.Loading
         if (turn == 0) NextTripStore.load(context)?.let { state = NextTripState.Ready(it) }
         val kakao = KakaoApi(com.htb.carplan.phone.BuildConfig.KAKAO_REST_KEY)
@@ -272,8 +297,26 @@ fun NextTripSheet(me: String, onAdd: (NextTrip) -> Unit, onDismiss: () -> Unit) 
     }
     CenterSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Text("다음엔 여기 어때요?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            when (val st = state) {
+            Text(if (mode == 0) "$fillRegion 더 채우기" else "다음엔 여기 어때요?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            if (mode == 0) {
+                Text("이 동네 대표 코스 중 아직 일정에 없는 곳이에요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
+                val fp = fillPlaces
+                if (fp == null) Text("찾는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
+                else fp.forEach { p ->
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1)
+                            val sub = listOfNotNull(p.kindLineOrNull(), p.address.ifBlank { null }).joinToString("  ·  ")
+                            if (sub.isNotBlank()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft, maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = { onAddOne?.invoke(p); added = added + p.name }, enabled = p.name !in added,
+                            shape = Corner, border = BorderStroke(1.dp, Palette.Line),
+                        ) { Text(if (p.name in added) "넣었어요" else "칸으로", fontSize = 14.sp, color = if (p.name in added) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                    }
+                }
+                TextButton(onClick = { mode = 1 }, modifier = Modifier.padding(top = 6.dp)) { Text("다른 동네 추천 받기", fontSize = 15.sp, color = Palette.Navy) }
+            } else when (val st = state) {
                 is NextTripState.Ready -> {
                     NextTripBody(st.trip)
                     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

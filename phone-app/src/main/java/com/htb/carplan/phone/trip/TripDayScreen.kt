@@ -523,7 +523,18 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     if (pickupOpen) PickupSheet(vm, onDismiss = { pickupOpen = false })
     if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placeQuery = ""; placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null; voteSeeds = emptyList() }, seed = voteSeed, seeds = voteSeeds)
-    if (aiOpen) me?.let { u -> com.htb.carplan.phone.record.NextTripSheet(u, onAdd = { t -> t.stops.forEach { p -> vm.addStop(p, null, "AI 추천") }; aiOpen = false }, onDismiss = { aiOpen = false }) }
+    if (aiOpen) me?.let { u ->
+        // 일정이 이미 어느 동네면(첫 칸 주소) 그 동네 채우기부터, 아니면 새 동네 추천 (정원 2026-11-09).
+        val live = stops.filterNot { it.deleted }
+        com.htb.carplan.phone.record.NextTripSheet(
+            u,
+            fillRegion = live.firstNotNullOfOrNull { s -> s.place.address.takeIf { it.isNotBlank() }?.let { com.htb.carplan.shared.calendar.TasteBuild.region(it) } },
+            existingNames = live.map { it.place.name }.toSet(),
+            onAddOne = { p -> vm.addStop(p, null, "추천") },
+            onAdd = { t -> t.stops.forEach { p -> vm.addStop(p, null, "AI 추천") }; aiOpen = false },
+            onDismiss = { aiOpen = false },
+        )
+    }
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
     if (chatOpen) com.htb.carplan.phone.ui.BackScreen(onBack = { chatOpen = false; ChatSeen.mark(context, ref.groupId) }) { closeChat -> ChatScreen(
         groupId = ref.groupId, eventId = ref.eventId, date = date, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,
