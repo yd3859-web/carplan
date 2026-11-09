@@ -138,6 +138,48 @@ class RecordTabViewModel : ViewModel() {
     }
 
     private val trips = com.htb.carplan.shared.data.TripRepository()
+
+    // ---------- D 다음 여행 추천 (NextTrip.kt) ----------
+    val suggest = MutableStateFlow<NextTripState>(NextTripState.Idle)
+    private val avoided = mutableListOf<String>() // [다른 곳]을 누른 동네는 다음 추천에서 뺀다
+
+    fun loadSuggestion(context: android.content.Context, force: Boolean = false) {
+        val bs = books.value?.filterNot { it.isLog } ?: return
+        if (!force && suggest.value !is NextTripState.Idle) return
+        if (bs.sumOf { b -> b.pages.sumOf { it.second.size } } < 3) {
+            suggest.value = NextTripState.Off("기록이 세 곳쯤 쌓이면 다음 여행을 추천해 드려요"); return
+        }
+        viewModelScope.launch {
+            // 저장해 둔 지난 추천 먼저 (시연장 인터넷 대비), 그 뒤 새로 받아 바꾼다.
+            if (!force && suggest.value is NextTripState.Idle) NextTripStore.load(context)?.let { suggest.value = NextTripState.Ready(it) }
+            if (suggest.value !is NextTripState.Ready) suggest.value = NextTripState.Loading
+            val t = NextTripLoader.load(bs, kakaoApi, avoided)
+            if (t != null) { suggest.value = NextTripState.Ready(t); NextTripStore.save(context, t) }
+            else if (suggest.value is NextTripState.Loading) suggest.value = NextTripState.Off("추천할 거리를 찾지 못했어요 · 나중에 다시 볼게요")
+        }
+    }
+
+    fun otherSuggestion(context: android.content.Context) {
+        (suggest.value as? NextTripState.Ready)?.trip?.region?.let { if (it !in avoided) avoided += it }
+        suggest.value = NextTripState.Loading
+        loadSuggestion(context, force = true)
+    }
+
+    /** [이 여행 만들기]: 나만 그룹에 여행 하나 + 추천 장소가 칸으로, 바로 그 레일을 연다. */
+    fun makeTrip(t: NextTrip, onOpen: (TripRef) -> Unit) {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                val eid = calendar.addEvent(s.soloGroupId, com.htb.carplan.shared.model.Event(
+                    categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id,
+                    title = t.title, startDate = t.date, endDate = t.date, allDay = true,
+                    memo = t.reason, createdBy = s.uid))
+                t.stops.forEach { p -> trips.addStop(s.soloGroupId, eid, t.date, p, null, "", s.uid) }
+                onOpen(TripRef(s.soloGroupId, eid, t.date))
+            }.onFailure { message.value = it.message }
+        }
+    }
+
     /** One read of the day's comments (the diary page shows them under their place). */
     suspend fun comments(p: DiaryDay): List<com.htb.carplan.shared.model.Comment> =
         runCatching { kotlinx.coroutines.withTimeout(8_000) { trips.observeDayComments(p.groupId, p.eventId, p.date).first() } }
@@ -247,6 +289,8 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
     com.htb.carplan.phone.ui.OnTabTapAgain { if (open != null) open = null else if (reading != null) reading = null else list.animateScrollToItem(0) }
     val today = LocalDate.now()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(books) { if (books != null) vm.loadSuggestion(ctx) }
     val todayPages = remember(days) {
         days.filter { ce -> ce.event.startDate <= today.toString() && ce.event.endDate.ifBlank { ce.event.startDate } >= today.toString() }
             .map { ce -> DiaryDay(ce.groupId, ce.event.id, today.toString(), ce.event.title, ce.event.id.startsWith("log-"),
@@ -274,6 +318,12 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
                 items(inMonth, key = { it.groupId + it.event.id }) { b ->
                     BookCard(b, names.let { _ -> b.memberIds.filter { it != vm.me() }.map(vm::nameOf) }) { page -> reading = b to page }
                 }
+            }
+            if (bs != null) item(key = "next-trip") {
+                val st by vm.suggest.collectAsStateWithLifecycle()
+                NextTripCard(st,
+                    onMake = { t -> vm.makeTrip(t) { ref -> open = listOf(ref.groupId, ref.eventId, ref.date) } },
+                    onOther = { vm.otherSuggestion(ctx) })
             }
             item { Spacer(Modifier.height(24.dp)) }
         }

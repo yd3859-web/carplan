@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.coil.network)
     // 17장 push
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.functions) // D4 다음 여행 추천(suggestTrip) 호출
     // 1장 로그인: 구글(Credential Manager) — 익명 계정에 연결
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play)

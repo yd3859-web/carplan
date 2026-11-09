@@ -225,3 +225,62 @@ exports.chatOnComment = onDocumentCreated("groups/{gid}/events/{eid}/days/{date}
   const stop = c.stopId ? await db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${c.stopId}`).get() : null;
   await chatCard(gid, `comment-${cid}`, { uid: c.uid || "", kind: "COMMENT", text: c.text, refId: c.stopId || null, lines: [stop?.get("place")?.name || "칸"], eventId: eid, date });
 });
+
+// ---------- D4 다음 여행 추천 (정원 2026-11-06) ----------
+// 폰이 보낸 취향 요약(장소 이름·지역·숫자만, 개인정보 없음)으로 Claude가 다음 여행 동네와 하루 동선을 고른다.
+// 키는 서버 비밀값(ANTHROPIC_API_KEY)에만: `firebase functions:secrets:set ANTHROPIC_API_KEY` 후 재배포.
+// 폰은 받은 장소를 카카오로 실제 있는지 확인한 뒤에만 보여 준다. 하루 10번(uid 기준).
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+
+exports.suggestTrip = onCall({ secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 60 }, async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "로그인이 필요해요");
+  const taste = String(req.data?.taste || "").slice(0, 2000);
+  if (!taste) throw new HttpsError("invalid-argument", "취향 요약이 비었어요");
+  const key = ANTHROPIC_API_KEY.value();
+  if (!key) throw new HttpsError("failed-precondition", "서버에 AI 키가 아직 없어요");
+
+  // 하루 10번: suggest/{uid} 문서에 날짜·횟수 (클라이언트는 못 읽는 컬렉션).
+  const today = new Date().toISOString().slice(0, 10);
+  const ref = db.doc(`suggest/${req.auth.uid}`);
+  const count = await db.runTransaction(async (tx) => {
+    const d = (await tx.get(ref)).data();
+    const n = d?.date === today ? (d.count || 0) + 1 : 1;
+    tx.set(ref, { date: today, count: n });
+    return n;
+  });
+  if (count > 10) throw new HttpsError("resource-exhausted", "오늘 추천을 다 썼어요 · 내일 다시");
+
+  const avoid = String(req.data?.avoid || "").slice(0, 300); // 이미 추천했던 동네 (다른 곳 버튼)
+  const prompt = `${taste}
+
+이 사람이 좋아할, 아직 안 가 본 대한민국 동네 한 곳과 차로 가는 하루 동선을 골라 줘.
+규칙:
+- "가 본 지역"과 그 바로 옆 동네는 피하되, 취향(종류)은 그대로 살릴 것${avoid ? `\n- 이 동네도 피할 것: ${avoid}` : ""}
+- 하루 이동 거리를 크게 넘지 않는 곳
+- 장소는 실제로 있는 유명한 곳만 3~4곳, 차로 도는 순서대로
+- reason은 기록을 근거로 한 문장 (예: "포항 바다에 또 갈래요를 눌러서 → 이번엔 영덕 바다")
+JSON만 답할 것:
+{"region":"영덕군","title":"영덕 바다 하루","reason":"…","stops":[{"name":"강구항","query":"영덕 강구항"}]}`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-5-5",
+      max_tokens: 700,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) throw new HttpsError("unavailable", `AI 응답 실패 ${res.status}`);
+  const body = await res.json();
+  const text = (body.content || []).map((c) => c.text || "").join("");
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new HttpsError("internal", "AI 답을 읽지 못했어요");
+  let out;
+  try { out = JSON.parse(m[0]); } catch { throw new HttpsError("internal", "AI 답이 JSON이 아니에요"); }
+  const stops = Array.isArray(out.stops) ? out.stops.slice(0, 5).map((s) => ({ name: String(s.name || ""), query: String(s.query || s.name || "") })).filter((s) => s.name) : [];
+  if (!out.region || stops.length < 2) throw new HttpsError("internal", "AI 추천이 비었어요");
+  return { region: String(out.region), title: String(out.title || `${out.region} 하루`), reason: String(out.reason || ""), stops };
+});
