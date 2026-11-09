@@ -35,6 +35,9 @@ import com.htb.carplan.shared.model.BuiltInCategory
 import kotlinx.coroutines.flow.first
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
+import com.htb.carplan.shared.calendar.Course
+import com.htb.carplan.shared.calendar.CourseBook
+import com.htb.carplan.shared.calendar.Taste
 import com.htb.carplan.shared.calendar.TasteBuild
 import com.htb.carplan.shared.calendar.TastePlace
 import com.htb.carplan.shared.calendar.TasteTrip
@@ -75,16 +78,18 @@ object NextTripLoader {
 
     fun nextSaturday(): String = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.SATURDAY)).toString()
 
-    /** 기록 책 → 취향 요약 글 (장소 이름·지역·숫자만 — 메모·사진·사람 이름은 안 보냄). */
-    fun tasteText(books: List<DiaryBook>): String {
-        val trips = books.map { b ->
-            TasteTrip(
-                days = b.pages.map { (_, rs) -> rs.map { r -> TastePlace(r.place.name, r.place.category, r.place.address, r.place.lat, r.place.lng, again = r.againBy.size) } },
-                members = b.memberIds.size.coerceAtLeast(1),
-            )
-        }
-        return TasteBuild.promptText(TasteBuild.from(trips))
-    }
+    /** 기록 책 → 취향 (장소 이름·지역·숫자만 — 메모·사진·사람 이름은 안 담김). */
+    fun tasteOf(books: List<DiaryBook>): Taste = TasteBuild.from(books.map { b ->
+        TasteTrip(
+            days = b.pages.map { (_, rs) -> rs.map { r -> TastePlace(r.place.name, r.place.category, r.place.address, r.place.lat, r.place.lng, again = r.againBy.size) } },
+            members = b.memberIds.size.coerceAtLeast(1),
+        )
+    })
+
+    /** D7 기억장치: 지역별 대표 코스 (assets/courses.txt — 여행상식.md 형식). */
+    @Volatile private var courseCache: List<Course>? = null
+    fun courses(context: Context): List<Course> = courseCache
+        ?: CourseBook.parse(runCatching { context.assets.open("courses.txt").bufferedReader().readText() }.getOrDefault("")).also { courseCache = it }
 
     /**
      * 기록 책을 그 자리에서 한 번 모은다 ([AI 추천] 칩 — 기록 탭 밖에서 추천을 쓸 때): 내 그룹들의 지난 1년 여행 중
@@ -113,13 +118,19 @@ object NextTripLoader {
         }
     }
 
-    suspend fun load(books: List<DiaryBook>, kakao: KakaoApi, avoid: List<String>): NextTrip? =
-        fromAi(tasteText(books), kakao, avoid) ?: fallback(books, kakao)
+    /** 추천 순서: AI(후보 코스를 참고로 받음) → 코스 기억장치에서 직접 → 또 갈래요 근처 다시 가기. */
+    suspend fun load(context: Context, books: List<DiaryBook>, kakao: KakaoApi, avoid: List<String>): NextTrip? {
+        val taste = tasteOf(books)
+        val cands = CourseBook.candidates(courses(context), taste, avoid)
+        return fromAi(TasteBuild.promptText(taste), kakao, avoid, CourseBook.promptLines(cands))
+            ?: fromCourses(kakao, cands, taste)
+            ?: fallback(books, kakao)
+    }
 
     /** 서버 suggestTrip → 카카오 확인. Null = 키 없음·실패·장소 확인 2곳 미만. */
-    private suspend fun fromAi(taste: String, kakao: KakaoApi, avoid: List<String>): NextTrip? = runCatching {
+    private suspend fun fromAi(taste: String, kakao: KakaoApi, avoid: List<String>, patterns: String): NextTrip? = runCatching {
         val res = FirebaseFunctions.getInstance("asia-northeast3").getHttpsCallable("suggestTrip")
-            .call(mapOf("taste" to taste, "avoid" to avoid.joinToString(", "))).await()
+            .call(mapOf("taste" to taste, "avoid" to avoid.joinToString(", "), "patterns" to patterns)).await()
         val m = res.data as? Map<*, *> ?: return null
         val region = m["region"] as? String ?: return null
         val raw = (m["stops"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }
@@ -133,7 +144,23 @@ object NextTripLoader {
         NextTrip(region, m["title"] as? String ?: "$region 하루", m["reason"] as? String ?: "", stops, fromAi = true, date = nextSaturday())
     }.onFailure { android.util.Log.w("NextTrip", "AI 추천 실패 — 대체 추천으로", it) }.getOrNull()
 
-    /** AI 없이: 또 갈래요(없으면 마지막 기록) 근처 다시 가기 + 그 둘레 명소·맛집 한 곳씩. */
+    /** AI 없이(키 전·실패): 기억장치의 후보 코스 중 카카오로 2곳 이상 확인되는 첫 동네. */
+    private suspend fun fromCourses(kakao: KakaoApi, cands: List<Course>, taste: Taste): NextTrip? {
+        if (!kakao.available) return null
+        for (c in cands) {
+            val stops = c.places.take(5).mapNotNull { name -> runCatching { kakao.searchKeyword("${c.word} $name", size = 1).firstOrNull() }.getOrNull() }
+            if (stops.size >= 2) {
+                val likes = taste.kinds.take(2).joinToString("·") { it.first }
+                val reason = "가 본 곳과 겹치지 않는 ${c.region}" +
+                    (if (likes.isNotBlank()) " · 좋아한 $likes 결로 골랐어요" else "") +
+                    (if (c.note.isNotBlank()) " · ${c.note}" else "")
+                return NextTrip(c.region, "${c.word} 하루", reason, stops, fromAi = false, date = nextSaturday())
+            }
+        }
+        return null
+    }
+
+    /** 마지막 대체: 또 갈래요(없으면 마지막 기록) 근처 다시 가기 + 그 둘레 명소·맛집 한 곳씩. */
     private suspend fun fallback(books: List<DiaryBook>, kakao: KakaoApi): NextTrip? {
         val all = books.flatMap { b -> b.pages.flatMap { it.second } }
         val base = (all.filter { it.againBy.isNotEmpty() }.sortedByDescending { it.againBy.size } + all.reversed())
@@ -220,7 +247,7 @@ fun NextTripBody(t: NextTrip) {
             }
         }
     }
-    Text(if (t.fromAi) "기록으로 정리한 취향 → AI가 고름 · 장소는 카카오로 확인했어요" else "기록만으로 고른 추천이에요",
+    Text(if (t.fromAi) "기록으로 정리한 취향 → AI가 고름 · 장소는 카카오로 확인했어요" else "기록 취향 + 대표 코스로 고른 추천이에요",
         fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
 }
 
@@ -239,7 +266,7 @@ fun NextTripSheet(me: String, onAdd: (NextTrip) -> Unit, onDismiss: () -> Unit) 
         if (turn == 0) NextTripStore.load(context)?.let { state = NextTripState.Ready(it) }
         val kakao = KakaoApi(com.htb.carplan.phone.BuildConfig.KAKAO_REST_KEY)
         val books = NextTripLoader.booksFor(me)
-        val t = if (books.sumOf { b -> b.pages.sumOf { it.second.size } } < 3) null else NextTripLoader.load(books, kakao, avoid)
+        val t = if (books.sumOf { b -> b.pages.sumOf { it.second.size } } < 3) null else NextTripLoader.load(context, books, kakao, avoid)
         if (t != null) { state = NextTripState.Ready(t); NextTripStore.save(context, t) }
         else if (state !is NextTripState.Ready) state = NextTripState.Off("기록이 세 곳쯤 쌓이면 추천해 드려요")
     }

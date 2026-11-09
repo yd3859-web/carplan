@@ -155,7 +155,7 @@ class RecordTabViewModel : ViewModel() {
             // 저장해 둔 지난 추천 먼저 (시연장 인터넷 대비), 그 뒤 새로 받아 바꾼다.
             if (!force && suggest.value is NextTripState.Idle) NextTripStore.load(context)?.let { suggest.value = NextTripState.Ready(it) }
             if (suggest.value !is NextTripState.Ready) suggest.value = NextTripState.Loading
-            val t = NextTripLoader.load(bs, kakaoApi, avoided)
+            val t = NextTripLoader.load(context, bs, kakaoApi, avoided)
             if (t != null) { suggest.value = NextTripState.Ready(t); NextTripStore.save(context, t) }
             else if (suggest.value is NextTripState.Loading) suggest.value = NextTripState.Off("추천할 거리를 찾지 못했어요 · 나중에 다시 볼게요")
         }

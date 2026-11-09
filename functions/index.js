@@ -253,6 +253,8 @@ exports.suggestTrip = onCall({ secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 60 
   if (count > 10) throw new HttpsError("resource-exhausted", "오늘 추천을 다 썼어요 · 내일 다시");
 
   const avoid = String(req.data?.avoid || "").slice(0, 300); // 이미 추천했던 동네 (다른 곳 버튼)
+  // D7 기억장치: 폰이 고른 후보 동네·대표 코스 (assets/courses.txt → CourseBook.candidates) — 지어내기 방지의 바탕.
+  const patterns = String(req.data?.patterns || "").slice(0, 1500);
   const prompt = `${taste}
 
 이 사람이 좋아할, 아직 안 가 본 대한민국 동네 한 곳과 차로 가는 하루 동선을 골라 줘.
@@ -262,7 +264,9 @@ exports.suggestTrip = onCall({ secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 60 
 - 하루 동선은 4~5곳: 명소 2~3곳 사이에 점심 식당 1곳(그 동네 이름난 먹거리)과 카페 1곳을 끼울 것 — 명소만 연달아 넣지 말 것 (기록이 자연·명소로 쏠려 있어도 밥·카페는 넣는다)
 - 장소는 실제로 있는 유명한 곳만, 차로 도는 순서대로(점심 식당은 정오쯤 지나는 자리에)
 - reason은 기록을 근거로 한 문장 (예: "포항 바다에 또 갈래요를 눌러서 → 이번엔 영덕 바다")
-JSON만 답할 것:
+${patterns ? `후보 동네와 대표 코스 — 이 중에서 고르는 걸 우선하고(더 맞는 동네가 있으면 다른 곳도 됨), 코스를 바탕으로 하되 밥·카페 규칙은 지킬 것:
+${patterns}
+` : ""}JSON만 답할 것:
 {"region":"영덕군","title":"영덕 바다 하루","reason":"…","stops":[{"name":"강구항","query":"영덕 강구항"}]}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
