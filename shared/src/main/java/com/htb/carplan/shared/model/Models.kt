@@ -41,6 +41,16 @@ data class User(
     val friendCode: String = "",
     /** 1장: "google" once the anonymous account was linked; null while anonymous. */
     val provider: String? = null,
+    /** D3: 폰이 고른 최신 "다음엔 여기 어때요?" — 차가 일정 없는 날 "오늘 갈 만한 곳"으로 보여 준다. */
+    val suggest: SuggestedTrip? = null,
+)
+
+/** users/{uid}.suggest — 폰 추천(NextTrip)의 서버 사본. 폰이 쓰고 차가 읽는다 (D3). */
+data class SuggestedTrip(
+    val region: String = "",
+    val title: String = "",
+    val reason: String = "",
+    val stops: List<Place> = emptyList(),
 )
 
 /** users/{uid}/friends/{friendUid} — added by code; people from shared groups show up without this (Q10). */

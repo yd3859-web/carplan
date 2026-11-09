@@ -92,6 +92,11 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
 
     fun observeUser(uid: String): Flow<User?> = db.document(FirestorePaths.user(uid)).observeDoc(User::class.java)
 
+    /** D3: 폰 추천을 서버에도 — 차가 일정 없는 날 "오늘 갈 만한 곳"으로 쓴다. Fire-and-forget (추천은 있으면 좋은 것). */
+    fun setSuggestedTrip(uid: String, s: com.htb.carplan.shared.model.SuggestedTrip) {
+        db.document(FirestorePaths.user(uid)).set(mapOf("suggest" to s), com.google.firebase.firestore.SetOptions.merge())
+    }
+
     fun observeCar(carId: String): Flow<Car?> = db.document(FirestorePaths.car(carId)).observeDoc(Car::class.java)
 
     private fun <T : Any> com.google.firebase.firestore.DocumentReference.observeDoc(type: Class<T>): Flow<T?> = callbackFlow {

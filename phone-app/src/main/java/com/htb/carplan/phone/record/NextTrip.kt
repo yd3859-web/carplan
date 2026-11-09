@@ -188,6 +188,12 @@ object NextTripStore {
                     .put("category", p.category).put("phone", p.phone).put("kakaoId", p.kakaoId ?: "")
             }))
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("t", o.toString()).apply()
+        // D3 차 연결: 서버에도 한 벌 — 차가 일정 없는 날 "오늘 갈 만한 곳"으로 보여 준다.
+        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
+            runCatching {
+                CalendarRepository().setSuggestedTrip(uid, com.htb.carplan.shared.model.SuggestedTrip(t.region, t.title, t.reason, t.stops))
+            }
+        }
     }
 
     fun load(context: Context): NextTrip? = runCatching {
@@ -264,6 +270,8 @@ fun NextTripSheet(
     existingNames: Set<String> = emptySet(),
     /** 한 곳씩 칸으로 넣기 (채우기 모드). Null이면 채우기 모드 없음. */
     onAddOne: ((Place) -> Unit)? = null,
+    /** 주요 버튼 글자 — 여행 안에선 "이 칸들로 넣기", 캘린더 빈 주말에선 "이 여행 만들기" (D3). */
+    addLabel: String = "이 칸들로 넣기",
     onAdd: (NextTrip) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -321,7 +329,7 @@ fun NextTripSheet(
                     NextTripBody(st.trip)
                     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { onAdd(st.trip) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-                            modifier = Modifier.weight(1f).height(48.dp)) { Text("이 칸들로 넣기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                            modifier = Modifier.weight(1f).height(48.dp)) { Text(addLabel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
                         OutlinedButton(onClick = { avoid = avoid + st.trip.region; turn++ }, shape = Corner, border = BorderStroke(1.dp, Palette.Line),
                             modifier = Modifier.height(48.dp)) { Text("다른 곳", fontSize = 15.sp, color = Palette.TextStrong) }
                     }

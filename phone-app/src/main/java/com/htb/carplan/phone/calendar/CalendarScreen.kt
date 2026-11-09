@@ -109,6 +109,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
     val lastGroupId by vm.lastGroupId.collectAsStateWithLifecycle()
     val commute by vm.commuteSuggestion.collectAsStateWithLifecycle()
     var daySheetOpen by remember { mutableStateOf(false) }
+    var suggestOpen by remember { mutableStateOf(false) } // D3 빈 주말 추천 창
     var editing by remember { mutableStateOf<com.htb.carplan.shared.data.CalendarEvent?>(null) }
     var carLinkOpen by remember { mutableStateOf(false) }
     if (carLinkOpen) com.htb.carplan.phone.ui.CarLinkSheet(onDismiss = { carLinkOpen = false })
@@ -135,6 +136,21 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                         )
                         androidx.compose.material3.TextButton(onClick = { vm.registerCommute(sg) }) { Text("등록", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                         androidx.compose.material3.TextButton(onClick = vm::dismissCommute) { Text("아니요", color = Palette.TextSoft) }
+                    }
+                    androidx.compose.material3.HorizontalDivider(color = Palette.Line)
+                }
+                // D3: 다가오는 주말이 통째로 비어 있으면 한 줄 제안 — 누르면 기록 취향 추천 창.
+                val nextSat = remember { LocalDate.now().with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.SATURDAY)) }
+                var weekendOff by remember { mutableStateOf(context.getSharedPreferences("weekend_hint", 0).getString("off", "") == nextSat.toString()) }
+                val weekendFree = upcoming.none { e -> !e.event.deleted &&
+                    (com.htb.carplan.shared.calendar.Repeat.occursOn(e.event, nextSat) || com.htb.carplan.shared.calendar.Repeat.occursOn(e.event, nextSat.plusDays(1))) }
+                if (!weekendOff && weekendFree) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("이번 주말(${nextSat.monthValue}/${nextSat.dayOfMonth} 토)은 비어 있어요", fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.TextButton(onClick = { suggestOpen = true }) { Text("추천 보기", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                        androidx.compose.material3.TextButton(onClick = {
+                            context.getSharedPreferences("weekend_hint", 0).edit().putString("off", nextSat.toString()).apply(); weekendOff = true
+                        }) { Text("닫기", color = Palette.TextSoft) }
                     }
                     androidx.compose.material3.HorizontalDivider(color = Palette.Line)
                 }
@@ -224,6 +240,14 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
                 }
             },
             onDismiss = { quickAddDate = null },
+        )
+    }
+    // D3 빈 주말 추천: 기록 탭과 같은 추천(저장된 것 먼저 → AI → 코스), [이 여행 만들기]는 토요일 여행 + 칸 + 레일.
+    if (suggestOpen) vm.me()?.let { u ->
+        com.htb.carplan.phone.record.NextTripSheet(
+            u, addLabel = "이 여행 만들기",
+            onAdd = { t -> suggestOpen = false; vm.makeTrip(t) { g, e, d -> openTrip = TripRef(g, e, d) } },
+            onDismiss = { suggestOpen = false },
         )
     }
     // Over the calendar, so the back gesture shows it underneath.

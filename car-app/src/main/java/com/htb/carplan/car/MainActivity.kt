@@ -257,7 +257,7 @@ private fun CarHome(vm: CarHomeViewModel) {
                                 (p.reason == PromptReason.FUEL && (railFuel != null || railNeed != null)))
                     }
                     val promptSlot: (@Composable () -> Unit)? = prompt?.takeIf { askOnRail == null }?.let { p -> { CarEnter(Entry.FADE, key = p.reason to p.stop.id) { PromptPanel(p, compact = compact, onGo = vm::go, onLater = vm::later) } } }
-                    if (compact) SplitDayView(trip, vm.dayComments.collectAsStateWithLifecycle().value, vm.fuelSuggestion.collectAsStateWithLifecycle().value?.takeIf { it.eventId == trip?.eventId }, vm::goViaSuggested, vm.fuelNeed.collectAsStateWithLifecycle().value, vm::findFuelOnRoute, askOnRail, vm::go, vm::later, trip?.let { fuelLine(it, vehicle, vm.fuelUsage.collectAsStateWithLifecycle().value) }, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
+                    if (compact) SplitDayView(trip, vm.dayComments.collectAsStateWithLifecycle().value, vm.fuelSuggestion.collectAsStateWithLifecycle().value?.takeIf { it.eventId == trip?.eventId }, vm::goViaSuggested, vm.fuelNeed.collectAsStateWithLifecycle().value, vm::findFuelOnRoute, askOnRail, vm::go, vm::later, trip?.let { fuelLine(it, vehicle, vm.fuelUsage.collectAsStateWithLifecycle().value) }, next, live, guiding, vehicle.drivingRestricted, promptSlot, otherTrips = (allTrips.size - 1).coerceAtLeast(0), onOtherTrip = { pickTrip = true }, suggested = vm.suggested.collectAsStateWithLifecycle().value, onGoSuggested = vm::goSuggestedTrip, onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) }, onMore = { more = true })
                     else HomeView(
                         today = today, week = week, vm = vm, trip = trip, next = next, guiding = guiding, live = live, prompt = promptSlot, ask = askOnRail, restricted = restricted, comment = nextComment, moving = vehicle.gear == com.htb.carplan.shared.model.Gear.D, onOtherTrip = { pickTrip = true }, onAdd = { adding = true }, onEdit = { editing = true },
                         onGo = { if (tripNext != null) vm.go() else next?.let(vm::goTo) },
@@ -504,6 +504,21 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text(doneLine(trip), color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
                 Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 10.dp))
             } else {
+            // D3: 주차 중·일정 없는 날 — 폰이 저장해 둔 추천(기록 취향)을 "오늘 갈 만한 곳"으로. [가기] 한 번이면 오늘 일정 + 경로.
+            val suggested by vm.suggested.collectAsStateWithLifecycle()
+            val freeDay = trip == null && nextName == null && todayEvents.isEmpty() && !restricted
+            if (freeDay && suggested != null) {
+                val s = suggested!!
+                Text("오늘 갈 만한 곳", color = Soft, fontSize = 20.sp)
+                Text(s.title.ifBlank { s.region }, color = Accent, fontSize = 48.sp, fontWeight = FontWeight.Black, lineHeight = 52.sp, maxLines = 2)
+                Text(s.stops.joinToString(" → ") { it.name }, color = Ink, fontSize = 26.sp, maxLines = 2, modifier = Modifier.padding(top = 6.dp))
+                if (s.reason.isNotBlank()) Text(s.reason, color = Soft, fontSize = 20.sp, maxLines = 2, modifier = Modifier.padding(top = 10.dp))
+                Button(
+                    onClick = vm::goSuggestedTrip, shape = Corner,
+                    colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk),
+                    modifier = Modifier.fillMaxWidth().padding(top = 18.dp).height(76.dp),
+                ) { Text("가기 · 오늘 일정이 돼요", fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            } else {
             Text(if (nextName == null && trip == null) "지금" else goingLabel, color = Soft, fontSize = 20.sp)
             val emptyLine = when {
                 trip != null && trip.stops.isEmpty() -> "여행에 칸이 아직 없어요"
@@ -541,6 +556,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 }
                 val more = trip.remaining.size - 2
                 if (more > 0) Text("그 뒤 ${more}곳 더", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp))
+            }
             }
             }
             Spacer(Modifier.weight(1f))
@@ -724,7 +740,7 @@ private fun remainText(live: NaviLive, trip: TodayTrip?, guiding: Boolean): Stri
  * passengers' phones; the car only shows the day and answers the voice questions. One small [더보기] while parked.
  */
 @Composable
-private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopComment>>, fuelStop: FuelSuggestion?, onFuelVia: () -> Unit, fuelNeed: FuelNeed?, onFindFuel: () -> Unit, ask: NextPrompt?, onYes: () -> Unit, onNo: () -> Unit, fuelLine: String?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
+private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopComment>>, fuelStop: FuelSuggestion?, onFuelVia: () -> Unit, fuelNeed: FuelNeed?, onFindFuel: () -> Unit, ask: NextPrompt?, onYes: () -> Unit, onNo: () -> Unit, fuelLine: String?, next: CalendarEvent?, live: NaviLive, guiding: Boolean, restricted: Boolean, prompt: (@Composable () -> Unit)?, otherTrips: Int = 0, onOtherTrip: () -> Unit = {}, suggested: com.htb.carplan.shared.model.SuggestedTrip? = null, onGoSuggested: () -> Unit = {}, onGo: () -> Unit, onMore: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -753,7 +769,21 @@ private fun SplitDayView(trip: TodayTrip?, comments: Map<String, List<StopCommen
                 // The half screen is tall and narrow: room between places, and (parked) the memo·comments·drive like the wide view (정원 2026-10-31).
                 TripStops(trip, big = true, foldVisited = true, times = drivenTimes(trip, live, guiding), driving = restricted, detail = !restricted, comments = comments, roomy = true, fuelStop = fuelStop, onFuelVia = onFuelVia, fuelNeed = fuelNeed, onFindFuel = onFindFuel, ask = ask, onYes = onYes, onNo = onNo)
                 if (trip.stops.isNotEmpty() && trip.next == null) Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 18.dp))
-            } else Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
+            } else {
+                Text(next?.event?.let { "${it.startTime ?: "종일"}  ${it.title}" } ?: "오늘은 일정이 없어요", color = Ink, fontSize = 28.sp)
+                // D3 반반 모양: 일정 없는 날 "오늘 갈 만한 곳" (주차 중만).
+                if (next == null && !restricted && suggested != null) {
+                    HorizontalDivider(color = Line, modifier = Modifier.padding(vertical = 18.dp))
+                    Text("오늘 갈 만한 곳", color = Soft, fontSize = 20.sp)
+                    Text(suggested.title.ifBlank { suggested.region }, color = Accent, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(suggested.stops.joinToString(" → ") { it.name }, color = Ink, fontSize = 24.sp, maxLines = 2, modifier = Modifier.padding(top = 4.dp))
+                    Button(
+                        onClick = onGoSuggested, shape = Corner,
+                        colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk),
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(76.dp),
+                    ) { Text("가기 · 오늘 일정이 돼요", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+                }
+            }
         }
         // The question on the rail already has [가기].
         if (!guiding && !restricted && ask == null && (trip?.next != null || next != null)) Button(

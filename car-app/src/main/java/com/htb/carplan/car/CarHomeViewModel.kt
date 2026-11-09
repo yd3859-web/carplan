@@ -503,6 +503,31 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // ── D3 "오늘 갈 만한 곳" (주차 중·일정 없는 날): 폰이 저장한 추천(users/{uid}.suggest)을 그대로 보여 준다.
+    val suggested: StateFlow<com.htb.carplan.shared.model.SuggestedTrip?> = owner
+        .map { it?.suggest?.takeIf { s -> s.stops.isNotEmpty() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** [가기] 한 번: 오늘 여행으로 만들고(캘린더에 남게) 바로 경로를 연다 — 질문을 다시 하지 않는다 (차 화면 원칙). */
+    fun goSuggestedTrip() {
+        val u = owner.value ?: return
+        val s = u.suggest?.takeIf { it.stops.isNotEmpty() } ?: return
+        viewModelScope.launch {
+            runCatching {
+                val today = LocalDate.now().toString()
+                val tripRepo = TripRepository()
+                val eid = calendar.addEvent(u.soloGroupId, Event(
+                    categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id,
+                    title = s.title.ifBlank { s.region }, startDate = today, endDate = today, allDay = true,
+                    memo = s.reason, createdBy = u.uid))
+                s.stops.forEach { p -> tripRepo.addStop(u.soloGroupId, eid, today, p, null, "추천", u.uid) }
+                // 여행이 흐름에 올라오면 바로 출발. 늦으면 평소처럼 "갈까요?" 질문이 뜬다.
+                kotlinx.coroutines.withTimeoutOrNull(10_000) { trip.first { it?.eventId == eid } }
+                navigator.go()
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     fun clearNotice() = navigator.clearNotice()
     fun go() = navigator.go()
     fun later() = navigator.later()

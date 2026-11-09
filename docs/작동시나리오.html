@@ -718,7 +718,7 @@
     <div class="note-in wide"><b>원칙:</b> 캘린더의 모든 일정은 하나의 "일정(event)" 형태. 여행·차량 관리·다른 일정·출퇴근·직접 추가한 카테고리는 <b>카테고리만 다름</b>. 모든 일정은 그룹 안에 있고, 혼자 쓰는 사람은 가입 때 자동으로 생기는 <b>"나만" 그룹</b>에 들어감(Q01). 캘린더 = "내가 속한 그룹들의 일정"</div>
     <div class="sub-block wide">
       <div class="sb-t">👤 사람 · 차</div>
-      <div class="sb-row"><code>users/{uid}</code> 이름, 사진, fcmTokens[], <b>soloGroupId</b>, carId?</div>
+      <div class="sb-row"><code>users/{uid}</code> 이름, 사진, fcmTokens[], <b>soloGroupId</b>, carId?, suggest?(다음 여행 추천 사본: region·title·reason·stops[] — 폰이 쓰고, 차가 일정 없는 날 "오늘 갈 만한 곳"으로 읽음, D3 2026-11-09)</div>
       <div class="sb-row"><code>users/{uid}/categories/{id}</code> 사용자가 추가한 카테고리: 이름, 색 (기본 3개는 앱에 고정)</div>
       <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 쓰는 일정 {groupId, eventId}, <b>state</b>{기어, 주행제한, 위치, updatedAt}, fuelAlertPercent(주유 알림 기준 %, 설정 탭)</div>
     </div>

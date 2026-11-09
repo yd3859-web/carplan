@@ -251,6 +251,23 @@ class CalendarViewModel : ViewModel() {
         }
     }
 
+    fun me(): String? = _session.value?.uid
+
+    /** D3 빈 주말 추천 [이 여행 만들기]: 나만 그룹에 여행 하나 + 추천 장소가 칸으로 (기록 탭과 같은 동작). */
+    fun makeTrip(t: com.htb.carplan.phone.record.NextTrip, onOpen: (groupId: String, eventId: String, date: String) -> Unit) {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                val eid = calendar.addEvent(s.soloGroupId, Event(
+                    categoryId = BuiltInCategory.TRIP.id,
+                    title = t.title, startDate = t.date, endDate = t.date, allDay = true,
+                    memo = t.reason, createdBy = s.uid))
+                t.stops.forEach { p -> tripRepo.addStop(s.soloGroupId, eid, t.date, p, null, "", s.uid) }
+                onOpen(s.soloGroupId, eid, t.date)
+            }.onFailure { _error.value = it.message }
+        }
+    }
+
     fun addCategory(name: String, color: Long, onAdded: (String) -> Unit) {
         val s = _session.value ?: return
         viewModelScope.launch {
