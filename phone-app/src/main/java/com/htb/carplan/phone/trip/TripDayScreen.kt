@@ -179,6 +179,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
     var pickupOpen by remember { mutableStateOf(false) }
     val pickups by vm.pickups.collectAsStateWithLifecycle()
+    var aiOpen by remember { mutableStateOf(false) }
     var dartOpen by remember { mutableStateOf(false) }
     // 여행별 채팅방 (A안 2026-11-03): only once someone else is on the trip.
     var chatOpen by remember { mutableStateOf(false) }
@@ -317,6 +318,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             ToolChip(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") { pickupOpen = true }
             ToolChip("투표") { voteOpen = true }
             ToolChip("다트 · 동네 뽑기") { dartOpen = true }
+            // 정원 2026-11-09: 일정 짜면서도 추천 — 받은 칸들을 이 날에 바로 넣는다.
+            ToolChip("AI 추천") { aiOpen = true }
             // 12장: parking around the next place — also what the "주차장 찾아봐 주세요" push opens.
             if (stops.any { !it.visited && !it.deleted }) ToolChip("주차장") { parkingAround = (stops.firstOrNull { it.id == day?.parkingHintStopId && !it.visited } ?: stops.first { !it.visited && !it.deleted }).id }
         }
@@ -520,6 +523,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     if (pickupOpen) PickupSheet(vm, onDismiss = { pickupOpen = false })
     if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placeQuery = ""; placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null; voteSeeds = emptyList() }, seed = voteSeed, seeds = voteSeeds)
+    if (aiOpen) me?.let { u -> com.htb.carplan.phone.record.NextTripSheet(u, onAdd = { t -> t.stops.forEach { p -> vm.addStop(p, null, "AI 추천") }; aiOpen = false }, onDismiss = { aiOpen = false }) }
     if (dartOpen) DartSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onDismiss = { dartOpen = false })
     if (chatOpen) com.htb.carplan.phone.ui.BackScreen(onBack = { chatOpen = false; ChatSeen.mark(context, ref.groupId) }) { closeChat -> ChatScreen(
         groupId = ref.groupId, eventId = ref.eventId, date = date, title = event?.title?.ifBlank { null } ?: "여행", me = me, nameOf = vm::nameOf,

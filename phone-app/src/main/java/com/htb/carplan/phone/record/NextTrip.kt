@@ -18,7 +18,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.functions.FirebaseFunctions
+import com.htb.carplan.phone.ui.CenterSheet
+import com.htb.carplan.shared.data.CalendarRepository
+import com.htb.carplan.shared.data.RecordRepository
+import com.htb.carplan.shared.model.BuiltInCategory
+import kotlinx.coroutines.flow.first
 import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.calendar.TasteBuild
@@ -70,6 +84,33 @@ object NextTripLoader {
             )
         }
         return TasteBuild.promptText(TasteBuild.from(trips))
+    }
+
+    /**
+     * 기록 책을 그 자리에서 한 번 모은다 ([AI 추천] 칩 — 기록 탭 밖에서 추천을 쓸 때): 내 그룹들의 지난 1년 여행 중
+     * 기록이 있는 최근 10개.
+     */
+    suspend fun booksFor(uid: String): List<DiaryBook> {
+        val calendar = CalendarRepository()
+        val records = RecordRepository()
+        val groups = runCatching { calendar.observeGroups(uid).first() }.getOrDefault(emptyList())
+        if (groups.isEmpty()) return emptyList()
+        val today = LocalDate.now()
+        val events = runCatching { calendar.observeEvents(groups.map { it.id }, today.minusYears(1).toString(), today.toString()).first() }.getOrDefault(emptyList())
+        return events.filter { ce ->
+            !ce.event.deleted && !ce.event.id.startsWith("log-") && ce.event.categoryId == BuiltInCategory.TRIP.id &&
+                (ce.event.endDate.ifBlank { ce.event.startDate }) < today.toString()
+        }.takeLast(10).mapNotNull { ce ->
+            val start = LocalDate.parse(ce.event.startDate)
+            val end = LocalDate.parse(ce.event.endDate.ifBlank { ce.event.startDate })
+            val days = generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }.toList()
+            val pages = days.mapIndexed { i, d ->
+                DiaryDay(ce.groupId, ce.event.id, d.toString(), ce.event.title, false, dayNo = i + 1) to
+                    runCatching { records.daySummary(ce.groupId, ce.event.id, d.toString()) }.getOrDefault(emptyList())
+            }.filter { it.second.isNotEmpty() }
+            if (pages.isEmpty()) null
+            else DiaryBook(ce.groupId, ce.event, pages, groups.firstOrNull { it.id == ce.groupId }?.takeIf { !it.solo }?.memberIds.orEmpty(), days.size)
+        }
     }
 
     suspend fun load(books: List<DiaryBook>, kakao: KakaoApi, avoid: List<String>): NextTrip? =
@@ -148,20 +189,7 @@ fun NextTripCard(state: NextTripState, onMake: (NextTrip) -> Unit, onOther: () -
             is NextTripState.Off -> Text(state.why, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
             is NextTripState.Ready -> {
                 val t = state.trip
-                Text(t.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 10.dp))
-                if (t.reason.isNotBlank()) Text(t.reason, fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp))
-                t.stops.forEachIndexed { i, p ->
-                    Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 10.dp else 6.dp)) {
-                        Text("${i + 1}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 10.dp))
-                        Column {
-                            Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1)
-                            val sub = listOfNotNull(p.kindLineOrNull(), p.address.ifBlank { null }).joinToString("  ·  ")
-                            if (sub.isNotBlank()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft, maxLines = 1)
-                        }
-                    }
-                }
-                Text(if (t.fromAi) "기록으로 정리한 취향 → AI가 고름 · 장소는 카카오로 확인했어요" else "기록만으로 고른 추천이에요",
-                    fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
+                NextTripBody(t)
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { onMake(t) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
                         modifier = Modifier.weight(1f).height(48.dp)) {
@@ -173,6 +201,67 @@ fun NextTripCard(state: NextTripState, onMake: (NextTrip) -> Unit, onOther: () -
                 }
             }
             else -> {}
+        }
+    }
+}
+
+/** 추천 내용 한 덩어리 (카드와 [AI 추천] 창이 같이 씀): 제목·이유·장소 목록·출처 한 줄. */
+@Composable
+fun NextTripBody(t: NextTrip) {
+    Text(t.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Palette.Teal, modifier = Modifier.padding(top = 10.dp))
+    if (t.reason.isNotBlank()) Text(t.reason, fontSize = 15.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp))
+    t.stops.forEachIndexed { i, p ->
+        Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 10.dp else 6.dp)) {
+            Text("${i + 1}", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 10.dp))
+            Column {
+                Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1)
+                val sub = listOfNotNull(p.kindLineOrNull(), p.address.ifBlank { null }).joinToString("  ·  ")
+                if (sub.isNotBlank()) Text(sub, fontSize = 13.sp, color = Palette.TextSoft, maxLines = 1)
+            }
+        }
+    }
+    Text(if (t.fromAi) "기록으로 정리한 취향 → AI가 고름 · 장소는 카카오로 확인했어요" else "기록만으로 고른 추천이에요",
+        fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
+}
+
+/**
+ * [AI 추천] 칩 (정원 2026-11-09 "다트 옆에 AI 추천 칸"): 일정을 짜다가 추천을 받아 그 날에 칸으로 바로 넣는다.
+ * 추천 재료·방법은 기록 탭 카드와 같다 (booksFor → Taste → suggestTrip → 카카오 확인).
+ */
+@Composable
+fun NextTripSheet(me: String, onAdd: (NextTrip) -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var state by remember { mutableStateOf<NextTripState>(NextTripState.Loading) }
+    var avoid by remember { mutableStateOf(listOf<String>()) }
+    var turn by remember { mutableIntStateOf(0) }
+    LaunchedEffect(turn) {
+        state = NextTripState.Loading
+        if (turn == 0) NextTripStore.load(context)?.let { state = NextTripState.Ready(it) }
+        val kakao = KakaoApi(com.htb.carplan.phone.BuildConfig.KAKAO_REST_KEY)
+        val books = NextTripLoader.booksFor(me)
+        val t = if (books.sumOf { b -> b.pages.sumOf { it.second.size } } < 3) null else NextTripLoader.load(books, kakao, avoid)
+        if (t != null) { state = NextTripState.Ready(t); NextTripStore.save(context, t) }
+        else if (state !is NextTripState.Ready) state = NextTripState.Off("기록이 세 곳쯤 쌓이면 추천해 드려요")
+    }
+    CenterSheet(onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            Text("다음엔 여기 어때요?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            when (val st = state) {
+                is NextTripState.Ready -> {
+                    NextTripBody(st.trip)
+                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { onAdd(st.trip) }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
+                            modifier = Modifier.weight(1f).height(48.dp)) { Text("이 칸들로 넣기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                        OutlinedButton(onClick = { avoid = avoid + st.trip.region; turn++ }, shape = Corner, border = BorderStroke(1.dp, Palette.Line),
+                            modifier = Modifier.height(48.dp)) { Text("다른 곳", fontSize = 15.sp, color = Palette.TextStrong) }
+                    }
+                }
+                is NextTripState.Off -> Text(st.why, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+                else -> Text("기록을 읽고 고르는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("닫기", fontSize = 15.sp, color = Palette.TextSoft) }
+            }
         }
     }
 }
