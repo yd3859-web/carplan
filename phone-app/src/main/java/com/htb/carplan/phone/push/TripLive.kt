@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
- * P-e "차가 오는 중" (애플 지도 도착 예정 공유 참고): while today's trip is on the road, a passenger's phone keeps one quiet
- * notification up — "다음 율동공원 · 13:43 도착 예정", or "차가 약 7분 뒤 데리러 와요" when they wait for a pickup. The
+ * P-e "데리러 오는 중" (애플 지도 도착 예정 공유 참고): while the car comes to pick me up with the driver's sharing on
+ * (정원 2026-11-09 — never otherwise), my phone keeps one quiet notification up — "차가 약 7분 뒤 데리러 와요". The
  * numbers are the car's own (days/{date}.etaNext, pickups.etaSeconds). The driver's phone shows nothing. Lives as long
  * as the app process (no service of its own); pushes from Functions cover the rest.
  */
@@ -58,18 +58,14 @@ object TripLive {
                     if (tripsToday.isEmpty()) flowOf(null)
                     else combine(tripsToday.map { ce ->
                         val g = ce.groupId; val e = ce.event.id
-                        combine(trips.observeDay(g, e, today), trips.observeStops(g, e, today), pickups.observe(g, e, today)) { day, stops, ps ->
+                        combine(trips.observeDay(g, e, today), pickups.observe(g, e, today)) { day, ps ->
                             // The driver (or, before "오늘 이 차로 가요", the host who made it) does not need this.
                             if (day?.status != DayStatus.DRIVING || (ce.event.driverUid ?: ce.event.createdBy) == me) return@combine null
-                            val mine = ps.firstOrNull { it.uid == me && it.status == PickupStatus.WAITING }
-                            val next = stops.filterNot { it.deleted || it.visited }.firstOrNull()
-                            val text = when {
-                                mine?.etaSeconds != null -> "차가 약 ${(mine.etaSeconds!! / 60).coerceAtLeast(1)}분 뒤 데리러 와요"
-                                mine != null -> "차가 데리러 오는 중이에요"
-                                next != null -> "다음 ${next.place.name}" + (day.etaNext?.let { " · $it 도착 예정" } ?: "")
-                                else -> return@combine null
-                            }
-                            Live(g, e, today, ce.event.title.ifBlank { "여행" } + " · 차가 가는 중", text)
+                            // 정원 2026-11-09: only while the car comes for me and the driver turned sharing on.
+                            val mine = ps.firstOrNull { it.uid == me && it.status == PickupStatus.WAITING } ?: return@combine null
+                            if (day.pickupSharing != true) return@combine null
+                            val text = mine.etaSeconds?.let { "차가 약 ${(it / 60).coerceAtLeast(1)}분 뒤 데리러 와요" } ?: "차가 데리러 오는 중이에요"
+                            Live(g, e, today, ce.event.title.ifBlank { "여행" } + " · 데리러 오는 중", text)
                         }.catch { emit(null) }
                     }) { all -> all.firstOrNull { it != null } }
                 }

@@ -53,8 +53,11 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     // 정원 2026-11-04: the pickup spot is picked on a map around where I am (search by name is one tap away inside).
     var mapPicking by remember { mutableStateOf(false) }
     val mine = pickups.firstOrNull { it.uid == me }
+    // 위치 공유 (정원 2026-11-09): only the car's position, only while it comes to pick someone up, only after the driver
+    // said yes — and only the person waiting for it sees the car (friends already on board do not need it).
     val sharing = day?.pickupSharing == true
-    val carPos = car?.state?.let { s -> if (sharing && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
+    val waitingForCar = mine?.status == PickupStatus.WAITING
+    val carPos = car?.state?.let { s -> if (sharing && waitingForCar && s.lat != null && s.lng != null) s.lat!! to s.lng!! else null }
 
     // 11장 4: the road from the car to my pickup place (Kakao Mobility — the phone has no Hyundai navigation, and the
     // car's own route line is not available from the SDK). Fetched once when the car sets off and kept, so the friend
@@ -91,8 +94,9 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
             Text(
                 when {
                     pickups.isEmpty() -> "태우러 올 곳을 정하면 차가 출발할 때 경유지 맨 앞에 들어가요."
-                    sharing -> "차가 오는 중 · 위치를 5초마다 보여 줘요"
-                    else -> "차가 출발하면 운전자에게 위치 공유를 물어봐요"
+                    sharing && waitingForCar -> "운전자가 위치 공유를 켰어요 · 데리러 오는 동안만 차 위치가 보여요"
+                    sharing -> "차가 일행을 태우러 가는 중이에요"
+                    else -> "차가 태우러 출발할 때 운전자가 켜면, 오는 동안만 차 위치가 보여요"
                 },
                 fontSize = 15.sp, color = if (sharing) Palette.Teal else Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
             )

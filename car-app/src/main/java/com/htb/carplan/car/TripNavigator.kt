@@ -852,7 +852,7 @@ class TripNavigator(
     private fun askPickup(t: TodayTrip) {
         pickupAsked += t.waitingPickups.map { "${t.eventId}/${t.date}/${it.uid}" }
         val names = t.waitingPickups.joinToString(", ") { it.name.ifBlank { "일행" } }
-        val message = "$names 태우러 가요. 위치를 일행에게 보여 줄까요?"
+        val message = "$names 태우러 가요. 데리러 가는 동안만 차 위치를 보여 줄까요?"
         show(NextPrompt(t.next ?: Stop(place = t.waitingPickups.first().place), PromptReason.PICKUP, message = message)) { askJob = scope.launch { answer(voice.ask(message, ::listening)) } }
     }
 
