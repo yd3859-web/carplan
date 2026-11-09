@@ -235,16 +235,23 @@ class RecordTabViewModel : ViewModel() {
     suspend fun roads(p: DiaryDay, pts: List<Pair<Double, Double>>): List<List<Pair<Double, Double>>> {
         val key = p.groupId + p.eventId + p.date + pts.hashCode()
         roadCache[key]?.let { return it }
+        // A1: the roads the car really drove first; a Kakao route only for legs it did not record.
+        val drives = records.tracks(p.groupId, p.eventId, p.date)
         val legs = pts.zipWithNext().mapIndexed { i, (a, b) ->
+            if (a == b) listOf(a, b)
+            else if (drives.isNotEmpty()) com.htb.carplan.shared.calendar.TrackMath.legBetween(drives, a, b) ?: kakaoLeg(i, a, b)
+            else kakaoLeg(i, a, b)
+        }
+        roadCache[key] = legs
+        return legs
+    }
+
+    private suspend fun kakaoLeg(i: Int, a: Pair<Double, Double>, b: Pair<Double, Double>): List<Pair<Double, Double>> =
             if (a == b) listOf(a, b)
             else if (!kakaoApi.available || i >= 12) listOf(a, b)
             else runCatching {
                 kakaoApi.route(com.htb.carplan.shared.model.Place(lat = a.first, lng = a.second), com.htb.carplan.shared.model.Place(lat = b.first, lng = b.second)).path
             }.getOrNull()?.takeIf { it.size >= 2 }?.let { listOf(a) + it + listOf(b) } ?: listOf(a, b)
-        }
-        roadCache[key] = legs
-        return legs
-    }
 
     init { viewModelScope.launch { runCatching { sessions.ensureSession() }.onSuccess { _session.value = it } } }
 

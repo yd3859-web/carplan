@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -520,11 +521,24 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                     categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id,
                     title = s.title.ifBlank { s.region }, startDate = today, endDate = today, allDay = true,
                     memo = s.reason, createdBy = u.uid))
-                s.stops.forEach { p -> tripRepo.addStop(u.soloGroupId, eid, today, p, null, "추천", u.uid) }
+                s.stops.forEach { p -> tripRepo.addStop(u.soloGroupId, eid, today, p, null, "", u.uid) }
                 // 여행이 흐름에 올라오면 바로 출발. 늦으면 평소처럼 "갈까요?" 질문이 뜬다.
                 kotlinx.coroutines.withTimeoutOrNull(10_000) { trip.first { it?.eventId == eid } }
                 navigator.go()
             }.onFailure { _error.value = it.message }
+        }
+    }
+
+    /** 시연 메뉴 [차주 연결 풀기]: 차 문서의 ownerUid를 비운다 → 6자리 화면, 다른 폰이 새 차주가 된다. */
+    fun unlinkOwner() {
+        val c = car.value ?: return
+        val uid = c.ownerUid ?: return
+        viewModelScope.launch {
+            runCatching { cars.unlink(c.id, uid) }
+                .recoverCatching { com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .document(com.htb.carplan.shared.data.FirestorePaths.car(c.id)).update("ownerUid", null).await() }
+                .onSuccess { navigator.notify("차주 연결을 풀었어요 · 폰에서 6자리를 넣어 주세요") }
+                .onFailure { _error.value = it.message }
         }
     }
 

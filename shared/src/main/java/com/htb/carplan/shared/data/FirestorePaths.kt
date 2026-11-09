@@ -33,6 +33,8 @@ object FirestorePaths {
     /** Member comments hanging under the day's stops (3장 말풍선). */
     fun dayComments(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/comments"
     fun records(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/records"
+    /** A1: the roads the car actually drove that day, one document per drive (D → P). */
+    fun tracks(groupId: String, eventId: String, date: String) = "${day(groupId, eventId, date)}/tracks"
     /** The next-due event of one maintenance item in the owner's solo group (15장). */
     fun dueEventId(item: String) = "due-$item"
     /** Auto event in the solo group that holds a non-trip day's records (Q37 "일상 기록"). */

@@ -31,6 +31,19 @@ class RecordRepository(
         awaitClose { reg.remove() }
     }
 
+    /** A1: one drive the car made (points flat lat,lng — see [com.htb.carplan.shared.calendar.TrackMath]). */
+    suspend fun addTrack(groupId: String, eventId: String, date: String, track: com.htb.carplan.shared.model.DriveTrack) {
+        db.collection(FirestorePaths.tracks(groupId, eventId, date)).document().set(track).await()
+    }
+
+    /** A1: the day's drives in time order, each as points. Empty when the car never recorded (or on failure). */
+    suspend fun tracks(groupId: String, eventId: String, date: String): List<List<Pair<Double, Double>>> = runCatching {
+        db.collection(FirestorePaths.tracks(groupId, eventId, date)).get().await()
+            .toObjects(com.htb.carplan.shared.model.DriveTrack::class.java)
+            .sortedBy { it.startedAt?.toDate()?.time ?: 0L }
+            .map { com.htb.carplan.shared.calendar.TrackMath.unflatten(it.points) }
+    }.getOrDefault(emptyList())
+
     /** Creates the record and returns its id. [arrivedAt] defaults to now. */
     suspend fun addRecord(groupId: String, eventId: String, date: String, record: Record): String {
         val ref = db.collection(FirestorePaths.records(groupId, eventId, date)).document()

@@ -217,6 +217,44 @@ class TripNavigator(
     private var lastReached: Pair<Stop, Long>? = null
     private var parkedDate: String = ""
     private var lastLocation: Pair<Double, Double>? = null
+
+    // ---------- A1 실제 달린 길: out of P, keep a point per ~30 m; parked again, save it under the day's records ----------
+    private val trackPts = mutableListOf<Pair<Double, Double>>()
+    private var trackStartedAt: com.google.firebase.Timestamp? = null
+    private var trackJob: kotlinx.coroutines.Job? = null
+
+    private fun trackPoint(lat: Double, lng: Double) {
+        if (lastGear == null || lastGear == Gear.P || (lat == 0.0 && lng == 0.0)) return
+        if (trackStartedAt == null) trackStartedAt = com.google.firebase.Timestamp.now()
+        com.htb.carplan.shared.calendar.TrackMath.keep(trackPts, lat to lng)
+        // A long drive: save in pieces so one document stays small (the diary joins them again).
+        if (trackPts.size >= TRACK_CHUNK) saveTrack(keepLast = true)
+    }
+
+    private fun startTrack() {
+        trackJob?.cancel()
+        // The navigation only reports the position on request when not guiding: ask every few seconds (on-car SDK, no quota).
+        trackJob = scope.launch { while (true) { if (!simActive) router.requestCurrentLocation(); delay(TRACK_INTERVAL_MS) } }
+    }
+
+    /** Saves what was driven since the last save — to today's trip, or the owner's 일상 기록 on a day without one. */
+    private fun saveTrack(keepLast: Boolean = false) {
+        val pts = trackPts.toList()
+        val started = trackStartedAt
+        trackPts.clear(); trackStartedAt = null
+        if (keepLast && pts.isNotEmpty()) { trackPts += pts.last(); trackStartedAt = com.google.firebase.Timestamp.now() }
+        if (pts.size < 2) return
+        scope.launch {
+            runCatching {
+                val today = LocalDate.now().toString()
+                val t = trip.value?.takeIf { it.date == today }
+                val (g, e) = if (t != null) t.groupId to t.eventId else dailyLogTarget(today) ?: return@runCatching
+                records.addTrack(g, e, today, com.htb.carplan.shared.model.DriveTrack(
+                    points = com.htb.carplan.shared.calendar.TrackMath.flatten(pts), startedAt = started,
+                    endedAt = com.google.firebase.Timestamp.now(), createdBy = carId.value.orEmpty()))
+            }.onFailure { Log.w(TAG, "달린 길 저장 실패", it) }
+        }
+    }
     private var lastAddress: String = ""
     // ---- 12장 fuel
     private var carState = CarState()
@@ -419,6 +457,7 @@ class TripNavigator(
             override fun onCurrentLocationInfo(info: CurrentLocationInfo) {
                 if (simActive) return // the simulator owns the position (the emulator GPS never moves)
                 lastLocation = info.latitude to info.longitude
+                trackPoint(info.latitude, info.longitude)
                 lastAddress = info.address
                 _live.update { it.copy(lat = info.latitude, lng = info.longitude, heading = info.heading, address = info.address) }
             }
@@ -550,6 +589,9 @@ class TripNavigator(
         }
         // 13장: P starts the 5-minute fallback; leaving P closes the record and resets.
         if (gear == Gear.P && prev != Gear.P) {
+            trackJob?.cancel(); trackJob = null
+            lastLocation?.let { (la, lo) -> com.htb.carplan.shared.calendar.TrackMath.keep(trackPts, la to lo, minStep = 0.0) }
+            saveTrack()
             // Parked = arrived: "근처 주차장 찾아볼까요?" is no longer a question.
             if (_prompt.value?.reason == PromptReason.PARKING) { askJob?.cancel(); closePrompt() }
             fuelAtPark = carState.fuelPercent
@@ -558,6 +600,8 @@ class TripNavigator(
             if (drovenSinceRecord) parkTimer = scope.launch { delay(PARK_CONFIRM_MS); confirmArrival(reason = "P 5분") }
         }
         if (prev == Gear.P && gear != Gear.P) {
+            startTrack()
+            lastLocation?.let { (la, lo) -> trackPoint(la, lo) }
             fillJob?.let { j -> if (j.isActive) { j.cancel(); fill?.let { scope.launch { logFuel(it) } }; fill = null } }
             drovenSinceRecord = true
             parkTimer?.cancel()
@@ -1093,6 +1137,7 @@ class TripNavigator(
     /** The simulated car moved: same effect as a navigation location + driving-info update. */
     fun simMove(lat: Double, lng: Double, remainMeters: Int, remainSeconds: Int, nextName: String) {
         lastLocation = lat to lng
+        trackPoint(lat, lng)
         _live.update { it.copy(lat = lat, lng = lng, remainMeters = remainMeters, remainSeconds = remainSeconds, stopSeconds = null, nextName = nextName) }
         publishEta(remainSeconds)
     }
@@ -1567,6 +1612,9 @@ class TripNavigator(
         private const val REVERT_WINDOW_MS = 10_000L
         /** Q34: P without a door signal counts as arrived after this long. */
         private const val PARK_CONFIRM_MS = 5 * 60_000L
+        // A1 달린 길: ask the position this often while out of P; save every this many points (≈ 15 km).
+        private const val TRACK_INTERVAL_MS = 5_000L
+        private const val TRACK_CHUNK = 500
         /** 13장 4: within this of the next planned stop = that stop. */
         private const val NEAR_METERS = 300.0
         /** Q29: range must cover the rest of the route plus this. */

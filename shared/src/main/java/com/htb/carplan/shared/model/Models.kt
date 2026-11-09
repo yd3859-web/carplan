@@ -287,6 +287,18 @@ data class Pickup(
 
 /** .../days/{date}/records/{id} — created when the car parks (13장). */
 /**
+ * days/{date}/tracks/{id} — A1 실제 달린 길: one drive (left P → parked again), written by the car.
+ * [points] is flat [lat, lng, lat, lng, …], already thinned to about one point per 30 m.
+ */
+data class DriveTrack(
+    @DocumentId val id: String = "",
+    val points: List<Double> = emptyList(),
+    val startedAt: Timestamp? = null,
+    val endedAt: Timestamp? = null,
+    val createdBy: String = "",
+)
+
+/**
  * .../days/{date}/records/{id} — one stop the car actually made (13장): created by the car at
  * P + driver door (or P 5 min), linked to a planned stop when within 300 m of it, otherwise unplanned.
  */
