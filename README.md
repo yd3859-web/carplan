@@ -85,3 +85,6 @@ Virtual Console(기어·문·좌석 직접 조작): `adb forward tcp:8088 tcp:80
 | [`docs/여행상식.md`](docs/여행상식.md) | 추천이 따르는 하루 구성 규칙과 코스 데이터 형식 |
 | [`docs/기획정리본.html`](docs/기획정리본.html) | 기술 확인 결과(Pleos SDK에서 되는 것/안 되는 것)·외부 API |
 | [`docs/README.md`](docs/README.md) | 문서 전체 목록 |
+
+## 데이터 출처
+지도 © OpenStreetMap contributors · 장소 검색 카카오 · 유가 오피넷(한국석유공사) · 여행코스 한국관광공사(TourAPI, 공공데이터) · 행정동 경계 행정안전부(가공: vuski/admdongkor) · 추천 AI Anthropic Claude(서버에서만 호출). 시연용 샘플 사진은 Lorem Picsum(Unsplash 라이선스)입니다.

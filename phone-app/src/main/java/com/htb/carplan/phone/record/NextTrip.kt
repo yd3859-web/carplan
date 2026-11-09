@@ -247,7 +247,7 @@ fun NextTripBody(t: NextTrip) {
             }
         }
     }
-    Text(if (t.fromAi) "기록으로 정리한 취향 → AI가 고름 · 장소는 카카오로 확인했어요" else "기록 취향 + 대표 코스로 고른 추천이에요",
+    Text(if (t.fromAi) "기록으로 정리한 취향 → AI가 고름 · 코스 출처 한국관광공사 · 장소는 카카오로 확인" else "기록 취향 + 대표 코스(한국관광공사)로 고른 추천이에요",
         fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp))
 }
 

@@ -189,7 +189,10 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("앱")
         SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
-        Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp, bottom = 32.dp))
+        Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+        // 공공데이터·오픈데이터 출처 표시 (공공누리·OSM 조건).
+        Text("데이터 출처 · 지도 © OpenStreetMap · 장소 카카오 · 유가 오피넷(한국석유공사) · 여행코스 한국관광공사 · 행정동 경계 행정안전부",
+            fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp, bottom = 32.dp))
     }
 
     if (renaming) RenameSheet(me?.name.orEmpty(), onDone = { vm.rename(it); renaming = false }, onDismiss = { renaming = false })
