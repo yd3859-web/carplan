@@ -616,7 +616,7 @@
     // 폰 폭에선 붙어 있는 사진 바로 아래가 기준선: 사진 밑에 보이는 단락이 지금 단락.
     const stage = story.querySelector(".stage");
     function pick() {
-      const line = narrow.matches ? stage.getBoundingClientRect().bottom + 48 : innerHeight * 0.6;
+      const line = narrow.matches ? stage.getBoundingClientRect().bottom + innerHeight * 0.28 : innerHeight * 0.6;
       let s = steps[0];
       steps.forEach(st => { if (st.getBoundingClientRect().top <= line) s = st; });
       if (s !== cur) { cur = s; show(s); }
