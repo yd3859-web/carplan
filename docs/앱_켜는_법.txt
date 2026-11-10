@@ -136,3 +136,5 @@ carplan 앱 켜는 법 (2026-10-30 정리)
   ./gradlew :car-app:assembleFast
   adb install -r car-app/build/outputs/apk/fast/car-app-fast.apk
 - fast = release처럼 빠르지만 debug 키로 서명 → debug 앱 위에 덮어 설치되고 데이터(차 연결)도 그대로. 다시 debug를 깔아도 된다.
+
+[안내서 APK] 안내서(carplan-htb.web.app/guide)의 APK 버튼은 hosting/public/apk/ 를 가리킨다. 이 폴더는 git에 없으니 배포 전에 복사: cp apk/*.apk hosting/public/apk/  →  firebase deploy --only hosting

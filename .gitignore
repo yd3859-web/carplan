@@ -28,3 +28,4 @@ firebase-debug.log
 firestore-debug.log
 .firebase/
 functions/node_modules/
+hosting/public/apk/
