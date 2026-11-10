@@ -15,7 +15,7 @@
   :root {
     --ink:#131417; --soft:#65676B; --faint:#9A9CA1; --line:#E7E7E9; --paper:#F6F6F7;
     --go:#0064FF; --bg:#FFFFFF;
-    --gut:72px; --col:760px;
+    --gut:72px; --col:860px; --nav:56px;
   }
   * { box-sizing:border-box; }
   html { scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
@@ -26,7 +26,7 @@
 
   /* ---------- 위 고정 줄 ---------- */
   nav { position:sticky; top:0; z-index:10; background:rgba(255,255,255,.94); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
-  nav .in { max-width:calc(var(--col) + var(--gut) + 48px); margin:0 auto; padding:0 24px; height:56px; display:flex; align-items:center; gap:4px; }
+  nav .in { max-width:calc(var(--col) + var(--gut) + 48px); margin:0 auto; padding:0 24px; height:var(--nav); display:flex; align-items:center; gap:4px; }
   nav .brand { font-weight:800; font-size:17px; letter-spacing:-0.02em; margin-right:14px; text-decoration:none; }
   nav .stops { display:flex; gap:2px; overflow-x:auto; scrollbar-width:none; flex:1; }
   nav .stops::-webkit-scrollbar { display:none; }
@@ -42,7 +42,6 @@
   .lede { font-size:20px; line-height:1.6; color:var(--soft); margin:22px 0 0; max-width:36em; }
   .lede b { color:var(--ink); font-weight:600; }
 
-  /* 고리 하나: 폰 → 차 → 기록 */
   .loop { display:grid; grid-template-columns:1fr 28px 1fr 28px 1fr; gap:12px; align-items:stretch; margin-top:44px; }
   .mock { border:1px solid var(--line); border-radius:4px; padding:16px 18px 18px; background:var(--bg); min-height:168px; display:flex; flex-direction:column; opacity:0; transform:translateY(6px); transition:opacity .45s ease, transform .45s ease; }
   .mock.show { opacity:1; transform:none; }
@@ -69,7 +68,7 @@
   .rail { position:relative; }
   .rail::before { content:""; position:absolute; left:calc(var(--gut) / 2 - 1px); top:var(--rail-top, 0px); bottom:0; width:2px; background:var(--line); }
   .fill { position:absolute; left:calc(var(--gut) / 2 - 1px); top:var(--rail-top, 0px); width:2px; background:var(--go); height:0; transition:height .35s ease; }
-  .stop { display:grid; grid-template-columns:var(--gut) minmax(0, var(--col)); padding:72px 0 24px; scroll-margin-top:56px; }
+  .stop { display:grid; grid-template-columns:var(--gut) minmax(0, var(--col)); padding:72px 0 24px; scroll-margin-top:var(--nav); }
   .node { position:relative; }
   .node i { position:absolute; left:calc(var(--gut) / 2 - 9px); top:18px; width:18px; height:18px; border-radius:50%; background:var(--bg); border:2px solid #C9CBD0; transition:background .3s, border-color .3s, box-shadow .3s; }
   .node i::after { content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border-right:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(45deg) scale(0); transition:transform .25s; }
@@ -83,40 +82,60 @@
   .stop p.say { font-size:18px; color:var(--soft); margin:14px 0 0; max-width:36em; }
   .stop p.say b { color:var(--ink); font-weight:600; }
 
-  figure.shot { margin:28px 0 0; }
-  figure.shot img { width:100%; border:1px solid var(--line); border-radius:4px; }
-  figure.shot figcaption { font-size:14px; color:var(--soft); margin-top:8px; display:flex; gap:8px; align-items:baseline; }
-  figcaption .dev { flex:none; font-size:12px; font-weight:600; color:var(--soft); border:1px solid var(--line); border-radius:4px; padding:0 6px; line-height:20px; }
-  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .two figure.shot { margin-top:20px; }
+  /* ---------- 스크롤이 곧 시간: 글이 내려가면 사진이 바뀐다 ---------- */
+  .story { display:grid; grid-template-columns:minmax(240px, 300px) minmax(0, 1fr); gap:0 36px; margin-top:36px; }
+  .story .steps { grid-column:1; grid-row:1; }
+  .story .stage { grid-column:2; grid-row:1; position:sticky; top:calc(var(--nav) + 28px); align-self:start; }
+  .step { min-height:54vh; display:flex; flex-direction:column; justify-content:center; padding:24px 0; opacity:.3; transition:opacity .35s ease; }
+  .step:first-child { min-height:40vh; justify-content:flex-start; padding-top:0; }
+  .step:last-child { min-height:40vh; }
+  .step.on { opacity:1; }
+  .step h3 { font-size:21px; line-height:1.3; letter-spacing:-0.02em; font-weight:800; margin:0 0 8px; }
+  .step p { font-size:16px; line-height:1.65; color:#2B2D31; margin:0; }
+  .frame { position:relative; width:100%; aspect-ratio:1100 / 791; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:var(--bg); }
+  .frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:top; opacity:0; transform:scale(.985); transition:opacity .45s ease, transform .45s ease; }
+  .frame img.on { opacity:1; transform:none; }
+  .focus { position:absolute; border:2px solid var(--go); border-radius:4px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 0 9999px rgba(255,255,255,.28); opacity:0; transition:all .45s ease; pointer-events:none; }
+  .focus.on { opacity:1; }
+  .cap { font-size:14px; color:var(--soft); margin-top:10px; display:flex; gap:8px; align-items:baseline; min-height:24px; }
+  @media (max-width:900px) { .cap { min-height:46px; align-items:flex-start; } }
+  .cap .dev { flex:none; font-size:12px; font-weight:600; color:var(--soft); border:1px solid var(--line); border-radius:4px; padding:0 6px; line-height:20px; }
 
-  details { border-top:1px solid var(--line); margin-top:22px; }
+  details { border-top:1px solid var(--line); }
   details:last-of-type { border-bottom:1px solid var(--line); }
+  .more-head { font-size:14px; color:var(--soft); margin:40px 0 6px; }
   summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:10px; padding:14px 0; font-size:17px; font-weight:700; }
   summary::-webkit-details-marker { display:none; }
   summary .more { margin-left:auto; font-size:13px; font-weight:500; color:var(--soft); }
   details[open] summary .more::before { content:"닫기"; }
   details:not([open]) summary .more::before { content:"펼치기"; }
-  .d { padding:0 0 18px; font-size:16px; color:#2B2D31; }
+  .d { padding:0 0 18px; font-size:16px; color:#2B2D31; max-width:40em; }
   .d p { margin:0 0 8px; }
   .d ul { margin:0; padding-left:18px; }
   .d li { margin:4px 0; }
-  .d code, .steps code { background:var(--paper); border-radius:4px; padding:1px 6px; font-size:14px; }
+  .d code, .steps-try code { background:var(--paper); border-radius:4px; padding:1px 6px; font-size:14px; }
   .d table { border-collapse:collapse; width:100%; font-size:15px; }
   .d th, .d td { text-align:left; padding:7px 8px 7px 0; border-bottom:1px solid var(--line); vertical-align:top; }
   .d th { color:var(--soft); font-weight:600; white-space:nowrap; }
 
-  .steps { margin:20px 0 0; padding:0; list-style:none; counter-reset:s; }
-  .steps li { counter-increment:s; display:grid; grid-template-columns:32px 1fr; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); font-size:16px; }
-  .steps li::before { content:counter(s); font-weight:800; color:var(--go); }
+  .steps-try { margin:20px 0 0; padding:0; list-style:none; counter-reset:s; max-width:40em; }
+  .steps-try li { counter-increment:s; display:grid; grid-template-columns:32px 1fr; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); font-size:16px; }
+  .steps-try li::before { content:counter(s); font-weight:800; color:var(--go); }
   .getrow { display:flex; flex-wrap:wrap; gap:10px; margin-top:22px; }
   .getrow a { text-decoration:none; font-weight:600; font-size:15px; padding:11px 16px; border:1px solid var(--line); border-radius:4px; }
   .getrow a.main { background:var(--ink); color:#fff; border-color:var(--ink); }
-  .note { font-size:14px; color:var(--soft); margin-top:12px; }
+  .note { font-size:14px; color:var(--soft); margin-top:12px; max-width:40em; }
 
   footer { margin-left:var(--gut); max-width:var(--col); padding:56px 0 80px; color:var(--soft); font-size:14px; line-height:1.7; }
   footer p { margin:4px 0; }
 
+  @media (max-width:900px) {
+    .story { display:block; }
+    .story .stage { position:sticky; top:var(--nav); z-index:2; background:var(--bg); padding:10px 0 6px; }
+    .step { min-height:46vh; justify-content:flex-start; padding-top:28px; } /* 글이 사진 바로 아래에 */
+    .step:first-child { min-height:30vh; padding-top:12px; }
+    .step:last-child { min-height:30vh; }
+  }
   @media (max-width:760px) {
     :root { --gut:28px; }
     nav .get { display:none; }
@@ -130,14 +149,18 @@
     .stop { padding-top:56px; }
     .node i { width:14px; height:14px; left:calc(var(--gut) / 2 - 7px); top:14px; }
     .node i::after { left:3px; top:0; width:3px; height:7px; }
-    .two { grid-template-columns:1fr; }
+    .step h3 { font-size:19px; }
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior:auto; }
     .mock, .arrow { opacity:1; transform:none; transition:none; }
-    .fill, .node i, .node i::after { transition:none; }
+    .fill, .node i, .node i::after, .step, .frame img, .focus { transition:none; }
   }
-  @media print { nav { display:none; } details { break-inside:avoid; } .mock, .arrow { opacity:1; transform:none; } }
+  @media print {
+    nav { display:none; } details { break-inside:avoid; } .mock, .arrow { opacity:1; transform:none; }
+    .story { display:block; } .story .stage { position:static; } .step { min-height:0; opacity:1; }
+    .frame { aspect-ratio:auto; } .frame img { position:static; opacity:1; height:auto; display:none; } .frame img:first-child { display:block; }
+  }
 </style>
 </head>
 <body>
@@ -179,7 +202,7 @@
       <div class="rec"><i></i><span class="t">일행 폰에 사진 넣을 칸이 열려요</span></div>
     </div>
   </div>
-  <p class="loop-cap">폰에서 차로, 차에서 다시 기록으로. 이 한 바퀴가 앱의 전부예요.<button type="button" id="replay">다시 보기</button></p>
+  <p class="loop-cap">폰에서 차로, 차에서 다시 기록으로. 이 한 바퀴가 앱의 전부예요. 아래로 내리면서 따라와 보세요.<button type="button" id="replay">다시 보기</button></p>
 </header>
 
 <div class="rail">
@@ -191,34 +214,54 @@
   <div class="body">
     <p class="when">여행 전</p>
     <h2>폰에서 같이 짭니다</h2>
-    <p class="say">하루는 <b>레일 타임라인</b>이에요. 장소를 넣고, 끌어서 순서를 바꾸고, 칸 아래에 "여기 주차 어렵대" 같은 말을 달아요. 같이 가는 사람 모두가 같은 레일을 봐요.</p>
+    <p class="say">하루는 <b>레일 타임라인</b>이에요. 같이 가는 사람 모두가 같은 레일을 보고, 같이 고쳐요.</p>
 
-    <figure class="shot"><img src="img/p_trip.jpg" alt="폰 여행 화면: 접히는 경로 지도와 레일 타임라인" loading="lazy">
-      <figcaption><span class="dev">폰</span>경로 지도 아래로 레일이 내려가요. 위 칩에서 채팅, 픽업, 투표, 다트, AI 추천, 주차장이 바로 열려요.</figcaption></figure>
-
-    <div class="two">
-      <figure class="shot"><img src="img/p_dart.jpg" alt="다트로 동네 뽑기" loading="lazy">
-        <figcaption><span class="dev">폰</span>어디 갈지 못 정했으면 전국 지도에 다트를 던져요. 일행과 같은 방에서 실시간으로.</figcaption></figure>
-      <figure class="shot"><img src="img/p_calendar.jpg" alt="폰 캘린더" loading="lazy">
-        <figcaption><span class="dev">폰</span>캘린더가 앱의 중심. 날짜를 눌러 한 줄로 일정을 넣어요.</figcaption></figure>
+    <div class="story">
+      <div class="stage">
+        <div class="frame">
+          <img src="img/p_trip.jpg" alt="폰 여행 화면: 경로 지도와 레일">
+          <img src="img/p_dart.jpg" alt="다트로 동네 뽑기" loading="lazy">
+          <img src="img/p_calendar.jpg" alt="폰 캘린더" loading="lazy">
+          <div class="focus"></div>
+        </div>
+        <p class="cap"><span class="dev"></span><span class="txt"></span></p>
+      </div>
+      <div class="steps">
+        <div class="step" data-img="0" data-dev="폰" data-cap="여행 하루: 위엔 경로 지도, 아래로 장소 칸이 내려가요">
+          <h3>하루는 레일이에요</h3>
+          <p>장소를 넣으면 칸이 생기고, 칸을 끌어 순서를 바꿔요. [동선 최소로 정렬] 한 번이면 총 이동이 가장 짧은 순서로. 칸 아래엔 "여기 주차 어렵대" 같은 말을 달아요.</p>
+        </div>
+        <div class="step" data-img="0" data-dev="폰" data-focus="0.5,6.8,26,10.6" data-cap="같이 정하는 도구는 레일 위 한 줄에">
+          <h3>같이 정하는 도구는 한 줄에</h3>
+          <p>채팅, 픽업, 투표, 다트, AI 추천, 주차장. 여행마다 채팅방이 하나 생기고, 칸이 바뀌거나 차가 도착하면 자동 카드가 올라와요.</p>
+        </div>
+        <div class="step" data-img="1" data-dev="폰" data-cap="다트를 당겼다 놓으면 전국 지도 어딘가에">
+          <h3>못 정했으면 다트</h3>
+          <p>전국 지도에 다트를 던져 동네를 뽑아요. 범위는 전국, 시·도, 내 위치 반경. 일행과 같은 방에서 실시간으로 돌아가며 던지고, 뽑힌 동네의 맛집·명소를 바로 칸으로 넣어요.</p>
+        </div>
+        <div class="step" data-img="2" data-dev="폰" data-cap="캘린더: 오늘 카드와 월 보기, 고른 날의 일정">
+          <h3>시작은 캘린더</h3>
+          <p>날짜를 눌러 한 줄로 일정을 넣어요. 제목에 "여행"이 들어가면 종류가 자동으로 여행이 돼요. 반복 일정과 구글 캘린더 읽어오기도 돼요.</p>
+        </div>
+      </div>
     </div>
 
+    <p class="more-head">더 자세히</p>
     <details>
       <summary>일정 만들기와 고치기<span class="more"></span></summary>
       <div class="d">
         <ul>
-          <li>날짜를 눌러 한 줄로 입력. 제목에 "여행·캠핑·나들이"가 있으면 종류가 자동으로 여행이 돼요.</li>
           <li>종류는 여행, 차량 관리, 다른 일정에 내 카테고리(8색)를 더할 수 있어요.</li>
           <li>지워도 8초 안에 되살리기. 장소 하나짜리 일정은 [여행으로 바꾸기]로 그 장소가 첫 칸이 돼요.</li>
-          <li>반복 일정(매주 출퇴근)과 구글 캘린더 읽어오기, 일정마다 알림.</li>
+          <li>일정마다 알림. 반복 일정도 제시간에 울려요.</li>
         </ul>
       </div>
     </details>
     <details>
-      <summary>어디 갈지 같이 정하기: 투표와 다트<span class="more"></span></summary>
+      <summary>투표와 다트<span class="more"></span></summary>
       <div class="d">
         <p><b>투표</b>: 후보 장소를 올리면 일행이 누르고, 전원이 다 누르면 자동으로 마감돼요. 최다 득표가 바로 칸으로 들어가요.</p>
-        <p><b>다트</b>: 범위를 전국, 시·도, 내 위치 반경(10~200km)으로 좁혀 던져요. 뽑힌 동네의 맛집·관광지를 바로 칸으로, 대표 코스가 있으면 [추천코스로 여행하기].</p>
+        <p><b>다트</b>: 범위 밖은 무효예요. 대표 코스가 있는 동네면 [추천코스로 여행하기]로 하루가 한 번에 생겨요.</p>
       </div>
     </details>
     <details>
@@ -226,16 +269,14 @@
       <div class="d">
         <ul>
           <li>장소 검색은 <b>우리 차 내비의 즐겨찾기와 우리가 가 본 곳이 먼저</b>, 그다음 카카오. 가 본 곳엔 "가 봄 3번, 주차 B2, 1시간 머묾"이 같이 떠요.</li>
-          <li>끌어서 순서 바꾸기, [동선 최소로 정렬] 한 번이면 총 이동이 가장 짧은 순서로.</li>
           <li>칸마다 [근처 맛집·명소]: 또 갈래요 → 가 봄 → 가까운 순. "평점·메뉴"는 카카오맵 페이지로.</li>
           <li>예상 도착 시각은 약속이 아니라 예상이에요. 늦으면 뒤 칸이 같이 밀려요.</li>
         </ul>
       </div>
     </details>
     <details>
-      <summary>채팅과 픽업<span class="more"></span></summary>
+      <summary>픽업<span class="more"></span></summary>
       <div class="d">
-        <p>여행마다 채팅방이 하나. 칸이 바뀌거나, 코멘트가 달리거나, 차가 도착하면 <b>자동 카드</b>가 올라와요. 채팅의 장소 카드는 바로 [칸으로].</p>
         <p>태워 갈 사람은 지도에서 내 위치를 보며 태울 곳을 찍어요. 그 자리는 일정의 한 칸이 돼서 다른 장소처럼 옮기고 정렬돼요. 여럿이면 차가 총 시간이 가장 짧은 순서로 데리러 가요.</p>
       </div>
     </details>
@@ -248,26 +289,48 @@
   <div class="body">
     <p class="when">여행 날</p>
     <h2>차가 안내합니다</h2>
-    <p class="say">차에 타면 "다음 목적지 죽녹원로 갈까요?"라고 <b>말로 묻고</b>, 대답은 "응" 한마디나 버튼 하나. 달리는 중에 일행이 폰에서 일정을 바꾸면 내비 경로도 따라 바뀌고, 운전자에겐 말로 알려 줘요.</p>
+    <p class="say">운전자는 화면을 볼 수 없어요. 그래서 중요한 건 <b>말로</b>, 조작은 버튼 하나나 음성으로.</p>
 
-    <figure class="shot"><img src="img/c_home.jpg" alt="차 첫 화면: 오늘 레일과 픽업 질문" loading="lazy">
-      <figcaption><span class="dev">차</span>왼쪽은 오늘 레일, 오른쪽은 지금 할 일 하나. 질문은 음성과 큰 버튼으로만.</figcaption></figure>
-
-    <figure class="shot"><img src="img/c_depart.jpg" alt="가는 중 화면" loading="lazy">
-      <figcaption><span class="dev">차</span>가는 중엔 다음 목적지와 그다음만. 경로는 현대 내비로 들어가고 이 화면은 그대로 남아요.</figcaption></figure>
-
-    <div class="two">
-      <figure class="shot"><img src="img/c_fuel.jpg" alt="오늘 갈 길 최저가 주유소" loading="lazy">
-        <figcaption><span class="dev">차</span>기름이 모자랄 것 같으면 출발 때 미리 계산해서 오늘 갈 길에서 가장 싼 곳을 말해 줘요.</figcaption></figure>
-      <figure class="shot"><img src="img/c_parking.jpg" alt="다음 목적지 근처 주차장" loading="lazy">
-        <figcaption><span class="dev">차</span>도착 5분 전, 동승자 폰에 "주차장 찾아봐 주세요" 알림. 찾는 건 동승자, 운전은 운전자.</figcaption></figure>
+    <div class="story">
+      <div class="stage">
+        <div class="frame">
+          <img src="img/c_home.jpg" alt="차 첫 화면: 오늘 레일과 질문" loading="lazy">
+          <img src="img/c_depart.jpg" alt="가는 중 화면" loading="lazy">
+          <img src="img/c_fuel.jpg" alt="오늘 갈 길 최저가 주유소" loading="lazy">
+          <img src="img/c_parking.jpg" alt="다음 목적지 근처 주차장" loading="lazy">
+          <div class="focus"></div>
+        </div>
+        <p class="cap"><span class="dev"></span><span class="txt"></span></p>
+      </div>
+      <div class="steps">
+        <div class="step" data-img="0" data-dev="차" data-focus="61,10,37,32" data-cap="오른쪽엔 지금 할 일 하나. 질문은 음성과 큰 버튼으로">
+          <h3>타면 묻습니다</h3>
+          <p>차를 켜거나 D단에 넣으면 "다음 목적지 죽녹원로 갈까요? 지금 출발하면 10시 12분 도착이에요"라고 말로 물어요. 대답은 "응" 한마디나 버튼 하나.</p>
+        </div>
+        <div class="step" data-img="0" data-dev="차" data-focus="0,9,60,52" data-cap="왼쪽은 오늘 레일. 일행이 단 말이 말풍선으로">
+          <h3>왼쪽은 오늘, 그대로</h3>
+          <p>폰에서 짠 레일이 차에 그대로 떠요. 일행이 "여기 주차 어렵대"라고 달아 둔 말도 그 자리에. 도착할 때마다 다음 곳이 자동으로 내비에 들어가요.</p>
+        </div>
+        <div class="step" data-img="1" data-dev="차" data-cap="가는 중: 다음 목적지와 그다음만">
+          <h3>달리는 중에 바뀌어도 따라가요</h3>
+          <p>경로는 현대 내비로 들어가고 이 화면은 그대로 남아요. 일행이 폰에서 일정을 바꾸면 5초 뒤 경로가 따라 바뀌고 말로 알려 줘요. 운전자에겐 [원래대로]가 10초.</p>
+        </div>
+        <div class="step" data-img="2" data-dev="차" data-cap="오늘 갈 길에서 가장 싼 주유소, 싼 순으로">
+          <h3>기름은 미리 계산</h3>
+          <p>남은 길에 비해 모자랄 것 같으면 출발할 때 "율동공원 지나서 ○○ 주유소에서 넣으면 좋아요"라고 먼저 말해 줘요. 전기차는 충전소와 도착 배터리 %로 같은 일을 해요.</p>
+        </div>
+        <div class="step" data-img="3" data-dev="차" data-cap="다음 목적지 근처 주차장, 가까운 순">
+          <h3>주차는 동승자가</h3>
+          <p>도착 5분 전, 동승자 폰에 "주차장 찾아봐 주세요" 알림이 가요. 누르면 바로 목록. 찾는 건 동승자, 운전은 운전자.</p>
+        </div>
+      </div>
     </div>
 
+    <p class="more-head">더 자세히</p>
     <details>
-      <summary>타면 묻고, 도착할 때마다 다음을 채웁니다<span class="more"></span></summary>
+      <summary>음성과 내비 경유지<span class="more"></span></summary>
       <div class="d">
-        <p>차를 켜거나 D단에 넣으면 묻고, 오늘 여행이 여럿이면 [다른 여행]으로 골라요. 내비 경유지는 두 곳과 목적지까지라 일정이 길어도 도착할 때마다 자동으로 채워 넣어요. 이름만 쓴 장소는 현대 내비 검색으로 이어 줘요.</p>
-        <p>[말하기]로 "주유소", "주차장", "건너뛰기", "다음 목적지"를 말할 수 있어요. 못 알아들으면 한 번만 다시 묻고 버튼으로 보여 줘요.</p>
+        <p>[말하기]로 "주유소", "주차장", "건너뛰기", "다음 목적지"를 말할 수 있어요. 못 알아들으면 한 번만 다시 묻고 버튼으로 보여 줘요. 내비 경유지는 두 곳과 목적지까지라 일정이 길어도 도착할 때마다 채워 넣어요. 이름만 쓴 장소는 현대 내비 검색으로 이어 줘요. 오늘 여행이 여럿이면 [다른 여행]으로 골라요.</p>
       </div>
     </details>
     <details>
@@ -277,9 +340,9 @@
       </div>
     </details>
     <details>
-      <summary>달리는 중 일정이 바뀌면<span class="more"></span></summary>
+      <summary>주행 중 화면<span class="more"></span></summary>
       <div class="d">
-        <p>5초 모아서 경로가 자동으로 바뀌고 말로 알려 줘요. 운전자에겐 [원래대로]가 10초 떠 있어요. 주행 중 차주 폰은 편집이 잠기고, 도착 예정 시각은 차가 계산한 하나의 숫자로 모두에게 보여요. 주행 중엔 화면이 "오늘"만으로 줄고 움직임도 멈춰요. 밤엔 자동 다크 모드.</p>
+        <p>주행 중엔 화면이 "오늘"만으로 줄고 움직임도 멈춰요(Pleos 주행 제한). 차주 폰은 편집이 잠기고, 도착 예정 시각은 차가 계산한 하나의 숫자로 모두에게 보여요. 밤엔 자동 다크 모드. ⋮를 끌어 내비와 반반으로 보면 레일이 세로로 다시 그려져요.</p>
       </div>
     </details>
   </div>
@@ -291,31 +354,43 @@
   <div class="body">
     <p class="when">다녀와서</p>
     <h2>세우는 것이 곧 기록입니다</h2>
-    <p class="say">기록하려고 뭘 누를 필요가 없어요. P단에 넣고 운전석 문이 열리면 그 자리에 <b>기록 칸</b>이 생겨요. 폰 GPS가 아니라 차 신호라서 정확하고, 배터리를 쓰지 않아요.</p>
+    <p class="say">기록하려고 뭘 누를 필요가 없어요. 폰 GPS가 아니라 <b>차 신호</b>라서 정확하고, 배터리를 쓰지 않아요.</p>
 
-    <div class="two">
-      <figure class="shot"><img src="img/p_records.jpg" alt="기록 탭: 여행마다 지도 표지" loading="lazy">
-        <figcaption><span class="dev">폰</span>다녀온 날이 여행 단위 책으로 쌓여요. 사진이 없으면 실제 경로가 표지.</figcaption></figure>
-      <figure class="shot"><img src="img/p_diary.jpg" alt="일기 한 장: 스크롤을 따라 차가 실제 길을 달린다" loading="lazy">
-        <figcaption><span class="dev">폰</span>한 장을 열면 스크롤이 곧 시간. 차가 그날 실제로 달린 길을 따라가요.</figcaption></figure>
+    <div class="story">
+      <div class="stage">
+        <div class="frame">
+          <img src="img/p_records.jpg" alt="기록 탭: 여행마다 지도 표지" loading="lazy">
+          <img src="img/p_diary.jpg" alt="일기 한 장: 차가 실제 길을 달린다" loading="lazy">
+          <div class="focus"></div>
+        </div>
+        <p class="cap"><span class="dev"></span><span class="txt"></span></p>
+      </div>
+      <div class="steps">
+        <div class="step" data-img="0" data-dev="폰" data-cap="다녀온 날이 여행 단위 책으로. 사진이 없으면 실제 경로가 표지">
+          <h3>세우면 기록 칸</h3>
+          <p>P단에 넣고 운전석 문이 열리면 그 자리에 칸이 생겨요. 계획에 있던 곳이면 그 칸에, 아니면 "계획 밖". 주차 위치가 저장돼 일행 폰 지도에 점으로 보여요.</p>
+        </div>
+        <div class="step" data-img="1" data-dev="폰" data-focus="1,5,49,88" data-cap="스크롤을 내리면 왼쪽 지도의 차가 그날 달린 길을 따라가요">
+          <h3>스크롤이 곧 시간</h3>
+          <p>한 장을 열면 내릴수록 레일이 자라고, 차가 그날 <b>실제로 달린 길</b>을 따라가요. 지금 이 페이지가 그러는 것처럼요. 칸마다 사진, 한 줄, 머문 시간, [또 갈래요].</p>
+        </div>
+        <div class="step" data-img="1" data-dev="폰" data-focus="56,20,42,70" data-cap="오른쪽 레일: 도착 시각, 이동 거리, 다음 곳">
+          <h3>차계부도 저절로</h3>
+          <p>주유·충전은 연료 변화로 알아채 주유소 이름과 금액까지 기록돼요. 소모품 시기가 오면 캘린더에 "차량 관리" 일정이 생기고 아침 9시에 알려 줘요.</p>
+        </div>
+      </div>
     </div>
 
+    <p class="more-head">더 자세히</p>
     <details>
       <summary>기록 칸에 남는 것<span class="more"></span></summary>
       <div class="d">
         <ul>
-          <li>계획에 있던 곳이면 그 칸에 연결, 아니면 "계획 밖". 장소 이름은 좌표로 찾아 줘요.</li>
-          <li>주차 위치가 저장돼 일행 폰 지도에 점으로. "B2 C-14" 같은 층·구역 메모도.</li>
-          <li>사진(칸당 10장)과 한 줄, 머문 시간. [또 갈래요]는 일행 각자 눌러서 다음 추천에 반영.</li>
+          <li>장소 이름은 좌표로 찾아 줘요. "B2 C-14" 같은 층·구역 메모도.</li>
+          <li>사진은 칸당 10장. [또 갈래요]는 일행 각자 눌러서 다음 추천에 반영.</li>
           <li>하루를 이미지 한 장이나 짧은 영상(mp4)으로 내보내기.</li>
           <li>여행 없는 날도 차를 세우면 "일상" 칸이 생겨요.</li>
         </ul>
-      </div>
-    </details>
-    <details>
-      <summary>차량 관리도 캘린더로<span class="more"></span></summary>
-      <div class="d">
-        <p>주행거리는 차가 올려 주고, 주유·충전은 연료 변화로 알아채 주유소 이름과 금액까지 자동 기록돼요. 엔진오일 같은 소모품 시기가 오면 캘린더에 "차량 관리" 일정이 생기고 아침 9시에 알려 줘요. 차 경고(워셔액 부족 등)도 캘린더로.</p>
       </div>
     </details>
   </div>
@@ -327,30 +402,37 @@
   <div class="body">
     <p class="when">다음 여행</p>
     <h2>기록이 다음 여행을 고릅니다</h2>
-    <p class="say">자주 간 종류, 또 갈래요, 하루 이동 거리, 몇 명이 같이 다녔는지로 취향을 계산해요. 그 위에서 <b>안 가 본 동네 하나와 하루 동선</b>을 골라 이유를 한 문장으로 말해요. [이 여행 만들기] 한 번이면 다시 여행 전으로 돌아가요.</p>
+    <p class="say">쌓인 기록이 되돌려주는 순간이에요. 여기서 다시 <b>여행 전</b>으로 돌아가요.</p>
 
-    <figure class="shot"><img src="img/p_ai_new.jpg" alt="다음엔 여기 어때요? 담양 추천" loading="lazy">
-      <figcaption><span class="dev">폰</span>"자연 100%, 하루 5km, 3명이 함께 다니는 기록이라 담양." 죽녹원, 국숫집(점심), 관방제림, 메타세쿼이아길.</figcaption></figure>
-
-    <div class="two">
-      <figure class="shot"><img src="img/p_ai_card.jpg" alt="기록 탭 끝의 추천 카드" loading="lazy">
-        <figcaption><span class="dev">폰</span>기록 탭 끝에서 [이 여행 만들기]. 토요일 일정과 칸, 경로까지 한 번에.</figcaption></figure>
-      <figure class="shot"><img src="img/p_fill.jpg" alt="여행을 짜는 중이면 그 동네 더 채우기" loading="lazy">
-        <figcaption><span class="dev">폰</span>이미 여행을 짜는 중이면 그 동네 대표 코스 중 아직 없는 곳만 채워 줘요.</figcaption></figure>
-    </div>
-
-    <details>
-      <summary>추천이 만들어지는 방식<span class="more"></span></summary>
-      <div class="d">
-        <ul>
-          <li>취향은 우리 기록만으로 계산해요. 이름, 사진, 메모는 서버로 보내지 않아요.</li>
-          <li>전국 72개 동네의 실재 대표 코스(한국관광공사 공공데이터 + 직접 정리)를 후보로 깔아요.</li>
-          <li>AI는 그 위에서 동네와 동선을 고르고 이유를 말해요. 명소 사이에 점심 식당과 카페를 끼우는 것까지 규칙이에요.</li>
-          <li>장소는 카카오로 실재 확인된 것만. 다가오는 2주 일정에 이미 있는 동네는 빼요.</li>
-          <li>AI가 응답하지 않아도 코스 데이터만으로 추천이 나와요.</li>
-        </ul>
+    <div class="story">
+      <div class="stage">
+        <div class="frame">
+          <img src="img/p_ai_new.jpg" alt="다음엔 여기 어때요? 담양 추천" loading="lazy">
+          <img src="img/p_ai_card.jpg" alt="기록 탭 끝의 추천 카드" loading="lazy">
+          <img src="img/p_fill.jpg" alt="여행을 짜는 중이면 그 동네 더 채우기" loading="lazy">
+          <div class="focus"></div>
+        </div>
+        <p class="cap"><span class="dev"></span><span class="txt"></span></p>
       </div>
-    </details>
+      <div class="steps">
+        <div class="step" data-img="0" data-dev="폰" data-focus="6,10,70,12" data-cap="이유 한 문장: 자연 100%, 하루 5km, 3명이 함께">
+          <h3>취향은 기록으로만</h3>
+          <p>자주 간 종류, 또 갈래요, 하루 이동 거리, 몇 명이 같이 다녔는지. 이름과 사진, 메모는 서버로 보내지 않아요.</p>
+        </div>
+        <div class="step" data-img="0" data-dev="폰" data-focus="6,22,52,36" data-cap="죽녹원, 국숫집(점심), 관방제림, 메타세쿼이아길">
+          <h3>안 가 본 동네 하나, 하루 동선</h3>
+          <p>전국 72개 동네의 실재 대표 코스를 후보로 깔고, AI가 그 위에서 고르고 이유를 말해요. 명소 사이에 점심과 카페를 끼우는 것까지 규칙. 장소는 카카오로 확인된 것만.</p>
+        </div>
+        <div class="step" data-img="1" data-dev="폰" data-cap="기록 탭 끝에서 [이 여행 만들기]">
+          <h3>버튼 한 번이면 다시 여행 전으로</h3>
+          <p>[이 여행 만들기]로 토요일 일정, 장소 칸, 경로까지 한 번에 생겨요. 다가오는 2주 일정에 이미 있는 동네는 빼요.</p>
+        </div>
+        <div class="step" data-img="2" data-dev="폰" data-cap="짜는 중이면 그 동네에서 아직 없는 곳만">
+          <h3>짜는 중이면 채워 줘요</h3>
+          <p>이미 여행을 짜는 중이면 [AI 추천] 칩이 그 동네 대표 코스 중 아직 일정에 없는 곳만 골라 줘요. 다트로 뽑은 동네도 같은 기억에서 나와요.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -360,15 +442,30 @@
   <div class="body">
     <p class="when">여행이 없는 날에도</p>
     <h2>차의 캘린더니까, 평일에도 돌아갑니다</h2>
-    <p class="say">비슷한 시간에 같은 곳으로 세 번 가면 "출퇴근으로 등록할까요?"라고 물어요. 등록해 두면 그 시간에 차를 탈 때 <b>"회사로 갈까요?"</b> 한마디로 끝나요. 주차 중엔 차에서도 폰처럼 일정을 만들고 기록을 넘겨 봐요.</p>
+    <p class="say">여행 앱이 아니라 <b>차의 캘린더</b>라서 매일 켜져요.</p>
 
-    <div class="two">
-      <figure class="shot"><img src="img/c_cal.jpg" alt="차에서 보는 캘린더" loading="lazy">
-        <figcaption><span class="dev">차</span>주차 중엔 차에서도 일정 추가, 수정, 여행으로 바꾸기.</figcaption></figure>
-      <figure class="shot"><img src="img/c_rec.jpg" alt="차에서 넘겨 보는 기록" loading="lazy">
-        <figcaption><span class="dev">차</span>기록도 차에서. 사진이 달력에 바로 보여요.</figcaption></figure>
+    <div class="story">
+      <div class="stage">
+        <div class="frame">
+          <img src="img/c_cal.jpg" alt="차에서 보는 캘린더" loading="lazy">
+          <img src="img/c_rec.jpg" alt="차에서 넘겨 보는 기록" loading="lazy">
+          <div class="focus"></div>
+        </div>
+        <p class="cap"><span class="dev"></span><span class="txt"></span></p>
+      </div>
+      <div class="steps">
+        <div class="step" data-img="0" data-dev="차" data-cap="주차 중엔 차에서도 일정 추가, 수정, 여행으로 바꾸기">
+          <h3>출퇴근은 차가 먼저 알아채요</h3>
+          <p>비슷한 시간에 같은 곳으로 세 번 가면 "출퇴근으로 등록할까요?"라고 물어요. 등록해 두면 그 시간에 차를 탈 때 "회사로 갈까요?" 한마디로 끝나요.</p>
+        </div>
+        <div class="step" data-img="1" data-dev="차" data-cap="기록도 차에서. 사진이 달력에 바로">
+          <h3>주차 중엔 차가 폰만큼</h3>
+          <p>아래 탭(오늘, 캘린더, 같이 탈 사람, 기록, 차량)으로 일정을 만들고 기록을 넘겨 봐요. 같이 탈 사람 탭의 QR로 동승자를 바로 초대하고, 현대 내비의 즐겨찾기에서 장소를 골라요.</p>
+        </div>
+      </div>
     </div>
 
+    <p class="more-head">더 자세히</p>
     <details>
       <summary>알림은 필요한 것만<span class="more"></span></summary>
       <div class="d">
@@ -409,7 +506,7 @@
     </div>
     <p class="note">저장소는 비공개예요. 접근 권한이 있는 계정으로 열어 주세요.</p>
 
-    <ol class="steps">
+    <ol class="steps-try">
       <li>에뮬레이터를 Cold boot로 켜고 차 앱을 설치해요. 폰 앱은 이름만 넣으면 시작돼요.</li>
       <li>차 화면의 6자리 코드를 폰 첫 화면에 넣어요. 이 차의 차주가 돼요.</li>
       <li>폰 캘린더에서 날짜를 눌러 여행을 만들고 장소를 2~3곳 넣어요. 차 "오늘"에 바로 떠요.</li>
@@ -449,15 +546,14 @@
   const fill = document.getElementById("fill");
   const stops = Array.from(document.querySelectorAll(".stop"));
   const links = Array.from(document.querySelectorAll("nav .stops a"));
-  // 선은 첫 노드 가운데에서 시작한다.
   function railTop() {
     const n = stops[0].querySelector(".node i");
     return n.getBoundingClientRect().top - rail.getBoundingClientRect().top + n.offsetHeight / 2;
   }
   let ticking = false;
   function update() {
-    rail.style.setProperty("--rail-top", railTop() + "px");
     ticking = false;
+    rail.style.setProperty("--rail-top", railTop() + "px");
     const mark = innerHeight * 0.42;
     let cur = -1;
     stops.forEach((s, i) => { if (s.getBoundingClientRect().top <= mark) cur = i; });
@@ -474,6 +570,43 @@
   addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
   addEventListener("resize", update);
   update();
+
+  // 스크롤이 곧 시간: 지금 읽는 단락의 사진과 표시 자리를 붙어 있는 틀에 보여 준다.
+  const narrow = matchMedia("(max-width: 900px)");
+  const stories = [];
+  document.querySelectorAll(".story").forEach(story => {
+    const steps = Array.from(story.querySelectorAll(".step"));
+    const imgs = Array.from(story.querySelectorAll(".frame img"));
+    const focus = story.querySelector(".focus");
+    const dev = story.querySelector(".cap .dev");
+    const txt = story.querySelector(".cap .txt");
+    function show(step) {
+      steps.forEach(s => s.classList.toggle("on", s === step));
+      const i = +step.dataset.img;
+      imgs.forEach((im, k) => im.classList.toggle("on", k === i));
+      dev.textContent = step.dataset.dev || "";
+      txt.textContent = step.dataset.cap || "";
+      const f = step.dataset.focus;
+      if (f) {
+        const [x, y, w, h] = f.split(",").map(Number);
+        Object.assign(focus.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
+        focus.classList.add("on");
+      } else focus.classList.remove("on");
+    }
+    let cur = null;
+    // 기준선(폰 폭에선 붙어 있는 사진 아래쯤)을 지난 마지막 단락이 지금 단락. 스크롤 위치로 바로 정해서 빨리 내려도 어긋나지 않는다.
+    function pick() {
+      const line = innerHeight * (narrow.matches ? 0.72 : 0.55);
+      let s = steps[0];
+      steps.forEach(st => { if (st.getBoundingClientRect().top <= line) s = st; });
+      if (s !== cur) { cur = s; show(s); }
+    }
+    pick();
+    stories.push(pick);
+  });
+  function pickAll() { stories.forEach(f => f()); }
+  addEventListener("scroll", () => requestAnimationFrame(pickAll), { passive: true });
+  addEventListener("resize", pickAll);
 
   // 인쇄하면 접힌 칸을 모두 펼친다.
   window.onbeforeprint = () => document.querySelectorAll("details").forEach(d => d.open = true);
