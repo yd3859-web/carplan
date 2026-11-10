@@ -294,7 +294,7 @@ fun DartGame(
                                         onClick = { vm.addCourseAsStops(course, d); coursePut = true }, enabled = !coursePut,
                                         shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
                                         modifier = Modifier.padding(top = 6.dp).fillMaxWidth().height(44.dp),
-                                    ) { Text(if (coursePut) "코스를 넣었어요" else "코스를 그대로 칸으로", fontSize = 15.sp, color = if (coursePut) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                                    ) { Text(if (coursePut) "코스를 넣었어요" else "추천코스로 여행하기", fontSize = 15.sp, color = if (coursePut) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
                                 }
                             }
                             if (onPick != null) OutlinedButton(
@@ -305,7 +305,7 @@ fun DartGame(
                             else if (eventId != null) OutlinedButton(
                                 onClick = { vm.addDartAsStop(d) }, shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
                                 modifier = Modifier.padding(top = 10.dp).fillMaxWidth().height(48.dp),
-                            ) { Text("동네 그대로 칸으로", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                            ) { Text("해당지역 여행하기", fontSize = 16.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                             // A안: 결과를 일행 채팅방에 올려 같이 이야기 (같이 가는 사람이 있을 때만).
                             val shared = (vm.group.collectAsStateWithLifecycle().value?.memberIds?.size ?: 0) > 1
                             if (onPick == null && shared) {

@@ -487,6 +487,21 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                     }
                 }
             }
+            // 하루 전체 이동 (정원 2026-11-10 "하루 일정 볼 때 가장 아래에 전체 이동거리"): 칸 사이 구간을 모두 더한다.
+            val dayLegs = stops.dropLast(1).mapNotNull { legs[it.id] }
+            if (stops.size >= 2 && dayLegs.isNotEmpty()) item(key = "day-total") {
+                Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
+                    HorizontalDivider(color = Palette.Line)
+                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.Bottom) {
+                        Text("하루 전체 이동", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
+                        val rough = dayLegs.size < stops.size - 1 || dayLegs.any { !it.exact }
+                        Text((if (rough) "약 " else "") + "${km(dayLegs.sumOf { it.meters })} · ${minutes(dayLegs.sumOf { it.seconds })}",
+                            fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                    }
+                    Text("${stops.size}곳 · 구간 ${stops.size - 1}개" + if (dayLegs.size < stops.size - 1) " (계산 중인 구간 빼고)" else "",
+                        fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
             item { Spacer(Modifier.height(16.dp)) }
         }
 
