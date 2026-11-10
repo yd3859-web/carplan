@@ -439,7 +439,8 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 }
                 // Every place done but another event still ahead today: the right panel moves on to it, so the
                 // finished trip says so here (the half view does the same in its header).
-                if (trip.stops.isNotEmpty() && trip.next == null) Text("오늘 일정 끝 · ${doneLine(trip)}", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
+                // (Not when the right panel says it big — 평가 2026-11-10: "오늘 일정 끝" twice.)
+                if (trip.stops.isNotEmpty() && trip.next == null && nextName != null) Text("오늘 일정 끝 · ${doneLine(trip)}", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 6.dp))
                 else if (!moving) fuelLine(trip, vm.vehicle.collectAsStateWithLifecycle().value, vm.fuelUsage.collectAsStateWithLifecycle().value)?.let {
                     Text(it, color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 6.dp))
                 }
@@ -503,6 +504,14 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 Text("오늘 일정 끝", color = Ink, fontSize = 48.sp, fontWeight = FontWeight.Black)
                 Text(doneLine(trip), color = Ink, fontSize = 24.sp, modifier = Modifier.padding(top = 6.dp))
                 Text("사진·한 줄은 폰 기록 탭에서 남겨요", color = Soft, fontSize = 26.sp, modifier = Modifier.padding(top = 10.dp))
+                // What comes next fills the panel (평가 2026-11-10: it sat empty under the done line).
+                later?.let { (d, item) ->
+                    HorizontalDivider(color = Line, modifier = Modifier.padding(top = 28.dp, bottom = 16.dp))
+                    Text("다음 일정", color = Soft, fontSize = 20.sp)
+                    Text(item.event.title, color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, maxLines = 2, modifier = Modifier.padding(top = 4.dp))
+                    val day = if (d == today.plusDays(1)) "내일" else "${d.monthValue}월 ${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}요일"
+                    Text(day + (item.event.startTime?.let { "  $it" } ?: ""), color = Soft, fontSize = 24.sp, modifier = Modifier.padding(top = 4.dp))
+                }
             } else {
             // D3: 주차 중·일정 없는 날 — 폰이 저장해 둔 추천(기록 취향)을 "오늘 갈 만한 곳"으로. [가기] 한 번이면 오늘 일정 + 경로.
             val suggested by vm.suggested.collectAsStateWithLifecycle()
@@ -569,7 +578,7 @@ private fun HomeView(today: LocalDate, week: List<CalendarEvent>, vm: CarHomeVie
                 }
             }
             // The left column already lists the week on a free day.
-            later?.takeIf { trip != null || todayEvents.isNotEmpty() }?.let { (d, item) ->
+            later?.takeIf { (trip != null || todayEvents.isNotEmpty()) && !dayDone }?.let { (d, item) ->
                 val label = if (d == today.plusDays(1)) "내일" else "${d.dayOfMonth}일 ${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)}"
                 Text("$label  ·  ${item.event.title}${item.event.startTime?.let { "  $it" } ?: ""}", color = Soft, fontSize = 20.sp, maxLines = 1, modifier = Modifier.padding(bottom = 16.dp))
             }

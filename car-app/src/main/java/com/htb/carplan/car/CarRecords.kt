@@ -369,13 +369,19 @@ fun RowScope.CarVehicle(vm: CarHomeViewModel) {
             "공기압  앞 " + "${v.tireKpa["FL"]?.toInt()} · ${v.tireKpa["FR"]?.toInt()}  뒤 ${v.tireKpa["RL"]?.toInt()} · ${v.tireKpa["RR"]?.toInt()} kPa",
             color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 4.dp),
         )
+        var showAll by remember { mutableStateOf(false) }
         LazyColumn(Modifier.weight(1f)) {
             // Due soonest first; an EV hides engine parts; washer fluid only when the car says it is low.
             val shown = MaintenanceItem.entries.filter { item ->
                 (item != MaintenanceItem.INSURANCE || dues[item] != null) && !(item.engineOnly && v.isEv == true) &&
                     (item != MaintenanceItem.WASHER_FLUID || item in warnings) && item != MaintenanceItem.FUEL
             }.sortedBy { dues[it]?.startDate ?: "9999" }
-            items(listOf(MaintenanceItem.FUEL) + shown, key = { it.name }) { item ->
+            // 평가 2026-11-10: nine rows of [했어요] to scroll — what is due within a month (or the car warns about)
+            // stays open, the rest folds under one row. Nothing due soon: the first three.
+            val soon = shown.filter { it in warnings || dues[it]?.let { d -> ChronoUnit.DAYS.between(today, LocalDate.parse(d.startDate)) <= 30 } == true }
+                .ifEmpty { shown.take(3) }
+            val folded = shown - soon.toSet()
+            items(listOf(MaintenanceItem.FUEL) + soon + (if (showAll) folded else emptyList()), key = { it.name }) { item ->
                 val last = records.firstOrNull { it.maintenance?.item == item }
                 val due = dues[item]
                 val dueDays = due?.let { ChronoUnit.DAYS.between(today, LocalDate.parse(it.startDate)) }
@@ -409,6 +415,12 @@ fun RowScope.CarVehicle(vm: CarHomeViewModel) {
                     }
                 }
                 HorizontalDivider(color = c.line)
+            }
+            if (folded.isNotEmpty()) item(key = "fold") {
+                OutlinedButton(
+                    onClick = { showAll = !showAll }, shape = Corner, border = BorderStroke(1.dp, c.line),
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = 76.dp),
+                ) { Text(if (showAll) "접기" else "다른 관리 ${folded.size}개 · " + folded.take(3).joinToString(" · ") { it.label } + if (folded.size > 3) " …" else "", color = c.ink, fontSize = 24.sp, maxLines = 1) }
             }
         }
     }

@@ -545,8 +545,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             u,
             fillRegion = live.firstNotNullOfOrNull { s -> s.place.address.takeIf { it.isNotBlank() }?.let { com.htb.carplan.shared.calendar.TasteBuild.region(it) } },
             existingNames = live.map { it.place.name }.toSet(),
-            onAddOne = { p -> vm.addStop(p, null, "추천") },
-            onAdd = { t -> t.stops.forEach { p -> vm.addStop(p, null, "AI 추천") }; aiOpen = false },
+            onAddOne = { p -> vm.addStop(p, null, com.htb.carplan.shared.calendar.StopMemo.PICKED) },
+            onAdd = { t -> t.stops.forEach { p -> vm.addStop(p, null, com.htb.carplan.shared.calendar.StopMemo.AI_PICKED) }; aiOpen = false },
             onDismiss = { aiOpen = false },
         )
     }
