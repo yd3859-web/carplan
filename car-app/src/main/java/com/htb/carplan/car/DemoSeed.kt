@@ -239,6 +239,270 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         say("더 채웠어요 · 여행 10개, 일상 10칸" + if (sample > 0) " · 사진은 웹 샘플 ${sample}장(Storage 막힘)" else "")
     }
 
+    // ---------- 11월 다시 채우기 ----------
+
+    /** One planned (or, with [unplanned], dropped-in) place of a November trip day: plan, what happened, and the talk under it. */
+    private data class Stay(
+        val p: P, val plan: String?, val arrive: String, val stayMin: Int, val memo: String = "", val note: String = "", val photos: Int = 0,
+        val talk: List<Pair<String, String>> = emptyList(), val parking: String = "", val again: List<String> = emptyList(), val unplanned: Boolean = false,
+    )
+
+    /**
+     * 시연 메뉴 [11월 다시 채우기] (정원 2026-11-10: "채워져 있는 기록·일정 다 지우고 진짜 사람이 쓴 것처럼 11월 한 달"):
+     * every event of the owner's groups goes away for good (차량 관리 기록·다음 점검만 남김), then November is written
+     * as one person's month — trips of four or more places, records with notes and photos on the days already past,
+     * plenty of talk from the group under each place, plans ahead with the chat that comes before a trip.
+     */
+    suspend fun refillNovember() {
+        val db = FirebaseFirestore.getInstance()
+        say("지난 일정·기록 지우는 중")
+        val mine = db.collection(FirestorePaths.GROUPS).whereArrayContains("memberIds", ownerUid).get().await().documents
+        var gone = 0
+        for (g in mine) gone += wipe(g.id)
+        prefs.edit().clear().apply()
+
+        say("같이 다니는 사람 맞추는 중")
+        val weekend = circle(mine, "주말 친구들", listOf("민지" to 0, "서연" to 2, "지훈" to 4))
+        val carpool = circle(mine, "출근 카풀", listOf("준호" to 1))
+        val family = circle(mine, "가족", listOf("엄마" to 3, "아빠" to 5))
+        val nov = { d: Int -> LocalDate.of(2026, 11, d) }
+
+        say("11월 지난 여행 넣는 중")
+        novTrip(weekend, "가평 단풍 드라이브", nov(1), listOf(listOf(
+            Stay(P("가평휴게소 (서울양양)", 37.7140, 127.4010, "경기 가평군 설악면 미사리로"), null, "09:40", 20, note = "호두과자 한 봉지. 아침이라 아직 한산", photos = 1, unplanned = true,
+                talk = listOf("서연" to "호두과자 남겨 둬", "지훈" to "이미 다 먹음ㅋㅋ")),
+            Stay(P("아침고요수목원", 37.7430, 127.3530, "경기 가평군 상면 수목원로 432"), "10:30", "10:25", 110, "단풍 절정", "하경정원 단풍 진짜 빨갰다. 입구 은행나무 길도 노랗게", 3,
+                listOf("민지" to "입장료 1인 11,000원 현장 결제", "서연" to "하경정원은 꼭 위에서 내려다봐야 해", "나" to "주차장 9시 반이면 여유 있대", "지훈" to "사진 백 장 찍을 예정"),
+                parking = "제2주차장", again = listOf("민지", "서연")),
+            Stay(P("송원 닭갈비", 37.8310, 127.5110, "경기 가평군 가평읍 가화로"), "13:00", "13:10", 60, "점심", "숯불 닭갈비 3인분 + 막국수. 막국수가 더 맛있었음", 2,
+                listOf("지훈" to "철판 말고 숯불로 시키자", "민지" to "막국수 비빔이 맛있대", "나" to "웨이팅 있으면 바로 옆 집도 괜찮음")),
+            Stay(P("남이섬", 37.7910, 127.5250, "강원 춘천시 남산면 남이섬길 1"), "14:30", "14:40", 120, "배 타고 들어가기", "메타세쿼이아 길 걷다가 자전거. 청설모 엄청 많음", 3,
+                listOf("서연" to "배 15분 간격으로 있어", "민지" to "메타세쿼이아 길에서 단체 사진 찍자", "지훈" to "자전거 2인용 빌리면 싸움 남", "서연" to "타조 조심…"),
+                parking = "남이섬 선착장 주차장 C", again = listOf("서연")),
+            Stay(P("자라섬", 37.8170, 127.5240, "경기 가평군 가평읍 달전리"), "17:00", "17:05", 50, "노을", "강 위로 해 지는 거 보고 출발. 생각보다 추웠다", 2,
+                listOf("나" to "5시 반이 일몰이래", "민지" to "담요 챙겨 와")),
+            Stay(P("잣향기 카페", 37.7650, 127.3990, "경기 가평군 상면 임초밤안골로"), "18:20", "18:25", 45, "마무리 커피", "잣라떼 고소함. 다들 차에서 꿀잠", 1,
+                listOf("지훈" to "운전 고생했다. 라떼는 내가 쏨", "나" to "다음엔 지훈이 운전")),
+        )))
+
+        novTrip(weekend, "속초·양양 1박 2일", nov(7), listOf(
+            listOf(
+                Stay(P("내린천휴게소", 37.9470, 128.1650, "강원 인제군 기린면 서울양양고속도로"), null, "09:50", 20, note = "화장실 + 감자떡. 터널 엄청 길다", photos = 1, unplanned = true,
+                    talk = listOf("민지" to "여기 감자떡 맛집")),
+                Stay(P("설악산 소공원", 38.1720, 128.4880, "강원 속초시 설악산로 833"), "10:40", "10:50", 150, "케이블카 → 권금성", "케이블카 40분 대기. 권금성 바람 미쳤음. 울산바위 선명하게 보임", 3,
+                    listOf("서연" to "케이블카 현장 발권만 돼. 일찍 가야 함", "나" to "10시 반 도착 목표로 출발 7시", "지훈" to "아침은 휴게소에서 먹자", "민지" to "등산화 꼭 신고 와", "서연" to "권금성 위 진짜 추움. 패딩 챙겨"),
+                    parking = "소공원 제1주차장 (6,000원)", again = listOf("서연", "지훈")),
+                Stay(P("속초 중앙시장", 38.2048, 128.5900, "강원 속초시 중앙로147번길 16"), "13:40", "13:50", 70, "점심 + 닭강정", "오징어순대, 아바이순대, 닭강정 반반. 줄은 닭강정이 제일 길었음", 2,
+                    listOf("지훈" to "만석닭강정 vs 중앙닭강정 투표 ㄱ", "민지" to "만석!", "서연" to "중앙이 덜 달아", "나" to "둘 다 사면 되지", "민지" to "아바이순대는 지하 1층")),
+                Stay(P("영금정", 38.2140, 128.6010, "강원 속초시 영금정로 43"), "15:30", "15:35", 40, "", "정자까지 다리 건너서 파도 구경. 물보라가 정자까지 튐", 2,
+                    listOf("서연" to "여기 일출 명소래. 내일 아침에 다시 올까?", "지훈" to "난 못 일어남")),
+                Stay(P("속초해수욕장", 38.1900, 128.6030, "강원 속초시 해오름로 186"), "16:30", "16:40", 60, "대관람차", "속초아이 타고 해변 산책. 바람이 차가웠다", 2,
+                    listOf("민지" to "대관람차 1인 15,000원", "나" to "해 질 때 타면 좋을 듯")),
+                Stay(P("대포항", 38.1745, 128.6070, "강원 속초시 대포항길 22"), "18:30", "18:35", 90, "저녁 회", "모둠회 중자 + 새우튀김. 숙소 가는 길에 들름", 2,
+                    listOf("지훈" to "새우튀김 골목 꼭", "서연" to "회는 2층 초장집에서 먹자", "민지" to "여기서 숙소 15분")),
+            ),
+            listOf(
+                Stay(P("낙산사", 38.1240, 128.6290, "강원 양양군 강현면 낙산사로 100"), "09:30", "09:40", 80, "해수관음상", "의상대에서 바다. 아침이라 조용해서 좋았다", 2,
+                    listOf("서연" to "의상대 꼭 들러", "나" to "주차장에서 좀 걸어", "민지" to "입장료 없어졌대")),
+                Stay(P("하조대", 38.0300, 128.7190, "강원 양양군 현북면 하조대길"), "11:20", "11:25", 40, "", "소나무 + 바위 + 바다. 등대까지 걸어감", 1,
+                    listOf("지훈" to "애국가 나오는 그 소나무")),
+                Stay(P("서피비치", 38.0210, 128.7180, "강원 양양군 현북면 하조대해안길 119"), "12:10", "12:15", 80, "점심 + 바다", "해변 펍에서 피시앤칩스. 서핑하는 사람들 구경", 2,
+                    listOf("민지" to "다음 여름엔 서핑 배우자", "지훈" to "난 구경만", "서연" to "빈백에 누워 있고 싶다")),
+                Stay(P("주문진수산시장", 37.8930, 128.8310, "강원 강릉시 주문진읍 시장길"), "14:30", "14:40", 50, "건어물 쇼핑", "오징어·황태 포장. 아이스박스 챙긴 거 신의 한 수", 2,
+                    listOf("나" to "아이스박스 트렁크에 있어", "서연" to "엄마가 황태 사 오래", "지훈" to "집 가는 길 막히기 전에 3시엔 출발하자"),
+                    parking = "주문진 공영주차장", again = listOf("서연")),
+            ),
+        ))
+
+        say("11월 일상 기록 넣는 중")
+        novDaily(nov(2), P("판교 테크노밸리 주차장", 37.4020, 127.1080, "경기 성남시 분당구 판교로"), "08:50", 540, "월요일. 카풀 첫날 준호 태우고 출근")
+        novDaily(nov(3), P("셀프세차장 분당점", 37.3602, 127.1215, "경기 성남시 분당구 탄천로"), "20:10", 40, "가평 다녀온 흙 세차. 휠까지 닦음", 1)
+        novDaily(nov(4), P("이마트 분당점", 37.3510, 127.1100, "경기 성남시 분당구 황새울로 300"), "19:20", 50, "속초 갈 간식이랑 아이스박스", 1, "B2 C-14")
+        novDaily(nov(6), P("정자동 카페거리", 37.3660, 127.1060, "경기 성남시 분당구 정자일로"), "12:30", 60, "점심 먹고 커피. 내일 여행 일정 마지막 정리", 1)
+        novDaily(nov(9), P("율동공원", 37.3755, 127.1500, "경기 성남시 분당구 문정로 72"), "18:00", 60, "여행 후유증. 호수 한 바퀴 걷고 옴", 2)
+        novDaily(nov(9), P("분당 서울대병원 주차장", 37.3520, 127.1240, "경기 성남시 분당구 구미로173번길 82"), "10:00", 90, "아빠 정기 검진 모셔다 드림", 0, "지하 3층 D-07")
+        made += event(family, Event(title = "아빠 생신 저녁", startDate = nov(5).toString(), endDate = nov(5).toString(), allDay = false, startTime = "19:00",
+            place = P("수원 본가 갈비", 37.2760, 127.0290, "경기 수원시 팔달구 중부대로").place, memo = "케이크는 내가 픽업"))
+
+        say("11월 앞으로의 일정 넣는 중")
+        made += event(carpool, Event(title = "출근", startDate = nov(2).toString(), endDate = nov(2).toString(), allDay = false, startTime = "08:20",
+            place = P("판교역", 37.3948, 127.1112, "경기 성남시 분당구 판교역로 160").place,
+            repeat = Repeat.weeklyRule(setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY))))
+        made += event(null, Event(title = "치과", startDate = nov(12).toString(), endDate = nov(12).toString(), allDay = false, startTime = "15:00",
+            place = P("서현 미소치과", 37.3850, 127.1235, "경기 성남시 분당구 서현로").place, memo = "스케일링"))
+        made += event(null, Event(title = "팀 회식", startDate = nov(13).toString(), endDate = nov(13).toString(), allDay = false, startTime = "19:00",
+            place = P("판교 화로구이", 37.3955, 127.1090, "경기 성남시 분당구 대왕판교로").place, memo = "차는 회사에 두고 대리"))
+        made += event(null, Event(categoryId = BuiltInCategory.CAR.id, title = "엔진오일 교체 예약", startDate = nov(17).toString(), endDate = nov(17).toString(), allDay = false, startTime = "10:00",
+            place = P("블루핸즈 분당점", 37.3712, 127.1180, "경기 성남시 분당구 성남대로").place))
+        made += event(weekend, Event(title = "민지 생일", startDate = nov(19).toString(), endDate = nov(19).toString(), memo = "선물 같이 사기 (지훈이 정리)"))
+        made += event(null, Event(title = "대학 동기 모임", startDate = nov(25).toString(), endDate = nov(25).toString(), allDay = false, startTime = "19:00",
+            place = P("강남역 11번 출구", 37.4980, 127.0276, "서울 강남구 강남대로").place))
+
+        novPlan(weekend, "전주·군산 1박 2일", nov(14), listOf(
+            listOf(
+                Stay(P("전주한옥마을", 35.8150, 127.1530, "전북 전주시 완산구 기린대로 99"), "11:00", "", 0, "한복 빌려 입기", talk = listOf(
+                    "민지" to "한복 대여 예약했어! 11시 반 4명", "서연" to "머리 땋아 주는 데도 있대", "지훈" to "난 갓 쓸래", "나" to "주차는 한옥마을 공영주차장 (치명자산 쪽)")),
+                Stay(P("경기전", 35.8153, 127.1497, "전북 전주시 완산구 태조로 44"), "12:30", "", 0, "", talk = listOf(
+                    "서연" to "한복 입으면 경기전 무료!", "민지" to "대나무숲에서 사진")),
+                Stay(P("베테랑 칼국수", 35.8170, 127.1530, "전북 전주시 완산구 경기전길 135"), "13:30", "", 0, "점심", talk = listOf(
+                    "지훈" to "칼국수 + 만두 무조건", "나" to "줄 길면 바로 옆 비빔밥집 플랜 B", "서연" to "콩국수는 여름만 해")),
+                Stay(P("자만벽화마을", 35.8160, 127.1580, "전북 전주시 완산구 교동"), "15:00", "", 0, "골목 카페", talk = listOf(
+                    "민지" to "오르막이라 편한 신발", "서연" to "꼭대기 카페에서 한옥마을 보여")),
+                Stay(P("남부시장 야시장", 35.8117, 127.1460, "전북 전주시 완산구 풍남문1길 19-3"), "19:00", "", 0, "야시장", talk = listOf(
+                    "지훈" to "금·토만 열어. 우리 토요일이라 딱", "민지" to "가맥 가자 가맥", "나" to "숙소는 걸어서 10분")),
+            ),
+            listOf(
+                Stay(P("군산 초원사진관", 35.9860, 126.7110, "전북 군산시 구영2길 12-1"), "10:30", "", 0, "8월의 크리스마스", talk = listOf(
+                    "서연" to "영화 촬영지! 여기서 사진 꼭", "나" to "전주에서 1시간")),
+                Stay(P("이성당", 35.9873, 126.7115, "전북 군산시 중앙로 177"), "11:10", "", 0, "단팥빵·야채빵", talk = listOf(
+                    "민지" to "야채빵 줄 따로 있대", "지훈" to "단팥빵 10개 살 거야", "엄마" to "엄마 것도 두 개만 사 와")),
+                Stay(P("경암동 철길마을", 35.9780, 126.7360, "전북 군산시 경촌4길 14"), "13:00", "", 0, "쫀드기 구워 먹기", talk = listOf(
+                    "서연" to "교복 대여도 있어ㅋㅋ")),
+                Stay(P("새만금방조제", 35.8100, 126.5600, "전북 군산시 옥도면 새만금로"), "15:00", "", 0, "드라이브 후 귀가", talk = listOf(
+                    "나" to "방조제 쭉 달리고 서해안고속도로로 올라가자", "지훈" to "운전 교대할게")),
+            ),
+        ))
+        novPlan(family, "양평 가족 나들이", nov(21), listOf(listOf(
+            Stay(P("두물머리", 37.5345, 127.3170, "경기 양평군 양서면 양수리"), "10:00", "", 0, "산책", talk = listOf(
+                "엄마" to "아침 물안개 보러 일찍 가자", "아빠" to "연핫도그 먹어야지", "나" to "8시 반에 데리러 갈게요")),
+            Stay(P("세미원", 37.5384, 127.3112, "경기 양평군 양서면 양수로 93"), "11:00", "", 0, "배다리", talk = listOf(
+                "엄마" to "배다리 건너면 두물머리랑 이어져")),
+            Stay(P("양평 옥천냉면", 37.5170, 127.4930, "경기 양평군 옥천면 옥천길 92"), "12:30", "", 0, "점심", talk = listOf(
+                "아빠" to "완자가 유명해", "나" to "11월이라 온면도 있대")),
+            Stay(P("용문사", 37.5370, 127.5810, "경기 양평군 용문면 용문산로 782"), "14:30", "", 0, "은행나무", talk = listOf(
+                "엄마" to "천 년 넘은 은행나무 꼭 보고 싶었어", "아빠" to "잎 다 떨어졌으려나", "나" to "주말에 떨어진 잎도 예쁘대요")),
+            Stay(P("양평 물맑은시장", 37.4920, 127.4910, "경기 양평군 양평읍 양평시장길"), "16:30", "", 0, "장 보고 귀가", talk = listOf(
+                "엄마" to "3·8일 장날인데 21일은 아니네", "아빠" to "그래도 상설시장은 열어")),
+        )))
+        novPlan(weekend, "부산 1박 2일", nov(28), listOf(
+            listOf(
+                Stay(P("해동용궁사", 35.1883, 129.2233, "부산 기장군 기장읍 용궁길 86"), "11:00", "", 0, "바다 옆 절", talk = listOf(
+                    "서연" to "주차 전쟁이래. 일찍 도착하자", "나" to "새벽 6시 출발 어때", "지훈" to "…살려줘")),
+                Stay(P("기장시장", 35.2443, 129.2187, "부산 기장군 기장읍 읍내로 104"), "12:30", "", 0, "대게 점심", talk = listOf(
+                    "민지" to "대게 시세 보고 정하자", "지훈" to "나는 곰장어")),
+                Stay(P("해운대 블루라인파크", 35.1590, 129.1720, "부산 해운대구 청사포로 116"), "14:30", "", 0, "스카이캡슐", talk = listOf(
+                    "민지" to "스카이캡슐 예약 필수! 내가 할게", "서연" to "4인 1캡슐", "나" to "미포 정거장 주차")),
+                Stay(P("더베이101", 35.1565, 129.1517, "부산 해운대구 동백로 52"), "18:00", "", 0, "야경", talk = listOf(
+                    "서연" to "마린시티 야경 여기서 보는 게 최고")),
+                Stay(P("광안리해수욕장", 35.1532, 129.1186, "부산 수영구 광안해변로 219"), "20:00", "", 0, "드론쇼", talk = listOf(
+                    "지훈" to "토요일 드론쇼 8시·10시", "민지" to "숙소 광안리 오션뷰로 잡았어")),
+            ),
+            listOf(
+                Stay(P("흰여울문화마을", 35.0780, 129.0450, "부산 영도구 영선동4가"), "10:00", "", 0, "바다 골목", talk = listOf(
+                    "서연" to "영화 변호인 촬영지", "민지" to "골목 카페 하나 찍어 둠")),
+                Stay(P("태종대", 35.0530, 129.0870, "부산 영도구 전망로 24"), "11:30", "", 0, "다누비 열차", talk = listOf(
+                    "나" to "다누비 열차 타고 한 바퀴")),
+                Stay(P("자갈치시장", 35.0967, 129.0305, "부산 중구 자갈치해안로 52"), "13:00", "", 0, "회 점심", talk = listOf(
+                    "지훈" to "2층 초장집", "민지" to "꼼장어 구이도")),
+                Stay(P("감천문화마을", 35.0975, 129.0106, "부산 사하구 감내2로 203"), "15:00", "", 0, "마지막 산책 후 귀가", talk = listOf(
+                    "서연" to "어린왕자 줄 길면 패스", "나" to "5시엔 출발해야 10시 전 도착")),
+            ),
+        ))
+
+        prefs.edit().putBoolean("done", true).putStringSet("events", made.toSet()).putStringSet("groups", setOf(weekend, carpool, family)).apply()
+        say("11월 채웠어요 · 지운 일정 ${gone}개 · 지난 여행 2개, 앞으로 여행 3개, 일상 기록 6칸" + if (sample > 0) " · 사진은 웹 샘플" else "")
+    }
+
+    /** Erases every event of [gid] for good — its days and everything under them — except 차량 관리 records and next-dues. */
+    private suspend fun wipe(gid: String): Int {
+        val db = FirebaseFirestore.getInstance()
+        val events = db.collection(FirestorePaths.events(gid)).get().await().documents
+        var n = 0
+        for (e in events) {
+            if (e.id.startsWith("due-") || e.get("maintenance") != null) continue
+            val listed = runCatching { db.collection("${FirestorePaths.event(gid, e.id)}/days").get().await().documents.map { it.id } }.getOrDefault(emptyList())
+            // Records of 일상 기록 hang under days that have no document of their own: walk the event's dates too.
+            val from = runCatching { LocalDate.parse(e.getString("startDate")) }.getOrNull()
+            val to = runCatching { LocalDate.parse(e.getString("endDate")) }.getOrNull() ?: from
+            val span = if (from != null && to != null && !to.isBefore(from) && to.toEpochDay() - from.toEpochDay() < 31)
+                generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }.map { it.toString() }.toList() else emptyList()
+            for (d in (listed + span).distinct()) {
+                for (sub in listOf("stops", "comments", "records", "tracks", "pickups")) deleteAll(db, "${FirestorePaths.day(gid, e.id, d)}/$sub")
+                db.document(FirestorePaths.day(gid, e.id, d)).delete().await()
+            }
+            e.reference.delete().await()
+            n++
+        }
+        // The group's "가 봄 · 또 갈래요" memos came from those records.
+        deleteAll(db, FirestorePaths.places(gid))
+        return n
+    }
+
+    private suspend fun deleteAll(db: FirebaseFirestore, path: String) {
+        val docs = db.collection(path).get().await().documents
+        docs.chunked(400).forEach { part -> db.runBatch { b -> part.forEach { b.delete(it.reference) } }.await() }
+    }
+
+    /** The owner's group called [name] (made when missing) with these people in it, as made-up friend accounts. */
+    private suspend fun circle(mine: List<com.google.firebase.firestore.DocumentSnapshot>, name: String, people: List<Pair<String, Int>>): String {
+        val gid = mine.firstOrNull { it.getString("name") == name && it.getString("forEvent") == null }?.id ?: groups.createGroup(name, ownerUid)
+        val have = names(gid).keys
+        people.forEach { (n, i) -> if (n !in have) groups.invite(gid, makeFriend(i, n)) }
+        return gid
+    }
+
+    /** name → uid of the group's members; the owner is "나". */
+    private suspend fun names(gid: String): Map<String, String> {
+        val db = FirebaseFirestore.getInstance()
+        val ids = (db.document(FirestorePaths.group(gid)).get().await().get("memberIds") as? List<*>)?.filterIsInstance<String>().orEmpty()
+        val out = mutableMapOf("나" to ownerUid)
+        ids.filter { it != ownerUid }.forEach { uid -> runCatching { db.document(FirestorePaths.user(uid)).get().await().getString("name") }.getOrNull()?.let { out.putIfAbsent(it, uid) } }
+        return out
+    }
+
+    /** A November trip already driven: plan, visited, a record per place (unplanned ones without a slot), talk, 또 갈래요. */
+    private suspend fun novTrip(gid: String, title: String, start: LocalDate, days: List<List<Stay>>) {
+        val key = event(gid, Event(categoryId = BuiltInCategory.TRIP.id, title = title, startDate = start.toString(), endDate = start.plusDays(days.size - 1L).toString(), carId = carId))
+        made += key
+        val eid = key.substringAfter("/")
+        val who = names(gid)
+        days.forEachIndexed { di, stays ->
+            val date = start.plusDays(di.toLong())
+            val ds = date.toString()
+            val ids = stays.map { s -> if (s.unplanned) null else trips.addStop(gid, eid, ds, s.p.place, s.plan, s.memo, ownerUid) }
+            var visited = 0
+            stays.forEachIndexed { i, s ->
+                val sid = ids[i]
+                if (sid != null) trips.setVisited(gid, eid, ds, sid, true, ++visited)
+                val rid = records.addRecord(gid, eid, ds, Record(
+                    place = s.p.place, stopId = sid, unplanned = s.unplanned, arrivedAt = stamp(date, s.arrive), leftAt = stamp(date, s.arrive, s.stayMin),
+                    note = s.note, createdBy = carId, parkedLat = s.p.lat, parkedLng = s.p.lng, parkingNote = s.parking,
+                ))
+                repeat(s.photos) { addPhoto(gid, eid, ds, rid) }
+                // Talk hangs under a slot; a dropped-in place has none, so its talk goes under the next planned one.
+                val under = sid ?: ids.drop(i).firstOrNull { it != null }
+                if (under != null) s.talk.forEach { (n, text) -> trips.addComment(gid, eid, ds, under, text, who[n] ?: ownerUid) }
+                s.again.mapNotNull { who[it] }.forEach { uid -> records.setAgain(gid, eid, ds, Record(id = rid, place = s.p.place), uid, true) }
+            }
+            trips.setDayStatus(gid, eid, ds, DayStatus.DONE)
+        }
+    }
+
+    /** A November trip ahead: the slots with planned times and memos, and the group talking it over. */
+    private suspend fun novPlan(gid: String, title: String, start: LocalDate, days: List<List<Stay>>) {
+        val key = event(gid, Event(categoryId = BuiltInCategory.TRIP.id, title = title, startDate = start.toString(), endDate = start.plusDays(days.size - 1L).toString(), carId = carId))
+        made += key
+        val eid = key.substringAfter("/")
+        val who = names(gid)
+        days.forEachIndexed { di, stays ->
+            val ds = start.plusDays(di.toLong()).toString()
+            stays.forEach { s ->
+                val sid = trips.addStop(gid, eid, ds, s.p.place, s.plan, s.memo, ownerUid)
+                // 엄마 on a friends' trip (이성당 빵 부탁) is not in the group: the line is kept as the owner relaying it.
+                s.talk.forEach { (n, text) -> trips.addComment(gid, eid, ds, sid, if (n in who) text else "$n: $text", who[n] ?: ownerUid) }
+            }
+        }
+    }
+
+    /** One 일상 기록 slot on a November day. */
+    private suspend fun novDaily(date: LocalDate, p: P, at: String, stay: Int, note: String, photos: Int = 0, parking: String = "") {
+        val ds = date.toString()
+        val eid = records.ensureDailyLog(soloGroupId, ds, ownerUid)
+        made += "$soloGroupId/$eid"
+        val rid = records.addRecord(soloGroupId, eid, ds, Record(place = p.place, unplanned = true, arrivedAt = stamp(date, at), leftAt = stamp(date, at, stay), note = note, createdBy = carId, parkedLat = p.lat, parkedLng = p.lng, parkingNote = parking))
+        repeat(photos) { addPhoto(soloGroupId, eid, ds, rid) }
+    }
+
     /**
      * 시연 메뉴 [폰 계정 넣기] (2026-11-04: 에뮬 폰 앱을 다시 깔아 새 익명 계정이 된 뒤): the phone account with this friend
      * code becomes the owner's friend and a member of every shared group the owner is in, so it sees the trips and

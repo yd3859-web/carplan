@@ -1235,6 +1235,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
                 FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { vm.seedDemo(); onDismiss() }) { Text("오래 쓴 것처럼 채우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.seedMoreDemo(); onDismiss() }) { Text("여행 기록 더 채우기", fontSize = 20.sp, color = Ink) }
+                    TextButton(onClick = { vm.refillNovember(); onDismiss() }) { Text("11월 다시 채우기", fontSize = 20.sp, color = Ink) }
                     TextButton(onClick = { vm.clearDemo(); onDismiss() }) { Text("데모 지우기", fontSize = 20.sp, color = Ink) }
                     // 다른 폰(새로 깐 앱의 새 계정)을 차주로 붙일 때: 연결을 풀면 차가 6자리 화면으로 돌아간다.
                     TextButton(onClick = { vm.unlinkOwner(); onDismiss() }) { Text("차주 연결 풀기", fontSize = 20.sp, color = Ink) }
