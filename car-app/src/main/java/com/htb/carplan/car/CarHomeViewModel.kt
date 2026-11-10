@@ -191,6 +191,32 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         if (!kakao.available) emptyList()
         else runCatching { kakao.searchCategory(category, lat, lng, radiusMeters = 2000, size = 4) }.getOrDefault(emptyList())
 
+    /** 다트 즉석 코스 (2026-11-10): 관광지·식당·카페 둘레 검색 3번 → 관광지 → 점심 → 관광지 → 카페. 던진 결과마다 한 번만. */
+    private val dartCourseCache = HashMap<String, List<Place>>()
+    suspend fun dartCourse(lat: Double, lng: Double, key: String): List<Place> {
+        dartCourseCache[key]?.let { return it }
+        if (!kakao.available) return emptyList()
+        val out = runCatching {
+            suspend fun around(c: com.htb.carplan.shared.net.KakaoCategory, r: Int) = kakao.searchCategory(c, lat, lng, radiusMeters = r, size = 6)
+            val sights = around(com.htb.carplan.shared.net.KakaoCategory.SIGHT, 10_000).ifEmpty { around(com.htb.carplan.shared.net.KakaoCategory.SIGHT, 20_000) }
+            com.htb.carplan.shared.calendar.DayCourse.build(lat, lng, sights,
+                around(com.htb.carplan.shared.net.KakaoCategory.FOOD, 10_000), around(com.htb.carplan.shared.net.KakaoCategory.CAFE, 10_000))
+        }.getOrDefault(emptyList())
+        dartCourseCache[key] = out
+        return out
+    }
+
+    /** [이 코스로 여행하기]: 코스 장소들을 오늘 여행 끝에 차례로. */
+    fun addCourseStops(places: List<Place>, town: String) {
+        val t = trip.value ?: return
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            runCatching { places.forEach { p -> TripRepository().addStop(t.groupId, t.eventId, t.date, p, null, "다트 · $town", u.uid) } }
+                .onSuccess { navigator.notify("${town} 코스 ${places.size}곳을 오늘 일정에 넣었어요") }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
     /** A recommended place from the dart window → a stop at the end of today's trip. */
     fun addPlaceAsStop(place: Place, memo: String) {
         val t = trip.value ?: return

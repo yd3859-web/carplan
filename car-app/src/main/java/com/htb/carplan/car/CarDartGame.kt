@@ -237,6 +237,23 @@ fun CarDartGame(
                                     }
                                 }
                             }
+                            // 어디에 꽂히든 그 동네 하루 코스 (폰과 같은 규칙, 2026-11-10).
+                            val course by androidx.compose.runtime.produceState<List<Place>?>(null, d.id, d.throwCount) { value = vm.dartCourse(d.resultLat, d.resultLng, d.id + "#" + d.throwCount) }
+                            Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                                Text(d.resultName.split(" ").last() + " 하루 코스", fontSize = 20.sp, color = Palette.TextSoft)
+                                val c = course
+                                if (c == null) Text("코스를 짜는 중", fontSize = 20.sp, color = Palette.TextSoft)
+                                else if (c.isEmpty()) Text("이 근처엔 알려진 곳이 적어요", fontSize = 20.sp, color = Palette.TextSoft)
+                                else {
+                                    Text(c.joinToString(" → ") { it.name }, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 2)
+                                    Text("관광지 → 점심 → 관광지 → 카페 · 장소 정보 카카오", fontSize = 20.sp, color = Palette.TextSoft)
+                                    if (onPick == null) OutlinedButton(
+                                        onClick = { vm.addCourseStops(c, d.resultName.split(" ").last()); onDismiss() }, shape = Corner,
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Palette.SheetEdge),
+                                        modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(76.dp),
+                                    ) { Text("이 코스로 여행하기", fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.SemiBold) }
+                                }
+                            }
                             Button(
                                 onClick = {
                                     if (onPick != null) { val parts = d.resultName.split(" "); onPick(Place(name = parts.last(), lat = d.resultLat, lng = d.resultLng, address = d.resultName)) }
@@ -438,6 +455,13 @@ private fun DotMapBoard(
             val n = Regions.nearest(la, lo, pool) ?: return t
             return toScreen(n.lat, n.lng)
         }
+        fun landBack(t: Offset): Offset {
+            if (near != null) return keepInside(t)
+            val inScope = pool.ifEmpty { Regions.all }
+            val c = toScreen(inScope.map { it.lat }.average(), inScope.map { it.lng }.average())
+            for (i in 1..60) { val q = t + (c - t) * (i / 60f); if (inRange(q)) return q }
+            return keepInside(t)
+        }
         suspend fun throwTo(target: Offset, ms: Int, from: Offset = launchAt) {
             flying = true; onFlying(true)
             flightFrom = from; flightTo = target; stuck = null
@@ -610,12 +634,14 @@ private fun DotMapBoard(
                             val reach = launchAt.y - boardH * 0.04f
                             val power = min(1f, p.getDistance() / (h * 0.40f))
                             val shake = Offset(gauss() * w * 0.008f, gauss() * boardH * 0.01f) // a little hand shake; it lands near the aim circle
-                            val target = Offset(
+                            val aimed = Offset(
                                 (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
                             )
                             // Released from where it was drawn back: the dart snaps forward out of the band.
-                            val ok = inRange(target)
+                            // 폰과 같게 (2026-11-10): 바다·범위 밖이면 날아온 방향을 따라 처음 닿는 육지에 꽂는다 — 무효 없음.
+                            val target = if (inRange(aimed)) aimed else landBack(aimed)
+                            val ok = true
                             missed = !ok
                             throwTo(target, 560, from = launchAt + back)
                             if (ok) { val (lat, lng) = toGeo(target); onLanded(lat, lng) }
