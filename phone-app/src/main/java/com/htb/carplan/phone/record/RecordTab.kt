@@ -236,7 +236,7 @@ class RecordTabViewModel : ViewModel() {
         val key = p.groupId + p.eventId + p.date + pts.hashCode()
         roadCache[key]?.let { return it }
         // A1: the roads the car really drove first; a Kakao route only for legs it did not record.
-        val drives = records.tracks(p.groupId, p.eventId, p.date)
+        val drives = drivesOf(p)
         val legs = pts.zipWithNext().mapIndexed { i, (a, b) ->
             if (a == b) listOf(a, b)
             else if (drives.isNotEmpty()) com.htb.carplan.shared.calendar.TrackMath.legBetween(drives, a, b) ?: kakaoLeg(i, a, b)
@@ -244,6 +244,23 @@ class RecordTabViewModel : ViewModel() {
         }
         roadCache[key] = legs
         return legs
+    }
+
+    private val drivesCache = mutableMapOf<String, List<List<Pair<Double, Double>>>>()
+    private suspend fun drivesOf(p: DiaryDay) = drivesCache.getOrPut(p.groupId + p.eventId + p.date) { records.tracks(p.groupId, p.eventId, p.date) }
+
+    /**
+     * A4 우리 데이터 비율 (Claude 제안 2026-11-10): of a month's diary roads (legs between the places of each day), how
+     * many the car's own drives draw — each one a Kakao route search not made. One tracks read per day, kept.
+     */
+    suspend fun ourShare(inMonth: List<DiaryBook>): Pair<Int, Int> {
+        var covered = 0; var all = 0
+        inMonth.flatMap { it.pages }.forEach { (p, rs) ->
+            val pts = rs.map { it.place }.filter { it.lat != 0.0 || it.lng != 0.0 }.map { it.lat to it.lng }
+            val (c, n) = com.htb.carplan.shared.calendar.TrackMath.coveredLegs(drivesOf(p), pts)
+            covered += c; all += n
+        }
+        return covered to all
     }
 
     private suspend fun kakaoLeg(i: Int, a: Pair<Double, Double>, b: Pair<Double, Double>): List<Pair<Double, Double>> =
@@ -323,7 +340,7 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
                 Text("아직 모아 둔 날이 없어요.\n여행에서 차를 세우면 그곳이 여기 한 장으로 남아요.", fontSize = 16.sp, color = Palette.TextSoft, lineHeight = 24.sp, modifier = Modifier.padding(top = 28.dp))
             }
             else bs.groupBy { java.time.YearMonth.from(LocalDate.parse(it.pages.last().first.date)) }.forEach { (ym, inMonth) ->
-                item(key = "m$ym") { MonthHeader(ym, inMonth) }
+                item(key = "m$ym") { MonthHeader(ym, inMonth, vm) }
                 items(inMonth, key = { it.groupId + it.event.id }) { b ->
                     BookCard(b, names.let { _ -> b.memberIds.filter { it != vm.me() }.map(vm::nameOf) }) { page -> reading = b to page }
                 }
@@ -346,13 +363,18 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
 }
 
 @Composable
-private fun MonthHeader(ym: java.time.YearMonth, books: List<DiaryBook>) {
+private fun MonthHeader(ym: java.time.YearMonth, books: List<DiaryBook>, vm: RecordTabViewModel) {
     val trips = books.count { !it.isLog }
     val label = if (ym.year == LocalDate.now().year) "${ym.monthValue}월" else "${ym.year}년 ${ym.monthValue}월"
     Row(Modifier.fillMaxWidth().padding(top = 30.dp, bottom = 4.dp), verticalAlignment = Alignment.Bottom) {
         Text(label, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
         Text(buildList { if (trips > 0) add("여행 ${trips}번"); val logs = books.size - trips; if (logs > 0) add("일상 ${logs}날") }.joinToString(" · "),
             fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 10.dp, bottom = 3.dp))
+    }
+    // A4: how much of this month's map our own car drew (no line until a drive was recorded).
+    val share by androidx.compose.runtime.produceState<Pair<Int, Int>?>(null, books) { value = runCatching { vm.ourShare(books) }.getOrNull() }
+    share?.takeIf { it.first > 0 }?.let { (c, n) ->
+        Text("길 ${n}구간 중 ${c}구간(${c * 100 / n}%)은 우리 차가 달린 길 · 길찾기 ${c}번 아낌", fontSize = 14.sp, color = Palette.TextSoft)
     }
 }
 

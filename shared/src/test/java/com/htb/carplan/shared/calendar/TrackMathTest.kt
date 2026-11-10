@@ -48,4 +48,12 @@ class TrackMathTest {
         assertNotNull(leg)
         assertTrue(leg!!.size > 10)
     }
+
+    @Test fun coveredLegsCountsLegsTheCarDrove() {
+        val drive = line(37.000, 37.020)
+        val a = 37.000 to 127.0; val b = 37.010 to 127.0; val c = 37.020 to 127.0; val far = 37.5 to 127.5
+        assertEquals(2 to 2, TrackMath.coveredLegs(listOf(drive), listOf(a, b, c)))
+        assertEquals(2 to 3, TrackMath.coveredLegs(listOf(drive), listOf(a, b, c, far)))
+        assertEquals(0 to 1, TrackMath.coveredLegs(emptyList(), listOf(a, b, b)))
+    }
 }

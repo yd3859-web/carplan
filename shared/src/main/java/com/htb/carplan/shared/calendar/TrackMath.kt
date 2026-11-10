@@ -27,6 +27,15 @@ object TrackMath {
      * the point nearest [b], both within [NEAR_M]. Null when no single drive went from one to the other
      * (then the caller falls back to a route search). The two places themselves are put at the ends.
      */
+    /**
+     * A4 우리 데이터 비율: of the legs between consecutive [places] (same spot twice is no leg), how many [drives]
+     * cover — each is one Kakao route search the diary did not need. (covered, all)
+     */
+    fun coveredLegs(drives: List<List<Pair<Double, Double>>>, places: List<Pair<Double, Double>>): Pair<Int, Int> {
+        val legs = places.zipWithNext().filter { (a, b) -> a != b }
+        return legs.count { (a, b) -> drives.isNotEmpty() && legBetween(drives, a, b) != null } to legs.size
+    }
+
     fun legBetween(drives: List<List<Pair<Double, Double>>>, a: Pair<Double, Double>, b: Pair<Double, Double>): List<Pair<Double, Double>>? {
         // Usually one drive per leg (P at a → D → P at b): its start is near a and its end near b.
         // A drive may also pass several places (no stop in between), so search inside each drive too.
