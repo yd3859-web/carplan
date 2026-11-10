@@ -55,7 +55,7 @@ fun RowScope.CarPeople(vm: CarHomeViewModel) {
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { QrPart(vm, trip, group, friendCode, fill = false) }
             HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
-            NamesPart(trip != null, members, friends)
+            NamesPart(trip != null, group != null, members, friends)
         }
         return
     }
@@ -64,7 +64,7 @@ fun RowScope.CarPeople(vm: CarHomeViewModel) {
     }
     VerticalDivider(color = c.line)
     Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 40.dp, vertical = 24.dp).verticalScroll(rememberScrollState())) {
-        NamesPart(trip != null, members, friends)
+        NamesPart(trip != null, group != null, members, friends)
     }
 }
 
@@ -104,11 +104,15 @@ private fun androidx.compose.foundation.layout.ColumnScope.QrPart(vm: CarHomeVie
 }
 
 @Composable
-private fun NamesPart(hasTrip: Boolean, members: List<String>, friends: List<String>) {
+private fun NamesPart(hasTrip: Boolean, qrShown: Boolean, members: List<String>, friends: List<String>) {
     val c = LocalCarColors.current
     run {
         if (hasTrip) {
-            Names("오늘 같이 가는 사람", members, empty = if (LocalCompact.current) "아직 없어요 · 위 QR을 찍으면 들어와요" else "아직 없어요 · 왼쪽 QR을 찍으면 들어와요")
+            Names("오늘 같이 가는 사람", members, empty = when {
+                !qrShown -> "아직 없어요 · [이 여행 QR 띄우기]를 눌러요"
+                LocalCompact.current -> "아직 없어요 · 위 QR을 찍으면 들어와요"
+                else -> "아직 없어요 · 왼쪽 QR을 찍으면 들어와요"
+            })
             HorizontalDivider(color = c.line, modifier = Modifier.padding(vertical = 20.dp))
         }
         Names("친구", friends, empty = "아직 없어요")

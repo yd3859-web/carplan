@@ -342,7 +342,7 @@ fun RowScope.CarVehicle(vm: CarHomeViewModel) {
             (if (v.isEv == true) "배터리" else "연료") to (v.fuelPercent?.let { "${it.toInt()}%" } ?: "—"),
             "주행가능" to (v.rangeKm?.takeIf { it > 0 }?.let { "${it.toInt()}km" } ?: "—"),
             "주행거리" to (v.odometerKm?.let { "%,dkm".format(it.toLong()) } ?: "—"),
-            "이번 달 주유비" to "%,d원".format(monthFuel),
+            (if (v.isEv == true) "이번 달 충전비" else "이번 달 주유비") to "%,d원".format(monthFuel),
         )
         // Wide: four in a row. Half screen: two rows of two.
         stats.chunked(if (compact) 2 else 4).forEach { row ->
@@ -381,7 +381,7 @@ fun RowScope.CarVehicle(vm: CarHomeViewModel) {
                 val dueDays = due?.let { ChronoUnit.DAYS.between(today, LocalDate.parse(it.startDate)) }
                 Row(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(item.label, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
+                        Text(if (item == MaintenanceItem.FUEL && v.isEv == true) "충전" else item.label, color = c.ink, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
                         Text(last?.let { "마지막 ${it.startDate.substring(5).replace('-', '/')}" + (it.maintenance?.odometerKm?.let { km -> " · ${"%,d".format(km.toLong())}km" } ?: "") }
                             ?: MaintenanceRules.NOTES[item]?.let { "추천 · $it" } ?: "기록 없음", color = c.soft, fontSize = 20.sp, maxLines = 2)
                     }
