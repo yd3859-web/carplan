@@ -67,7 +67,7 @@
   /* ---------- 레일 ---------- */
   .rail { position:relative; }
   .rail::before { content:""; position:absolute; left:calc(var(--gut) / 2 - 1px); top:var(--rail-top, 0px); bottom:0; width:2px; background:var(--line); }
-  .fill { position:absolute; left:calc(var(--gut) / 2 - 1px); top:var(--rail-top, 0px); width:2px; background:var(--go); height:0; transition:height .35s ease; }
+  .fill { position:absolute; left:calc(var(--gut) / 2 - 1px); top:var(--rail-top, 0px); width:2px; background:var(--go); height:0; }
   .stop { display:grid; grid-template-columns:var(--gut) minmax(0, var(--col)); padding:72px 0 24px; scroll-margin-top:var(--nav); }
   .node { position:relative; }
   .node i { position:absolute; left:calc(var(--gut) / 2 - 9px); top:18px; width:18px; height:18px; border-radius:50%; background:var(--bg); border:2px solid #C9CBD0; transition:background .3s, border-color .3s, box-shadow .3s; }
@@ -83,19 +83,19 @@
   .stop p.say b { color:var(--ink); font-weight:600; }
 
   /* ---------- 스크롤이 곧 시간: 글이 내려가면 사진이 바뀐다 ---------- */
-  .story { display:grid; grid-template-columns:minmax(240px, 300px) minmax(0, 1fr); gap:0 36px; margin-top:36px; }
+  .story { display:grid; grid-template-columns:minmax(260px, 340px) minmax(0, 1fr); gap:0 32px; margin-top:36px; }
   .story .steps { grid-column:1; grid-row:1; }
-  .story .stage { grid-column:2; grid-row:1; position:sticky; top:calc(var(--nav) + 28px); align-self:start; }
-  .step { min-height:54vh; display:flex; flex-direction:column; justify-content:center; padding:24px 0; opacity:.3; transition:opacity .35s ease; }
-  .step:first-child { min-height:40vh; justify-content:flex-start; padding-top:0; }
-  .step:last-child { min-height:40vh; }
+  .story .stage { grid-column:2; grid-row:1; position:sticky; top:max(calc(var(--nav) + 20px), calc(50vh - 210px)); align-self:start; }
+  .step { min-height:50vh; display:flex; flex-direction:column; justify-content:center; padding:24px 0; opacity:.4; transition:opacity .35s ease; }
+  .step:first-child { min-height:44vh; }
+  .step:last-child { min-height:44vh; }
   .step.on { opacity:1; }
   .step h3 { font-size:21px; line-height:1.3; letter-spacing:-0.02em; font-weight:800; margin:0 0 8px; }
   .step p { font-size:16px; line-height:1.65; color:#2B2D31; margin:0; }
   .frame { position:relative; width:100%; aspect-ratio:1100 / 791; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:var(--bg); }
   .frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:top; opacity:0; transform:scale(.985); transition:opacity .45s ease, transform .45s ease; }
   .frame img.on { opacity:1; transform:none; }
-  .focus { position:absolute; border:2px solid var(--go); border-radius:4px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 0 9999px rgba(255,255,255,.28); opacity:0; transition:all .45s ease; pointer-events:none; }
+  .focus { position:absolute; border:2px solid var(--go); border-radius:4px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 0 9999px rgba(255,255,255,.28); opacity:0; transition:opacity .3s ease; pointer-events:none; }
   .focus.on { opacity:1; }
   .cap { font-size:14px; color:var(--soft); margin-top:10px; display:flex; gap:8px; align-items:baseline; min-height:24px; }
   @media (max-width:900px) { .cap { min-height:46px; align-items:flex-start; } }
@@ -550,11 +550,15 @@
     const n = stops[0].querySelector(".node i");
     return n.getBoundingClientRect().top - rail.getBoundingClientRect().top + n.offsetHeight / 2;
   }
+  // 기준선 하나: 화면 가운데(폰 폭에선 붙어 있는 사진 아래쯤). 레일 노드·위 메뉴·사진이 모두 이 선으로 바뀐다.
+  const narrow = matchMedia("(max-width: 900px)");
+  const lineY = () => innerHeight * (narrow.matches ? 0.68 : 0.5);
   let ticking = false;
   function update() {
     ticking = false;
-    rail.style.setProperty("--rail-top", railTop() + "px");
-    const mark = innerHeight * 0.42;
+    const rt = railTop();
+    rail.style.setProperty("--rail-top", rt + "px");
+    const mark = lineY();
     let cur = -1;
     stops.forEach((s, i) => { if (s.getBoundingClientRect().top <= mark) cur = i; });
     stops.forEach((s, i) => {
@@ -562,17 +566,17 @@
       s.classList.toggle("now", i === cur);
     });
     links.forEach((a, i) => a.classList.toggle("on", i === cur));
-    if (cur < 0) { fill.style.height = "0px"; return; }
-    const node = stops[cur].querySelector(".node i");
-    const top = node.getBoundingClientRect().top - rail.getBoundingClientRect().top + node.offsetHeight / 2;
-    fill.style.height = Math.max(0, top - railTop()) + "px";
+    // 파란 선은 기준선을 따라 연속으로 차오른다 (첫 노드에서 마지막 노드까지).
+    const last = stops[stops.length - 1].querySelector(".node i");
+    const lastY = last.getBoundingClientRect().top - rail.getBoundingClientRect().top + last.offsetHeight / 2;
+    const y = mark - rail.getBoundingClientRect().top;
+    fill.style.height = Math.min(Math.max(0, y - rt), lastY - rt) + "px";
   }
   addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
   addEventListener("resize", update);
   update();
 
   // 스크롤이 곧 시간: 지금 읽는 단락의 사진과 표시 자리를 붙어 있는 틀에 보여 준다.
-  const narrow = matchMedia("(max-width: 900px)");
   const stories = [];
   document.querySelectorAll(".story").forEach(story => {
     const steps = Array.from(story.querySelectorAll(".step"));
@@ -587,18 +591,24 @@
       dev.textContent = step.dataset.dev || "";
       txt.textContent = step.dataset.cap || "";
       const f = step.dataset.focus;
+      focus.classList.remove("on");
+      clearTimeout(focus._t);
       if (f) {
         const [x, y, w, h] = f.split(",").map(Number);
-        Object.assign(focus.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
-        focus.classList.add("on");
-      } else focus.classList.remove("on");
+        // 옛 자리에서 미끄러져 오지 않게: 숨긴 뒤 자리를 옮기고 나타난다.
+        focus._t = setTimeout(() => {
+          Object.assign(focus.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
+          focus.classList.add("on");
+        }, 320);
+      }
     }
     let cur = null;
     // 기준선(폰 폭에선 붙어 있는 사진 아래쯤)을 지난 마지막 단락이 지금 단락. 스크롤 위치로 바로 정해서 빨리 내려도 어긋나지 않는다.
+    // 기준선에 가운데가 가장 가까운 단락이 지금 단락 (글과 사진이 같은 눈높이).
     function pick() {
-      const line = innerHeight * (narrow.matches ? 0.72 : 0.55);
-      let s = steps[0];
-      steps.forEach(st => { if (st.getBoundingClientRect().top <= line) s = st; });
+      const line = lineY();
+      let s = steps[0], best = Infinity;
+      steps.forEach(st => { const r = st.getBoundingClientRect(); const d = Math.abs((r.top + r.bottom) / 2 - line); if (d < best) { best = d; s = st; } });
       if (s !== cur) { cur = s; show(s); }
     }
     pick();
