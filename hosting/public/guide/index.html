@@ -86,17 +86,18 @@
   .story { display:grid; grid-template-columns:minmax(260px, 340px) minmax(0, 1fr); gap:0 32px; margin-top:36px; }
   .story .steps { grid-column:1; grid-row:1; }
   .story .stage { grid-column:2; grid-row:1; position:sticky; top:max(calc(var(--nav) + 20px), calc(50vh - 210px)); align-self:start; }
-  .step { min-height:50vh; display:flex; flex-direction:column; justify-content:center; padding:24px 0; opacity:.4; transition:opacity .35s ease; }
-  .step:first-child { min-height:44vh; }
-  .step:last-child { min-height:44vh; }
+  .step { min-height:38vh; display:flex; flex-direction:column; justify-content:center; padding:20px 0; opacity:.4; transition:opacity .35s ease; }
+  .step:first-child { min-height:30vh; }
+  .step:last-child { min-height:34vh; }
   .step.on { opacity:1; }
   .step h3 { font-size:21px; line-height:1.3; letter-spacing:-0.02em; font-weight:800; margin:0 0 8px; }
   .step p { font-size:16px; line-height:1.65; color:#2B2D31; margin:0; }
   .frame { position:relative; width:100%; aspect-ratio:1100 / 791; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:var(--bg); }
-  .frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:top; opacity:0; transform:scale(.985); transition:opacity .45s ease, transform .45s ease; }
+  .frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:center; opacity:0; transform-origin:0 0; transform:scale(.985); transition:opacity .45s ease, transform .55s cubic-bezier(.2,.7,.2,1); }
   .frame img.on { opacity:1; transform:none; }
-  .focus { position:absolute; border:2px solid var(--go); border-radius:4px; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 0 9999px rgba(255,255,255,.28); opacity:0; transition:opacity .3s ease; pointer-events:none; }
-  .focus.on { opacity:1; }
+  /* 단락이 가리키는 부분을 확대해 보여 준다 (같은 사진이라도 단락마다 보는 곳이 달라짐) */
+  .frame img.on.zoom { transform:translate(var(--tx), var(--ty)) scale(var(--k)); }
+  .focus { display:none; }
   .cap { font-size:14px; color:var(--soft); margin-top:10px; display:flex; gap:8px; align-items:baseline; min-height:24px; }
   @media (max-width:900px) { .cap { min-height:46px; align-items:flex-start; } }
   .cap .dev { flex:none; font-size:12px; font-weight:600; color:var(--soft); border:1px solid var(--line); border-radius:4px; padding:0 6px; line-height:20px; }
@@ -132,9 +133,9 @@
   @media (max-width:900px) {
     .story { display:block; }
     .story .stage { position:sticky; top:var(--nav); z-index:2; background:var(--bg); padding:10px 0 6px; }
-    .step { min-height:46vh; justify-content:flex-start; padding-top:28px; } /* 글이 사진 바로 아래에 */
-    .step:first-child { min-height:30vh; padding-top:12px; }
-    .step:last-child { min-height:30vh; }
+    .step { min-height:34vh; justify-content:flex-start; padding-top:24px; } /* 글이 사진 바로 아래에 */
+    .step:first-child { min-height:26vh; padding-top:12px; }
+    .step:last-child { min-height:26vh; }
   }
   @media (max-width:760px) {
     :root { --gut:28px; }
@@ -220,8 +221,8 @@
       <div class="stage">
         <div class="frame">
           <img src="img/p_trip.jpg" alt="폰 여행 화면: 경로 지도와 레일">
-          <img src="img/p_dart.jpg" alt="다트로 동네 뽑기" loading="lazy">
-          <img src="img/p_calendar.jpg" alt="폰 캘린더" loading="lazy">
+          <img src="img/p_dart.jpg" alt="다트로 동네 뽑기">
+          <img src="img/p_calendar.jpg" alt="폰 캘린더">
           <div class="focus"></div>
         </div>
         <p class="cap"><span class="dev"></span><span class="txt"></span></p>
@@ -231,7 +232,7 @@
           <h3>하루는 레일이에요</h3>
           <p>장소를 넣으면 칸이 생기고, 칸을 끌어 순서를 바꿔요. [동선 최소로 정렬] 한 번이면 총 이동이 가장 짧은 순서로. 칸 아래엔 "여기 주차 어렵대" 같은 말을 달아요.</p>
         </div>
-        <div class="step" data-img="0" data-dev="폰" data-focus="0.5,6.8,26,10.6" data-cap="같이 정하는 도구는 레일 위 한 줄에">
+        <div class="step" data-img="0" data-dev="폰" data-focus="0,5,30,13" data-cap="같이 정하는 도구는 레일 위 한 줄에">
           <h3>같이 정하는 도구는 한 줄에</h3>
           <p>채팅, 픽업, 투표, 다트, AI 추천, 주차장. 여행마다 채팅방이 하나 생기고, 칸이 바뀌거나 차가 도착하면 자동 카드가 올라와요.</p>
         </div>
@@ -294,10 +295,10 @@
     <div class="story">
       <div class="stage">
         <div class="frame">
-          <img src="img/c_home.jpg" alt="차 첫 화면: 오늘 레일과 질문" loading="lazy">
-          <img src="img/c_depart.jpg" alt="가는 중 화면" loading="lazy">
-          <img src="img/c_fuel.jpg" alt="오늘 갈 길 최저가 주유소" loading="lazy">
-          <img src="img/c_parking.jpg" alt="다음 목적지 근처 주차장" loading="lazy">
+          <img src="img/c_home.jpg" alt="차 첫 화면: 오늘 레일과 질문">
+          <img src="img/c_depart.jpg" alt="가는 중 화면">
+          <img src="img/c_fuel.jpg" alt="오늘 갈 길 최저가 주유소">
+          <img src="img/c_parking.jpg" alt="다음 목적지 근처 주차장">
           <div class="focus"></div>
         </div>
         <p class="cap"><span class="dev"></span><span class="txt"></span></p>
@@ -359,8 +360,8 @@
     <div class="story">
       <div class="stage">
         <div class="frame">
-          <img src="img/p_records.jpg" alt="기록 탭: 여행마다 지도 표지" loading="lazy">
-          <img src="img/p_diary.jpg" alt="일기 한 장: 차가 실제 길을 달린다" loading="lazy">
+          <img src="img/p_records.jpg" alt="기록 탭: 여행마다 지도 표지">
+          <img src="img/p_diary.jpg" alt="일기 한 장: 차가 실제 길을 달린다">
           <div class="focus"></div>
         </div>
         <p class="cap"><span class="dev"></span><span class="txt"></span></p>
@@ -407,9 +408,9 @@
     <div class="story">
       <div class="stage">
         <div class="frame">
-          <img src="img/p_ai_new.jpg" alt="다음엔 여기 어때요? 담양 추천" loading="lazy">
-          <img src="img/p_ai_card.jpg" alt="기록 탭 끝의 추천 카드" loading="lazy">
-          <img src="img/p_fill.jpg" alt="여행을 짜는 중이면 그 동네 더 채우기" loading="lazy">
+          <img src="img/p_ai_new.jpg" alt="다음엔 여기 어때요? 담양 추천">
+          <img src="img/p_ai_card.jpg" alt="기록 탭 끝의 추천 카드">
+          <img src="img/p_fill.jpg" alt="여행을 짜는 중이면 그 동네 더 채우기">
           <div class="focus"></div>
         </div>
         <p class="cap"><span class="dev"></span><span class="txt"></span></p>
@@ -447,8 +448,8 @@
     <div class="story">
       <div class="stage">
         <div class="frame">
-          <img src="img/c_cal.jpg" alt="차에서 보는 캘린더" loading="lazy">
-          <img src="img/c_rec.jpg" alt="차에서 넘겨 보는 기록" loading="lazy">
+          <img src="img/c_cal.jpg" alt="차에서 보는 캘린더">
+          <img src="img/c_rec.jpg" alt="차에서 넘겨 보는 기록">
           <div class="focus"></div>
         </div>
         <p class="cap"><span class="dev"></span><span class="txt"></span></p>
@@ -584,31 +585,40 @@
     const focus = story.querySelector(".focus");
     const dev = story.querySelector(".cap .dev");
     const txt = story.querySelector(".cap .txt");
+    const frame = story.querySelector(".frame");
+    // data-focus="x,y,w,h" (사진 안 %)인 단락은 그 부분이 틀 가운데에 크게 오도록 확대한다.
+    function zoomTo(im, f) {
+      im.classList.remove("zoom");
+      if (!f) return;
+      const [x, y, w, h] = f.split(",").map(Number);
+      const fw = frame.clientWidth, fh = frame.clientHeight;
+      // object-fit: contain, 가운데 맞춤 — 사진 내용의 실제 높이와 위쪽 여백
+      const ch = im.naturalWidth ? Math.min(fh, fw * im.naturalHeight / im.naturalWidth) : fh;
+      const oy = (fh - ch) / 2;
+      const rx = x / 100 * fw, ry = oy + y / 100 * ch, rw = w / 100 * fw, rh = h / 100 * ch;
+      const k = Math.min(3, Math.min(fw / rw, fh / rh) * 0.8);
+      const tx = fw / 2 - (rx + rw / 2) * k, ty = fh / 2 - (ry + rh / 2) * k;
+      im.style.setProperty("--k", k.toFixed(3)); im.style.setProperty("--tx", tx.toFixed(1) + "px"); im.style.setProperty("--ty", ty.toFixed(1) + "px");
+      im.classList.add("zoom");
+    }
     function show(step) {
       steps.forEach(s => s.classList.toggle("on", s === step));
       const i = +step.dataset.img;
-      imgs.forEach((im, k) => im.classList.toggle("on", k === i));
+      imgs.forEach((im, k) => { im.classList.toggle("on", k === i); if (k !== i) im.classList.remove("zoom"); });
       dev.textContent = step.dataset.dev || "";
       txt.textContent = step.dataset.cap || "";
-      const f = step.dataset.focus;
-      focus.classList.remove("on");
-      clearTimeout(focus._t);
-      if (f) {
-        const [x, y, w, h] = f.split(",").map(Number);
-        // 옛 자리에서 미끄러져 오지 않게: 숨긴 뒤 자리를 옮기고 나타난다.
-        focus._t = setTimeout(() => {
-          Object.assign(focus.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
-          focus.classList.add("on");
-        }, 320);
-      }
+      const im = imgs[i];
+      if (im.complete) zoomTo(im, step.dataset.focus); else im.addEventListener("load", () => { if (cur === step) zoomTo(im, step.dataset.focus); }, { once: true });
     }
     let cur = null;
     // 기준선(폰 폭에선 붙어 있는 사진 아래쯤)을 지난 마지막 단락이 지금 단락. 스크롤 위치로 바로 정해서 빨리 내려도 어긋나지 않는다.
-    // 기준선에 가운데가 가장 가까운 단락이 지금 단락 (글과 사진이 같은 눈높이).
+    // 단락 제목이 화면 60% 선까지 올라오는 순간 그 단락으로 — 다 내리기 전에 바뀐다.
+    // 폰 폭에선 붙어 있는 사진 바로 아래가 기준선: 사진 밑에 보이는 단락이 지금 단락.
+    const stage = story.querySelector(".stage");
     function pick() {
-      const line = lineY();
-      let s = steps[0], best = Infinity;
-      steps.forEach(st => { const r = st.getBoundingClientRect(); const d = Math.abs((r.top + r.bottom) / 2 - line); if (d < best) { best = d; s = st; } });
+      const line = narrow.matches ? stage.getBoundingClientRect().bottom + 48 : innerHeight * 0.6;
+      let s = steps[0];
+      steps.forEach(st => { if (st.getBoundingClientRect().top <= line) s = st; });
       if (s !== cur) { cur = s; show(s); }
     }
     pick();
