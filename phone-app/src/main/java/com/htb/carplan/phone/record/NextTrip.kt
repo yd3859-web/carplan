@@ -121,11 +121,26 @@ object NextTripLoader {
     /** 추천 순서: AI(후보 코스를 참고로 받음) → 코스 기억장치에서 직접 → 또 갈래요 근처 다시 가기. */
     suspend fun load(context: Context, books: List<DiaryBook>, kakao: KakaoApi, avoid: List<String>): NextTrip? {
         val taste = tasteOf(books)
-        val cands = CourseBook.candidates(courses(context), taste, avoid)
-        return fromAi(TasteBuild.promptText(taste), kakao, avoid, CourseBook.promptLines(cands))
-            ?: fromCourses(kakao, cands, taste)
-            ?: fallback(books, kakao)
+        // B10: 다가오는 2주 일정에 이미 있는 동네는 빼고 고른다 (AI·코스 둘 다에 알려 주고, 결과도 한 번 더 거른다).
+        val upcoming = upcomingTexts()
+        val avoidAll = avoid + upcoming
+        val cands = CourseBook.candidates(courses(context), taste, avoidAll)
+        fun fresh(t: NextTrip?) = t?.takeIf { !com.htb.carplan.shared.calendar.Upcoming.covers(it.region, upcoming) }
+        return fresh(fromAi(TasteBuild.promptText(taste), kakao, avoidAll, CourseBook.promptLines(cands)))
+            ?: fresh(fromCourses(kakao, cands, taste))
+            ?: fresh(fallback(books, kakao))
     }
+
+    /** Titles and places of my events from today through two weeks ahead. Empty when signed out or offline. */
+    private suspend fun upcomingTexts(): List<String> = runCatching {
+        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList()
+        val calendar = CalendarRepository()
+        kotlinx.coroutines.withTimeout(8_000) {
+            val ids = calendar.observeGroups(uid).first().map { it.id }
+            val today = java.time.LocalDate.now()
+            com.htb.carplan.shared.calendar.Upcoming.texts(calendar.observeEvents(ids, today.toString(), today.plusDays(14).toString()).first().map { it.event })
+        }
+    }.getOrDefault(emptyList())
 
     /** 서버 suggestTrip → 카카오 확인. Null = 키 없음·실패·장소 확인 2곳 미만. */
     private suspend fun fromAi(taste: String, kakao: KakaoApi, avoid: List<String>, patterns: String): NextTrip? = runCatching {

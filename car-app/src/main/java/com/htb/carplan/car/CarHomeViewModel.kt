@@ -505,9 +505,10 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // ── D3 "오늘 갈 만한 곳" (주차 중·일정 없는 날): 폰이 저장한 추천(users/{uid}.suggest)을 그대로 보여 준다.
-    val suggested: StateFlow<com.htb.carplan.shared.model.SuggestedTrip?> = owner
-        .map { it?.suggest?.takeIf { s -> s.stops.isNotEmpty() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    // B10: a 동네 already in this week's plan (토요일 담양 여행) is not offered again today.
+    val suggested: StateFlow<com.htb.carplan.shared.model.SuggestedTrip?> = combine(owner, week) { u, w ->
+        u?.suggest?.takeIf { s -> s.stops.isNotEmpty() && !com.htb.carplan.shared.calendar.Upcoming.covers(s.region, com.htb.carplan.shared.calendar.Upcoming.texts(w.map { it.event })) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** [가기] 한 번: 오늘 여행으로 만들고(캘린더에 남게) 바로 경로를 연다 — 질문을 다시 하지 않는다 (차 화면 원칙). */
     fun goSuggestedTrip() {
