@@ -80,5 +80,10 @@ class CarRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIns
         db.document(FirestorePaths.car(carId)).set(mapOf("fuelAlertPercent" to percent), com.google.firebase.firestore.SetOptions.merge()).await()
     }
 
+    /** A2: the navigation's saved places, replaced as a whole (the car sends them only when they change). */
+    suspend fun setNaviPlaces(carId: String, places: List<com.htb.carplan.shared.model.NaviPlace>) {
+        db.document(FirestorePaths.car(carId)).update("naviPlaces", places).await()
+    }
+
     private fun newCode() = (1..6).joinToString("") { Random.nextInt(10).toString() }
 }

@@ -112,7 +112,30 @@ data class Car(
     val intervals: Map<String, Map<String, Long>> = emptyMap(),
     /** 12장: "주유소 들를까요?" when the tank/battery is at or under this (%), set in the phone's 설정 tab. */
     val fuelAlertPercent: Int = 20,
+    /** A2: the navigation's 즐겨찾기 (집·회사 first) and 최근 목적지, copied up when they change — the owner's phone lists them first. */
+    val naviPlaces: List<NaviPlace> = emptyList(),
 )
+
+/** One place the car's navigation knows. [kind] = Pleos bookmark category (HOME, OFFICE, …); null = 최근 목적지. */
+data class NaviPlace(
+    val name: String = "",
+    val address: String = "",
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val kind: String? = null,
+) {
+    /** The navigation's 집·회사 come without a name: they go by "집" / "회사". */
+    @get:com.google.firebase.firestore.Exclude
+    val place: Place get() = Place(name = name.ifBlank { kindLabel }, lat = lat, lng = lng, address = address)
+
+    /** Somewhere to go: a spot or at least an address (an empty 집 slot of the navigation is not). */
+    @get:com.google.firebase.firestore.Exclude
+    val usable: Boolean get() = (lat != 0.0 || lng != 0.0) || address.isNotBlank()
+
+    /** "집" / "회사" / "충전소" / "즐겨찾기" / "최근". */
+    @get:com.google.firebase.firestore.Exclude
+    val kindLabel: String get() = when (kind) { null -> "최근"; "HOME" -> "집"; "OFFICE" -> "회사"; "EV_CHARGING_STATION" -> "충전소"; else -> "즐겨찾기" }
+}
 
 // ---------- Groups & calendar events ----------
 
@@ -332,7 +355,22 @@ data class PlaceMemo(
     val name: String = "",
     val againBy: List<String> = emptyList(),
     val visited: Boolean = false,
-)
+    // A3 "우리가 가 본 곳" (2026-11-10): where it is and what the car learned there, written with each record.
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val address: String = "",
+    val category: String = "",
+    /** How many times the car parked here. */
+    val visits: Long = 0,
+    val lastAt: Timestamp? = null,
+    /** The last spot written on a phone ("B2 C-14"). */
+    val parking: String = "",
+    /** How long the last stop lasted (car parked → pulled away). */
+    val stayMinutes: Long? = null,
+) {
+    @get:com.google.firebase.firestore.Exclude
+    val place: Place get() = Place(name = name, lat = lat, lng = lng, address = address, kakaoId = kakaoId.takeIf { !it.startsWith("n:") && it.isNotBlank() }, category = category)
+}
 
 /**
  * A short note by a member. Lives in two places:

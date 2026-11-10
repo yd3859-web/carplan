@@ -56,7 +56,9 @@ import com.htb.carplan.phone.ui.Palette
 import androidx.compose.material3.HorizontalDivider
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.net.KakaoCategory
+import com.htb.carplan.shared.calendar.OurPlaces
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -111,7 +113,14 @@ fun PlaceSearchSheet(
     var loading by remember { mutableStateOf(false) }
     val hasKey = vm.kakaoAvailable
     var memos by remember { mutableStateOf<Map<String, com.htb.carplan.shared.model.PlaceMemo>>(emptyMap()) }
-    LaunchedEffect(Unit) { memos = runCatching { vm.memos() }.getOrDefault(emptyMap()) }
+    // A2·A3: what we already know — the car navigation's places and where our cars parked — before any Kakao call.
+    var navi by remember { mutableStateOf<List<com.htb.carplan.shared.model.NaviPlace>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        val known = runCatching { knownPlaces() }.getOrNull()
+        navi = known?.first.orEmpty()
+        memos = runCatching { vm.memos() }.getOrDefault(emptyMap()).ifEmpty { known?.second.orEmpty() }
+    }
+    val ours = if (activeCategory != null) emptyList() else OurPlaces.list(navi, memos.values, query)
 
     fun runSearch() {
         activeCategory = null
@@ -191,7 +200,16 @@ fun PlaceSearchSheet(
             if (loading) Text("찾는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
 
             LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
-                items(com.htb.carplan.shared.calendar.PlaceRank.rank(results, memos), key = { it.kakaoId ?: it.name + it.lat }) { p ->
+                if (ours.isNotEmpty()) {
+                    item(key = "ours") { ListHead("우리가 아는 곳") }
+                    items(ours, key = { "o:" + it.place.name + it.place.lat }) { o ->
+                        PlaceRow(o.place, if (added != null && (o.place.kakaoId ?: o.place.name) in added) "넣음" else null, sub = o.label) { onPick(o.place) }
+                    }
+                }
+                // A Kakao result that is one of ours is already listed above.
+                val kakaoRows = com.htb.carplan.shared.calendar.PlaceRank.rank(results, memos).filter { r -> ours.none { it.place.name.replace(" ", "") == r.name.replace(" ", "") } }
+                if (ours.isNotEmpty() && kakaoRows.isNotEmpty()) item(key = "kakao") { ListHead(if (activeCategory == null) "검색 결과" else "근처") }
+                items(kakaoRows, key = { it.kakaoId ?: it.name + it.lat }) { p ->
                     PlaceRow(p, if (added != null && (p.kakaoId ?: p.name) in added) "넣음" else com.htb.carplan.shared.calendar.PlaceRank.badge(p, memos)) { onPick(p) }
                 }
             }
@@ -211,7 +229,21 @@ fun PlaceSearchSheet(
 }
 
 @Composable
-private fun PlaceRow(p: Place, badge: String? = null, onClick: () -> Unit) {
+private fun ListHead(text: String) =
+    Text(text, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+
+/** A2·A3: the car this phone owns (its navigation's places) and every place memo of my groups. Nulls/empties when signed out. */
+private suspend fun knownPlaces(): Pair<List<com.htb.carplan.shared.model.NaviPlace>, Map<String, com.htb.carplan.shared.model.PlaceMemo>> {
+    val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList<com.htb.carplan.shared.model.NaviPlace>() to emptyMap()
+    val calendar = com.htb.carplan.shared.data.CalendarRepository()
+    val carId = withTimeoutOrNull(5_000) { calendar.observeUser(uid).first() }?.carId
+    val navi = carId?.let { withTimeoutOrNull(5_000) { calendar.observeCar(it).first() }?.naviPlaces }.orEmpty()
+    val groups = withTimeoutOrNull(5_000) { calendar.observeGroups(uid).first() }.orEmpty().map { it.id }
+    return navi to com.htb.carplan.shared.data.RecordRepository().placeMemos(groups)
+}
+
+@Composable
+private fun PlaceRow(p: Place, badge: String? = null, sub: String? = null, onClick: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
     ) {
@@ -220,6 +252,7 @@ private fun PlaceRow(p: Place, badge: String? = null, onClick: () -> Unit) {
             // Q58: my groups' memory of this place, small and quiet.
             badge?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = 8.dp).border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
         }
+        sub?.let { Text(it, fontSize = 14.sp, color = Palette.Teal) }
         p.kindLine()?.let { Text(it + if (p.phone.isNotBlank()) "  ·  ${p.phone}" else "", fontSize = 14.sp, color = Palette.ChipText) }
         if (p.address.isNotBlank()) Text(p.address, fontSize = 15.sp, color = Palette.TextSoft)
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 10.dp))

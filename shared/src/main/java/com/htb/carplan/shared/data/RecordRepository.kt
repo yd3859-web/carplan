@@ -50,7 +50,13 @@ class RecordRepository(
         ref.set(record.copy(arrivedAt = record.arrivedAt ?: Timestamp.now())).await()
         // Q58 "가 봄": the group has been here (recommendations list it before unknown places).
         com.htb.carplan.shared.calendar.PlaceRank.keyOf(record.place)?.let { id ->
-            runCatching { db.document("${FirestorePaths.places(groupId)}/$id").set(mapOf("name" to record.place.name, "visited" to true), SetOptions.merge()).await() }
+            // A3: where it is too, so the phone can offer it again before any Kakao search.
+            val p = record.place
+            val memo = mutableMapOf<String, Any>("name" to p.name, "visited" to true, "visits" to FieldValue.increment(1), "lastAt" to Timestamp.now())
+            if (p.lat != 0.0 || p.lng != 0.0) { memo["lat"] = p.lat; memo["lng"] = p.lng }
+            if (p.address.isNotBlank()) memo["address"] = p.address
+            if (p.category.isNotBlank()) memo["category"] = p.category
+            runCatching { db.document("${FirestorePaths.places(groupId)}/$id").set(memo, SetOptions.merge()).await() }
         }
         return ref.id
     }
@@ -68,7 +74,14 @@ class RecordRepository(
     suspend fun placeMemos(groupIds: List<String>): Map<String, com.htb.carplan.shared.model.PlaceMemo> {
         val all = groupIds.flatMap { gid -> runCatching { db.collection(FirestorePaths.places(gid)).get().await().toObjects(com.htb.carplan.shared.model.PlaceMemo::class.java) }.getOrDefault(emptyList()) }
         return all.groupBy { it.kakaoId }.mapValues { (id, list) ->
-            com.htb.carplan.shared.model.PlaceMemo(id, list.first().name, list.flatMap { it.againBy }.distinct(), list.any { it.visited })
+            val at = list.firstOrNull { it.lat != 0.0 || it.lng != 0.0 } ?: list.first()
+            val last = list.maxByOrNull { it.lastAt?.toDate()?.time ?: 0L } ?: list.first()
+            com.htb.carplan.shared.model.PlaceMemo(
+                id, list.first().name, list.flatMap { it.againBy }.distinct(), list.any { it.visited },
+                at.lat, at.lng, at.address, list.firstOrNull { it.category.isNotBlank() }?.category.orEmpty(),
+                list.sumOf { it.visits }, last.lastAt, last.parking.ifBlank { list.firstOrNull { it.parking.isNotBlank() }?.parking.orEmpty() },
+                last.stayMinutes,
+            )
         }
     }
 
@@ -88,7 +101,17 @@ class RecordRepository(
 
     /** The car pulled away (P → D): close the newest open record (13장 9). */
     suspend fun markLeft(groupId: String, eventId: String, date: String, recordId: String) {
-        db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("leftAt", Timestamp.now()).await()
+        val ref = db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId")
+        val now = Timestamp.now()
+        ref.update("leftAt", now).await()
+        // A3: how long the stop lasted goes to the place memo ("1시간 머묾" in the phone's place list).
+        runCatching {
+            val r = ref.get().await().toObject(Record::class.java) ?: return@runCatching
+            val minutes = r.arrivedAt?.let { (now.toDate().time - it.toDate().time) / 60_000 } ?: return@runCatching
+            com.htb.carplan.shared.calendar.PlaceRank.keyOf(r.place)?.let { id ->
+                db.document("${FirestorePaths.places(groupId)}/$id").set(mapOf("stayMinutes" to minutes), SetOptions.merge()).await()
+            }
+        }
     }
 
     suspend fun setNote(groupId: String, eventId: String, date: String, recordId: String, note: String) {
@@ -98,7 +121,15 @@ class RecordRepository(
     /** Q36: fix a wrong place name (keeps the record's own coordinates when the new place has none). */
     /** ★3: the spot written on a phone ("B2 C-14") next to where the car parked. */
     suspend fun setParkingNote(groupId: String, eventId: String, date: String, recordId: String, note: String) {
-        db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId").update("parkingNote", note.trim()).await()
+        val ref = db.document("${FirestorePaths.records(groupId, eventId, date)}/$recordId")
+        ref.update("parkingNote", note.trim()).await()
+        // A3: the spot is remembered with the place ("주차 B2" next time someone picks it).
+        if (note.isNotBlank()) runCatching {
+            val r = ref.get().await().toObject(Record::class.java) ?: return@runCatching
+            com.htb.carplan.shared.calendar.PlaceRank.keyOf(r.place)?.let { id ->
+                db.document("${FirestorePaths.places(groupId)}/$id").set(mapOf("parking" to note.trim()), SetOptions.merge()).await()
+            }
+        }
     }
 
     /** 묶음 6: the 주유 done at this stop goes on its record too — unless someone already wrote a line there. */

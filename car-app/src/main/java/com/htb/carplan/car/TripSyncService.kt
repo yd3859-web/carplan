@@ -13,12 +13,14 @@ import androidx.lifecycle.lifecycleScope
 import com.google.firebase.auth.FirebaseAuth
 import com.htb.carplan.shared.data.CarRepository
 import com.htb.carplan.shared.data.ensureSignedIn
+import com.htb.carplan.shared.model.NaviPlace
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -45,6 +47,16 @@ class TripSyncService : LifecycleService() {
                 CarRuntime.navigator(this@TripSyncService).onCarState(state) // 12장 fuel check
             }
         }
+        // A2: the navigation's 즐겨찾기·최근 목적지 go to cars/{id} when they change, for the owner's phone place picker.
+        lifecycleScope.launch {
+            val carId = runCatching { FirebaseAuth.getInstance().ensureSignedIn() }.getOrNull() ?: return@launch
+            CarRuntime.router(this@TripSyncService).saved
+                .map { list -> list.take(MAX_NAVI_PLACES).map { NaviPlace(it.place.name, it.place.address, it.place.lat, it.place.lng, it.kind) } }
+                .filter { it.isNotEmpty() }
+                .debounce(2_000) // bookmarks and recents answer separately
+                .distinctUntilChanged()
+                .collect { runCatching { CarRepository().setNaviPlaces(carId, it) }.onFailure { e -> Log.w(TAG, "navi places upload failed", e) } }
+        }
         // 9장: P → D asks "다음 목적지로 갈까요?" even while the navigation is in front.
         lifecycleScope.launch {
             monitor.state.map { it.gear }.distinctUntilChanged().collect { CarRuntime.navigator(this@TripSyncService).onGear(it) }
@@ -69,6 +81,7 @@ class TripSyncService : LifecycleService() {
         private const val TAG = "TripSyncService"
         private const val CHANNEL_ID = "trip_sync"
         private const val NOTIFICATION_ID = 1
+        private const val MAX_NAVI_PLACES = 30
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, TripSyncService::class.java))

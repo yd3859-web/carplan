@@ -720,12 +720,12 @@
       <div class="sb-t">👤 사람 · 차</div>
       <div class="sb-row"><code>users/{uid}</code> 이름, 사진, fcmTokens[], <b>soloGroupId</b>, carId?, suggest?(다음 여행 추천 사본: region·title·reason·stops[] — 폰이 쓰고, 차가 일정 없는 날 "오늘 갈 만한 곳"으로 읽음, D3 2026-11-09)</div>
       <div class="sb-row"><code>users/{uid}/categories/{id}</code> 사용자가 추가한 카테고리: 이름, 색 (기본 3개는 앱에 고정)</div>
-      <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 쓰는 일정 {groupId, eventId}, <b>state</b>{기어, 주행제한, 위치, updatedAt}, fuelAlertPercent(주유 알림 기준 %, 설정 탭)</div>
+      <div class="sb-row"><code>cars/{carId}</code> ownerUid, linkCode, 지금 쓰는 일정 {groupId, eventId}, <b>state</b>{기어, 주행제한, 위치, updatedAt}, fuelAlertPercent(주유 알림 기준 %, 설정 탭), <b>naviPlaces[]</b>{name, address, lat, lng, kind(HOME·OFFICE… / 없으면 최근)} — 차 내비 즐겨찾기·최근 목적지, 바뀔 때만 차가 올림, 폰 장소 고르기 맨 위 "우리가 아는 곳" (A2, 2026-11-10)</div>
     </div>
     <div class="sub-block wide">
       <div class="sb-t">👥 그룹 · 일정</div>
       <div class="sb-row"><code>groups/{gid}</code> 이름, memberIds[], ownerUid, inviteCode, solo(나만 그룹 여부), forEvent(그 일정 전용 그룹이면 일정 id — 없으면 "자주 타는 사람" 묶음, 2026-11-01)</div>
-      <div class="sb-row"><code>groups/{gid}/places/{카카오 id 또는 n:이름@위치}</code> name, againBy[](또 갈래요 누른 uid), visited(차가 선 적 있음) — Q58 추천 순서용 (2026-11-01). 기록 칸 <code>records/{id}</code>에도 againBy[]</div>
+      <div class="sb-row"><code>groups/{gid}/places/{카카오 id 또는 n:이름@위치}</code> name, againBy[](또 갈래요 누른 uid), visited(차가 선 적 있음) — Q58 추천 순서용 (2026-11-01). <b>A3(2026-11-10)</b>: lat, lng, address, category, visits(선 횟수), lastAt, parking(마지막 주차 자리), stayMinutes(마지막 머문 분) — 기록 칸 생길 때·떠날 때·주차 자리 쓸 때 같이 씀 → 폰 장소 고르기 "가 봄 3번 · 주차 B2 · 1시간 머묾". 기록 칸 <code>records/{id}</code>에도 againBy[]</div>
       <div class="sb-row"><code>groups/{gid}/events/{eid}</code> <b>캘린더의 모든 일정</b>: 카테고리, 제목, 시작·끝 날짜(시간), 하루종일?, 장소?, 반복?, 알림(몇 분 전)?, 메모, 체크리스트[{글, 완료}], 만든사람, deleted<br>· 여행: 사용자가 고른 날짜들(여러 날 가능), carId?, driverUid?<br>· 차량 관리: 항목(주유·점검…), 주행거리, 자동여부, 금액?·리터? — 차 주인의 나만 그룹에 들어감</div>
       <div class="sb-row"><code>…/events/{eid}/days/{yyyy-MM-dd}</code> 여행의 <b>하루</b>: version, 지금 칸 번호, 상태(준비/이동중/끝), 마지막 수정자, <b>차가 반영한 version(routeSyncedVersion)·운전자 보류(holdByDriver)·다음 도착 예정(etaNext)</b>(10장), <code>parkingHintStopId</code>(차가 다음 칸 5분 전에 씀 → "주차장 찾아봐 주세요" 푸시, 12장), <code>fuelNote</code>{afterStopId, stationName, priceWon, lat, lng, percentThen, ev, chosen}(차가 쓰는 오늘 주유·충전 계획 → 폰 레일 "주유하기", Q55, 2026-11-01)</div>
       <div class="sb-row"><code>…/days/{date}/stops/{id}</code> 장소 칸: 순서, 장소{이름,좌표,주소,kakaoId}, 시간?(도착 시각), 메모, 만든사람, 마지막 수정자·시각(Q07), deleted, 다녀옴, <b>건너뜀(skipped</b>, 차 음성 "건너뛰기" — 다녀옴과 함께 true, 2026-10-31), <b>pickupUid?</b>(픽업 칸 — 그 사람을 태우는 자리, 2026-11-09)</div>
