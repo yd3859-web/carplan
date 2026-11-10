@@ -95,6 +95,8 @@
   .frame { position:relative; width:100%; aspect-ratio:1100 / 791; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:var(--bg); }
   .frame img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; object-position:center; opacity:0; transform-origin:0 0; transform:scale(.985); transition:opacity .45s ease, transform .55s cubic-bezier(.2,.7,.2,1); }
   .frame img.on { opacity:1; transform:none; }
+  .frame video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .45s ease; background:var(--bg); }
+  .frame video.on { opacity:1; }
   /* 단락이 가리키는 부분을 확대해 보여 준다 (같은 사진이라도 단락마다 보는 곳이 달라짐) */
   .frame img.on.zoom { transform:translate(var(--tx), var(--ty)) scale(var(--k)); }
   .focus { display:none; }
@@ -221,7 +223,7 @@
       <div class="stage">
         <div class="frame">
           <img src="img/p_trip.jpg" alt="폰 여행 화면: 경로 지도와 레일">
-          <img src="img/p_dart.jpg" alt="다트로 동네 뽑기">
+          <video src="vid/p_dart.mp4" poster="vid/p_dart.jpg" muted playsinline preload="metadata" aria-label="다트를 던져 동네를 뽑고 그 동네 하루 코스가 나오는 실제 화면"></video>
           <img src="img/p_calendar.jpg" alt="폰 캘린더">
           <div class="focus"></div>
         </div>
@@ -236,9 +238,9 @@
           <h3>같이 정하는 도구는 한 줄에</h3>
           <p>채팅, 픽업, 투표, 다트, AI 추천, 주차장. 여행마다 채팅방이 하나 생기고, 칸이 바뀌거나 차가 도착하면 자동 카드가 올라와요.</p>
         </div>
-        <div class="step" data-img="1" data-dev="폰" data-cap="다트를 당겼다 놓으면 전국 지도 어딘가에">
+        <div class="step" data-img="1" data-dev="폰" data-cap="실제 화면 녹화: 던지면 동네가 뽑히고 그 동네 하루 코스까지">
           <h3>못 정했으면 다트</h3>
-          <p>전국 지도에 다트를 던져 동네를 뽑아요. 범위는 전국, 시·도, 내 위치 반경. 일행과 같은 방에서 실시간으로 돌아가며 던지고, 뽑힌 동네의 맛집·명소를 바로 칸으로 넣어요.</p>
+          <p>전국 지도에 다트를 던져 동네를 뽑아요. 꽂힌 그 동네로 관광지 → 점심 → 관광지 → 카페 하루 코스가 바로 짜이고, 버튼 한 번이면 칸으로 들어가요. 범위는 전국, 시·도, 내 위치 반경.</p>
         </div>
         <div class="step" data-img="2" data-dev="폰" data-cap="캘린더: 오늘 카드와 월 보기, 고른 날의 일정">
           <h3>시작은 캘린더</h3>
@@ -581,7 +583,7 @@
   const stories = [];
   document.querySelectorAll(".story").forEach(story => {
     const steps = Array.from(story.querySelectorAll(".step"));
-    const imgs = Array.from(story.querySelectorAll(".frame img"));
+    const imgs = Array.from(story.querySelectorAll(".frame img, .frame video"));
     const focus = story.querySelector(".focus");
     const dev = story.querySelector(".cap .dev");
     const txt = story.querySelector(".cap .txt");
@@ -604,10 +606,18 @@
     function show(step) {
       steps.forEach(s => s.classList.toggle("on", s === step));
       const i = +step.dataset.img;
-      imgs.forEach((im, k) => { im.classList.toggle("on", k === i); if (k !== i) im.classList.remove("zoom"); });
+      imgs.forEach((im, k) => {
+        im.classList.toggle("on", k === i); if (k !== i) im.classList.remove("zoom");
+        // 영상은 그 단락이 강조될 때 처음부터 한 번 재생하고 마지막 장면에서 멈춘다 (움직임 줄이기면 결과 장면만).
+        if (im.tagName === "VIDEO") {
+          if (k === i && !reduce) { im.currentTime = 0; im.play().catch(() => {}); }
+          else im.pause();
+        }
+      });
       dev.textContent = step.dataset.dev || "";
       txt.textContent = step.dataset.cap || "";
       const im = imgs[i];
+      if (im.tagName === "VIDEO") return;
       if (im.complete) zoomTo(im, step.dataset.focus); else im.addEventListener("load", () => { if (cur === step) zoomTo(im, step.dataset.focus); }, { once: true });
     }
     let cur = null;
@@ -625,6 +635,8 @@
     stories.push(pick);
   });
   function pickAll() { stories.forEach(f => f()); }
+  // 영상을 누르면 처음부터 다시.
+  document.querySelectorAll(".frame video").forEach(v => v.addEventListener("click", () => { v.currentTime = 0; v.play().catch(() => {}); }));
   addEventListener("scroll", () => requestAnimationFrame(pickAll), { passive: true });
   addEventListener("resize", pickAll);
 
