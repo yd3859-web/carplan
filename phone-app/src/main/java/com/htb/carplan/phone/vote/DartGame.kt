@@ -279,22 +279,28 @@ fun DartGame(
                                     }
                                 }
                             }
-                            // D7 기억장치: 뽑힌 동네에 대표 코스가 있으면 통째로 제안 (정원 2026-11-09).
-                            val course = remember(d.id, d.throwCount) {
-                                com.htb.carplan.phone.record.NextTripLoader.courses(context).firstOrNull { c -> d.resultName.split(" ").any { t -> t.startsWith(c.word) } }
-                            }
-                            if (course != null) Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                            // 어디에 꽂히든 그 동네 하루 코스 (2026-11-10): 대표 코스가 있으면 그것, 없으면 둘레에서 바로 짠 코스.
+                            val course by androidx.compose.runtime.produceState<VoteDartViewModel.DartCourse?>(null, d.id, d.throwCount) { value = vm.dartCourse(context, d) }
+                            var courseLoading by remember(d.id, d.throwCount) { mutableStateOf(true) }
+                            LaunchedEffect(course) { if (course != null) courseLoading = false }
+                            LaunchedEffect(d.id, d.throwCount) { kotlinx.coroutines.delay(6000); courseLoading = false }
+                            Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                                 androidx.compose.material3.HorizontalDivider(color = Palette.Line)
-                                Text("이 동네 대표 코스", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
-                                Text(course.places.joinToString(" → "), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
-                                if (course.note.isNotBlank()) Text(course.note, fontSize = 14.sp, color = Palette.TextSoft)
-                                if (onPick == null && eventId != null) {
-                                    var coursePut by remember(d.id, d.throwCount) { mutableStateOf(false) }
-                                    OutlinedButton(
-                                        onClick = { vm.addCourseAsStops(course, d); coursePut = true }, enabled = !coursePut,
-                                        shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
-                                        modifier = Modifier.padding(top = 6.dp).fillMaxWidth().height(44.dp),
-                                    ) { Text(if (coursePut) "코스를 넣었어요" else "추천코스로 여행하기", fontSize = 15.sp, color = if (coursePut) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                                val c = course
+                                if (c == null) Text(if (courseLoading) "이 동네로 하루 코스를 짜는 중…" else "이 근처엔 알려진 곳이 적어요 · 동네 그대로 넣을 수 있어요",
+                                    fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+                                else {
+                                    Text(c.title, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp))
+                                    Text(c.places.joinToString(" → ") { it.name }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong)
+                                    Text(c.note.ifBlank { if (c.curated) "" else "관광지 → 점심 → 관광지 → 카페, 가까운 순서로 · 장소 정보 카카오" }, fontSize = 14.sp, color = Palette.TextSoft)
+                                    if (onPick == null && eventId != null) {
+                                        var coursePut by remember(d.id, d.throwCount) { mutableStateOf(false) }
+                                        OutlinedButton(
+                                            onClick = { vm.addDartCourse(c, d); coursePut = true }, enabled = !coursePut,
+                                            shape = Corner, border = androidx.compose.foundation.BorderStroke(1.dp, Palette.Line),
+                                            modifier = Modifier.padding(top = 6.dp).fillMaxWidth().height(44.dp),
+                                        ) { Text(if (coursePut) "코스를 넣었어요" else "이 코스로 여행하기", fontSize = 15.sp, color = if (coursePut) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                                    }
                                 }
                             }
                             if (onPick != null) OutlinedButton(
@@ -488,7 +494,7 @@ private fun DotMapBoard(
             }
             val (la, lo) = toGeo(t)
             val anyNear = Regions.nearest(la, lo, Regions.all) ?: return false
-            return RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < 0.06 * 0.06 && (areaSido == null || anyNear.sido == areaSido)
+            return RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < LAND_DEG * LAND_DEG && (areaSido == null || anyNear.sido == areaSido)
         }
         // (old) snap to the edge / nearest 동네 inside — kept for replays of an old result only.
         fun keepInside(t: Offset): Offset {
@@ -500,10 +506,19 @@ private fun DotMapBoard(
             }
             val (la, lo) = toGeo(t)
             val anyNear = Regions.nearest(la, lo, Regions.all)
-            val inside = anyNear != null && RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < 0.06 * 0.06 && (areaSido == null || anyNear.sido == areaSido)
+            val inside = anyNear != null && RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < LAND_DEG * LAND_DEG && (areaSido == null || anyNear.sido == areaSido)
             if (inside) return t
             val n = Regions.nearest(la, lo, pool) ?: return t
             return toScreen(n.lat, n.lng)
+        }
+        // 바다·범위 밖에 떨어지면 지도 가운데(범위의 가운데) 쪽으로 조금씩 당겨 처음 닿는 육지에 꽂는다 — 날아간 방향은 그대로라
+        // 동해로 넘기면 동해안, 남해로 넘기면 남해안 (가장 가까운 동네로 옮기면 바다 쪽은 다 울릉도가 됐다).
+        fun landBack(t: Offset): Offset {
+            if (near != null) return keepInside(t)
+            val inScope = pool.ifEmpty { Regions.all }
+            val c = toScreen(inScope.map { it.lat }.average(), inScope.map { it.lng }.average())
+            for (i in 1..60) { val q = t + (c - t) * (i / 60f); if (inRange(q)) return q }
+            return keepInside(t)
         }
         suspend fun throwTo(target: Offset, ms: Int, from: Offset = launchAt) {
             flying = true; onFlying(true)
@@ -679,12 +694,14 @@ private fun DotMapBoard(
                             val reach = launchAt.y - boardH * 0.04f
                             val power = min(1f, p.getDistance() / (h * 0.40f))
                             val shake = Offset(gauss() * w * 0.008f, gauss() * boardH * 0.01f) // a little hand shake; it lands near the aim circle
-                            val target = Offset(
+                            val aimed = Offset(
                                 (launchAt.x + dir.x * reach * power * 1.2f + shake.x).coerceIn(w * 0.02f, w * 0.98f),
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
                             )
                             // Released from where it was drawn back: the dart snaps forward out of the band.
-                            val ok = inRange(target)
+                            // 테스트·심사용 (정원 2026-11-10): 바다나 범위 밖으로 가도 무효로 돌려보내지 않고 가장 가까운 범위 안 동네에 꽂는다.
+                            val target = if (inRange(aimed)) aimed else landBack(aimed)
+                            val ok = true
                             missed = !ok // known before it flies, so the hit itself already looks like a miss
                             throwTo(target, 560, from = launchAt + back)
                             if (ok) { val (lat, lng) = toGeo(target); onLanded(lat, lng) }
@@ -788,3 +805,6 @@ private fun gauss(): Float {
     val u = max(1e-6, Random.nextDouble()); val v = Random.nextDouble()
     return (sqrt(-2 * ln(u)) * cos(2 * PI * v)).toFloat().coerceIn(-2.5f, 2.5f)
 }
+
+/** Land test: within this many degrees of some 읍·면·동 centre (rural centres sit up to ~0.11° apart; 0.06 rejected real land in 강원 산간). */
+private const val LAND_DEG = 0.1

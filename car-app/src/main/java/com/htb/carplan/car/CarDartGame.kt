@@ -422,7 +422,7 @@ private fun DotMapBoard(
             }
             val (la, lo) = toGeo(t)
             val anyNear = Regions.nearest(la, lo, Regions.all) ?: return false
-            return RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < 0.06 * 0.06 && (areaSido == null || anyNear.sido == areaSido)
+            return RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < LAND_DEG * LAND_DEG && (areaSido == null || anyNear.sido == areaSido)
         }
         fun keepInside(t: Offset): Offset {
             if (near != null) {
@@ -433,7 +433,7 @@ private fun DotMapBoard(
             }
             val (la, lo) = toGeo(t)
             val anyNear = Regions.nearest(la, lo, Regions.all)
-            val inside = anyNear != null && RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < 0.06 * 0.06 && (areaSido == null || anyNear.sido == areaSido)
+            val inside = anyNear != null && RouteMathDeg(la, lo, anyNear.lat, anyNear.lng) < LAND_DEG * LAND_DEG && (areaSido == null || anyNear.sido == areaSido)
             if (inside) return t
             val n = Regions.nearest(la, lo, pool) ?: return t
             return toScreen(n.lat, n.lng)
@@ -720,3 +720,6 @@ private fun gauss(): Float {
     val u = max(1e-6, Random.nextDouble()); val v = Random.nextDouble()
     return (sqrt(-2 * ln(u)) * cos(2 * PI * v)).toFloat().coerceIn(-2.5f, 2.5f)
 }
+
+/** Land test: within this many degrees of some 읍·면·동 centre (rural centres sit up to ~0.11° apart; 0.06 rejected real land in 강원 산간). */
+private const val LAND_DEG = 0.1

@@ -127,6 +127,46 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
         message.value = if (put > 0) "${c.word} 코스 ${put}곳을 칸으로 넣었어요" else "코스 장소를 찾지 못했어요"
     }
 
+    /** 다트가 꽂힌 동네의 하루 코스: 손으로 정리한 대표 코스가 있으면 그것, 없으면 그 자리 둘레에서 바로 짠다. */
+    data class DartCourse(val title: String, val places: List<Place>, val curated: Boolean, val note: String = "")
+    private val courseCache = HashMap<String, DartCourse?>()
+
+    /**
+     * 즉석 코스 (2026-11-10): 어디에 꽂히든 그 동네 코스가 나오게. 대표 코스(기억장치)가 있는 시·군이면 그 장소들을 카카오로
+     * 확인해 쓰고, 없으면 관광지·식당·카페를 둘레에서 찾아 관광지 → 점심 → 관광지 → 카페로 엮는다 (shared [DayCourse]).
+     * 던질 때마다 카카오 3번, 같은 결과는 기억해 다시 부르지 않는다 (API 한도). 키가 없으면 대표 코스 이름만.
+     */
+    suspend fun dartCourse(context: Context, d: Dart): DartCourse? {
+        val key = "${d.id}#${d.throwCount}"
+        if (courseCache.containsKey(key)) return courseCache[key]
+        val kakao = com.htb.carplan.phone.trip.kakao
+        val curated = com.htb.carplan.phone.record.NextTripLoader.courses(context).firstOrNull { c -> d.resultName.split(" ").any { t -> t.startsWith(c.word) } }
+        val result = if (curated != null) {
+            val places = if (kakao.available) curated.places.take(5).mapNotNull { name ->
+                runCatching { kakao.searchKeyword("${curated.word} $name", size = 1).firstOrNull() }.getOrNull()
+            } else curated.places.take(5).map { Place(name = it) }
+            DartCourse("${curated.word} 대표 코스", places, curated = true, note = curated.note)
+        } else if (kakao.available) runCatching {
+            suspend fun around(c: com.htb.carplan.shared.net.KakaoCategory, r: Int) =
+                kakao.searchCategory(c, d.resultLat, d.resultLng, radiusMeters = r, size = 6)
+            val sights = around(com.htb.carplan.shared.net.KakaoCategory.SIGHT, 10_000).ifEmpty { around(com.htb.carplan.shared.net.KakaoCategory.SIGHT, 20_000) }
+            val foods = around(com.htb.carplan.shared.net.KakaoCategory.FOOD, 10_000)
+            val cafes = around(com.htb.carplan.shared.net.KakaoCategory.CAFE, 10_000)
+            val day = com.htb.carplan.shared.calendar.DayCourse.build(d.resultLat, d.resultLng, sights, foods, cafes)
+            DartCourse("${d.resultName.split(" ").last()} 하루 코스", day, curated = false)
+        }.getOrNull() else null
+        val kept = result?.takeIf { it.places.isNotEmpty() }
+        courseCache[key] = kept
+        return kept
+    }
+
+    /** [이 코스로 여행하기]: 코스 장소들을 차례로 칸으로. */
+    fun addDartCourse(course: DartCourse, d: Dart) = act {
+        val e = eventId ?: return@act
+        course.places.forEach { p -> trips.addStop(groupId, e, date ?: java.time.LocalDate.now().toString(), p, null, "다트 · " + d.resultName.split(" ").last(), uid.value.orEmpty()) }
+        message.value = "${course.places.size}곳을 칸으로 넣었어요"
+    }
+
     /** The board needs the full 읍·면·동 list to frame the scope. */
     fun ensureRegions(context: Context) = loadRegionsOnce(context)
 
