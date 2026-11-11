@@ -331,7 +331,7 @@ private fun SettingsDialog(onDemo: () -> Unit, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, buttons: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
+internal fun CarDialog(onDismiss: () -> Unit, title: String, width: Dp = 780.dp, buttons: @Composable RowScope.() -> Unit, content: @Composable ColumnScope.() -> Unit) {
     // A bump on the road must not close a window: only its [닫기] does (no tap-outside dismiss).
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
         Box(

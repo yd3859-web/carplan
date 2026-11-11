@@ -87,9 +87,10 @@ fun EventEditSheet(
 
     CenterSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp)) {
-            Text(if (isTrip) "여행 정보 고치기" else "일정 고치기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            com.htb.carplan.phone.ui.SheetTitle(if (isTrip) "여행 정보 고치기" else "일정 고치기")
             Spacer(Modifier.height(14.dp))
-            OutlinedTextField(title, { title = it }, label = { Text("제목") }, singleLine = true, modifier = Modifier.fillMaxWidth(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp))
+            androidx.compose.material3.TextField(title, { title = it }, placeholder = { Text("제목", fontSize = 18.sp) }, singleLine = true, shape = Corner, colors = com.htb.carplan.phone.ui.sheetFieldColors(),
+                modifier = Modifier.fillMaxWidth(), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold))
             Spacer(Modifier.height(10.dp))
             Line("종류") {
                 Row(Modifier.clip(Corner).clickable(enabled = !isTrip) { categorySheet = true }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -124,14 +125,10 @@ fun EventEditSheet(
                 Text(e.place?.let { "${com.htb.carplan.shared.text.Josa.ga(it.name)} 첫 칸이 되고, 이어서 장소를 더 넣을 수 있어요" }
                     ?: "여행 칸 화면이 열려서 장소를 차례로 넣을 수 있어요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp, bottom = 12.dp))
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { confirmDelete = true }) { Text("지우기", fontSize = 16.sp, color = Palette.Sunday) }
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismiss) { Text("취소", fontSize = 16.sp, color = Palette.TextSoft) }
-                Button(
-                    onClick = { onSave(title.ifBlank { e.title }, categoryId, start, end, if (nowTrip) true else allDay, time, place) },
-                    shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-                ) { Text("저장", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                TextButton(onClick = { confirmDelete = true }) { Text("지우기", fontSize = 17.sp, color = Palette.Sunday) }
+                com.htb.carplan.phone.ui.SheetActions("저장", onAction = { onSave(title.ifBlank { e.title }, categoryId, start, end, if (nowTrip) true else allDay, time, place) },
+                    onCancel = onDismiss, modifier = Modifier.weight(1f))
             }
         }
     }

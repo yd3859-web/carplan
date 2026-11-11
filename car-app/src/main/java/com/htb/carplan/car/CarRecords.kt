@@ -236,13 +236,17 @@ private fun DayTimeline(vm: CarHomeViewModel, date: LocalDate, rds: List<RecordD
             Text(if (rd.eventId.startsWith("log-")) "일상" else rd.title, color = c.ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
             Text(
                 listOfNotNull(list.map { it.place.name }.distinct().size.takeIf { it > 0 }?.let { "${it}곳" }, list.sumOf { it.photoUrls.size }.takeIf { it > 0 }?.let { "사진 ${it}장" }).joinToString("  ·  ").ifBlank { dayText(date) },
-                color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(bottom = 20.dp),
+                color = c.soft, fontSize = 20.sp,
             )
+            // Who came (C1 2026-11-11: 차에서도 일기처럼 — 누구랑 갔는지가 먼저 보이게).
+            val with by androidx.compose.runtime.produceState<List<String>>(emptyList(), rd) { value = vm.companionsOf(rd) }
+            if (with.isNotEmpty()) Text("함께 · " + with.joinToString(" · "), color = c.ink, fontSize = 24.sp, modifier = Modifier.padding(top = 4.dp))
+            Box(Modifier.height(20.dp))
             when {
                 recs == null -> Text("불러오는 중", color = c.soft, fontSize = 24.sp)
                 list.isEmpty() -> Text("이 여행엔 남긴 곳이 아직 없어요", color = c.soft, fontSize = 24.sp)
                 else -> {
-                    list.forEachIndexed { i, r -> RailEntry(r, list.getOrNull(i + 1), first = i == 0, comments = comments[r.stopId].orEmpty(), number = i + 1) }
+                    list.forEachIndexed { i, r -> RailEntry(vm, r, list.getOrNull(i + 1), first = i == 0, comments = comments[r.stopId].orEmpty(), number = i + 1) }
                     val start = list.firstNotNullOfOrNull { it.arrivedAt }?.toDate()?.time
                     val end = list.last().let { it.leftAt ?: it.arrivedAt }?.toDate()?.time
                     val span = if (start != null && end != null && end - start >= 60_000) ((end - start) / 60_000).let { m -> if (m >= 60) "${m / 60}시간${if (m % 60 > 0) " ${m % 60}분" else ""}" else "${m}분" } else null
@@ -257,8 +261,11 @@ private fun DayTimeline(vm: CarHomeViewModel, date: LocalDate, rds: List<RecordD
 
 /** A stop on the rail with what was left there: photos, my line (big), the group's comments; the facts small. */
 @Composable
-private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<StopComment>, number: Int) {
+private fun RailEntry(vm: CarHomeViewModel, r: Record, next: Record?, first: Boolean, comments: List<StopComment>, number: Int) {
     val c = LocalCarColors.current
+    var viewing by remember { mutableStateOf<Int?>(null) }
+    viewing?.let { CarPhotoViewer(r.place.name.ifBlank { "사진" }, r.photoUrls, it) { viewing = null } }
+    val again by androidx.compose.runtime.produceState<List<String>>(emptyList(), r.againBy) { value = r.againBy.map { vm.memberName(it) } }
     val hm = remember { SimpleDateFormat("HH:mm", Locale.KOREA) }
     val arrived = r.arrivedAt?.toDate()
     val left = r.leftAt?.toDate()
@@ -286,10 +293,10 @@ private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<S
             Text(r.place.name.ifBlank { "이름 없는 곳" }, color = c.ink, fontSize = if (rich) 30.sp else 26.sp, fontWeight = if (rich) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
             when (r.photoUrls.size) {
                 0 -> {}
-                1 -> Photo(r.photoUrls[0], Modifier.padding(top = 10.dp).fillMaxWidth().height(220.dp))
-                else -> r.photoUrls.chunked(2).forEach { row ->
+                1 -> Photo(r.photoUrls[0], Modifier.padding(top = 10.dp).fillMaxWidth().height(220.dp).clickable { viewing = 0 })
+                else -> r.photoUrls.chunked(2).forEachIndexed { ri, row ->
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        row.forEach { Photo(it, Modifier.weight(1f).height(160.dp)) }
+                        row.forEachIndexed { ci, u -> Photo(u, Modifier.weight(1f).height(160.dp).clickable { viewing = ri * 2 + ci }) }
                         if (row.size == 1) Box(Modifier.weight(1f))
                     }
                 }
@@ -301,6 +308,7 @@ private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<S
                     Text(cm.text, color = c.ink, fontSize = 24.sp, modifier = Modifier.border(1.dp, c.line, Corner).padding(horizontal = 14.dp, vertical = 8.dp))
                 }
             }
+            if (again.isNotEmpty()) Text("또 갈래요 · " + again.joinToString(" · "), color = c.ink, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
             listOfNotNull(
                 if (arrived != null && left != null) "${((left.time - arrived.time) / 60_000).coerceAtLeast(1)}분 머묾" else null,
                 r.parkingNote.ifBlank { null }?.let { "주차 $it" },
@@ -309,6 +317,29 @@ private fun RailEntry(r: Record, next: Record?, first: Boolean, comments: List<S
             val nextAt = next?.arrivedAt?.toDate()
             if (left != null && nextAt != null && nextAt.after(left)) Text("이동 ${((nextAt.time - left.time) / 60_000).coerceAtLeast(1)}분", color = c.soft, fontSize = 20.sp, modifier = Modifier.padding(top = 14.dp))
         }
+    }
+}
+
+/**
+ * A record's photos big (parked only — the 기록 tab is not there while driving): one at a time, whole, with
+ * [‹ 이전] [다음 ›] buttons instead of swiping (차: 큰 버튼, 손짓 대신), the count as the title.
+ */
+@Composable
+private fun CarPhotoViewer(place: String, urls: List<String>, start: Int, onClose: () -> Unit) {
+    val c = LocalCarColors.current
+    var i by remember { mutableStateOf(start.coerceIn(0, urls.lastIndex)) }
+    CarDialog(onDismiss = onClose, title = "$place  ${i + 1} / ${urls.size}", width = 1400.dp, buttons = {
+        if (urls.size > 1) {
+            OutlinedButton(onClick = { i = (i - 1 + urls.size) % urls.size }, shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.heightIn(min = 76.dp).width(180.dp)) { Text("‹ 이전", color = c.ink, fontSize = 24.sp) }
+            OutlinedButton(onClick = { i = (i + 1) % urls.size }, shape = Corner, border = BorderStroke(1.dp, c.line), modifier = Modifier.padding(start = 12.dp).heightIn(min = 76.dp).width(180.dp)) { Text("다음 ›", color = c.ink, fontSize = 24.sp) }
+            Box(Modifier.weight(1f))
+        }
+        CarCloseButton(onClick = onClose)
+    }) {
+        coil3.compose.AsyncImage(
+            model = urls[i], contentDescription = place, contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = Modifier.fillMaxWidth().height(640.dp).clip(Corner).background(c.sheet),
+        )
     }
 }
 

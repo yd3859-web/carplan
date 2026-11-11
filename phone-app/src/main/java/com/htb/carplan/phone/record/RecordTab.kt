@@ -2,6 +2,7 @@ package com.htb.carplan.phone.record
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
@@ -274,6 +275,28 @@ class RecordTabViewModel : ViewModel() {
 
     suspend fun summary(p: DiaryDay) = runCatching { records.daySummary(p.groupId, p.eventId, p.date) }.getOrDefault(emptyList())
 
+    /**
+     * C1 오늘 칸 (팀장 2026-11-11): a line or a photo written straight on today's page. With a [recordId] it goes on that
+     * slot; without one (nothing recorded yet) today's 일상 기록 gets a slot of its own first. [done] reloads the page.
+     */
+    fun writeToday(page: DiaryDay?, recordId: String?, note: String? = null, jpeg: ByteArray? = null, done: () -> Unit) {
+        val s = _session.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                val (p, rid) = if (page != null && recordId != null) page to recordId else {
+                    val today = LocalDate.now().toString()
+                    val eid = records.ensureDailyLog(s.soloGroupId, today, s.uid)
+                    val r = records.addRecord(s.soloGroupId, eid, today, com.htb.carplan.shared.model.Record(
+                        place = com.htb.carplan.shared.model.Place(name = MANUAL_PLACE), unplanned = true, createdBy = s.uid))
+                    DiaryDay(s.soloGroupId, eid, today, "일상 기록", isLog = true) to r
+                }
+                note?.let { records.setNote(p.groupId, p.eventId, p.date, rid, it.trim()) }
+                jpeg?.let { message.value = "사진 올리는 중…"; records.addPhoto(p.groupId, p.eventId, p.date, rid, it); message.value = null }
+            }.onFailure { message.value = it.message }
+            done()
+        }
+    }
+
     /** "오늘 기록 칸 직접 추가": opens (creating if needed) today's 일상 기록 and hands back its ref. */
     fun openTodayLog(onReady: (TripRef) -> Unit) {
         val s = _session.value ?: return
@@ -285,6 +308,9 @@ class RecordTabViewModel : ViewModel() {
         }
     }
 }
+
+/** Name of a slot written by hand on the record tab (no place: the car did not stop for it). */
+internal const val MANUAL_PLACE = "직접 남긴 기록"
 
 /** One page of the diary: a trip day or an 일상 기록 day. */
 data class DiaryDay(val groupId: String, val eventId: String, val date: String, val title: String, val isLog: Boolean, val dayNo: Int = 1)
@@ -333,7 +359,7 @@ fun RecordTab(vm: RecordTabViewModel = viewModel()) {
             message?.let { Text(it, color = Palette.Sunday, fontSize = 15.sp) }
         }
         LazyColumn(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 20.dp), state = list) {
-            item { TodayPage(today, todayPages, vm) { ref -> open = ref } }
+            item { TodayPage(today, todayPages, books, vm, onOpen = { ref -> open = ref }, onRead = { b, p -> reading = b to p }) }
             val bs = books
             if (bs == null) item { Text("기록을 펼치는 중…", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 28.dp)) }
             else if (bs.isEmpty()) item {
@@ -450,46 +476,145 @@ private fun dateRange(b: DiaryBook): String {
     }
 }
 
+/**
+ * C1 오늘 칸 (팀장 2026-11-11 "일기 느낌으로", 다른 기록 앱 참고): the app first lays out what the car already kept
+ * today (Apple 저널: 앱이 먼저 모아 제안), each slot takes a photo or a line right here (Day One: 바로 넣기), the day's
+ * way on a small map (Polarsteps), and a page from the same day back then (Google 포토 추억). Nothing yet: a question
+ * of the day and the same two buttons.
+ */
 @Composable
-private fun TodayPage(today: LocalDate, pages: List<DiaryDay>, vm: RecordTabViewModel, onOpen: (List<String>) -> Unit) {
+private fun TodayPage(today: LocalDate, pages: List<DiaryDay>, books: List<DiaryBook>?, vm: RecordTabViewModel, onOpen: (List<String>) -> Unit, onRead: (DiaryBook, DiaryDay) -> Unit) {
+    var tick by remember { mutableStateOf(0) }
     // Several things today (two trips, 일상): the page that already has records leads, else the first trip.
-    val loaded by produceState<List<Pair<DiaryDay, List<com.htb.carplan.shared.model.Record>>>>(emptyList(), pages) { value = pages.map { it to vm.summary(it) } }
+    val loaded by produceState<List<Pair<DiaryDay, List<com.htb.carplan.shared.model.Record>>>>(emptyList(), pages, tick) { value = pages.map { it to vm.summary(it) } }
     val chosen = loaded.firstOrNull { it.second.isNotEmpty() } ?: loaded.firstOrNull { !it.first.isLog } ?: loaded.firstOrNull()
     val page = chosen?.first ?: pages.firstOrNull { !it.isLog } ?: pages.firstOrNull()
     val recs = chosen?.second.orEmpty()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    // What the next photo / line goes on: a slot of today's page, or null = a new hand-written slot.
+    var photoFor by remember { mutableStateOf<String?>(null) }
+    var noteFor by remember { mutableStateOf<com.htb.carplan.shared.model.Record?>(null) }
+    var noteNew by remember { mutableStateOf(false) }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) Photos.downscaleToJpeg(ctx, uri)?.let { jpeg -> vm.writeToday(page.takeIf { photoFor != null }, photoFor, jpeg = jpeg) { tick++ } }
+    }
+    fun pickPhoto(r: com.htb.carplan.shared.model.Record?) {
+        photoFor = r?.id
+        pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+    noteFor?.let { r -> com.htb.carplan.phone.trip.NoteDialog(title = r.place.name.ifBlank { "한 줄" }, initial = r.note,
+        onSave = { t -> vm.writeToday(page, r.id, note = t) { tick++ }; noteFor = null }, onDismiss = { noteFor = null }) }
+    if (noteNew) com.htb.carplan.phone.trip.NoteDialog(title = "오늘 한 줄", hint = dayQuestion(today), initial = "",
+        onSave = { t -> vm.writeToday(null, null, note = t) { tick++ }; noteNew = false }, onDismiss = { noteNew = false })
+
     // No box around it (sections aren't boxed): the big date and a line under it do the job (디자인 평가 2026-11-04).
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text("${today.dayOfMonth}", fontSize = 40.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
             Text("  ${today.monthValue}월 · ${today.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.KOREAN)} · 오늘", fontSize = 17.sp, color = Palette.TextSoft, modifier = Modifier.padding(bottom = 8.dp))
         }
-        if (recs.isEmpty()) Text("아직 쓴 게 없어요. 차를 세우면 칸이 생기고, 직접 쓸 수도 있어요.", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
-        else DiaryBody(page!!, recs)
-        Button(
-            onClick = { if (page != null && !page.isLog) onOpen(listOf(page.groupId, page.eventId, page.date)) else vm.openTodayLog { onOpen(listOf(it.groupId, it.eventId, it.date)) } },
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(52.dp), shape = Corner,
-            colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy),
-        ) { Text(if (recs.isEmpty()) "오늘 쓰기" else "오늘 이어 쓰기", fontWeight = FontWeight.SemiBold, fontSize = 17.sp) }
+        if (recs.isEmpty()) {
+            // A question of the day instead of "nothing yet" — the page asks, like a diary would.
+            Text(dayQuestion(today), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, lineHeight = 28.sp, modifier = Modifier.padding(top = 6.dp))
+            Text("차를 세우면 그곳이 여기 칸으로 생겨요. 지금 바로 남겨도 돼요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TodayButton("사진 넣기", Modifier.weight(1f)) { pickPhoto(null) }
+                TodayButton("한 줄 쓰기", Modifier.weight(1f)) { noteNew = true }
+            }
+        } else {
+            page?.takeIf { !it.isLog }?.let { Text(it.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp)) }
+            val pts = recs.map { it.place }.filter { it.lat != 0.0 || it.lng != 0.0 }.map { it.lat to it.lng }.distinct()
+            if (pts.size >= 2) {
+                com.htb.carplan.phone.ui.SimpleMap(
+                    centerLat = pts.first().first, centerLng = pts.first().second, zoom = 12,
+                    markers = pts.mapIndexed { i, (la, lo) -> com.htb.carplan.phone.ui.MapMarker(la, lo, "${i + 1}", com.htb.carplan.phone.ui.MapMarker.Kind.STOP) },
+                    path = pts, fit = pts, height = 140.dp,
+                )
+            }
+            recs.forEach { r -> TodaySlot(r, onPhoto = { pickPhoto(r) }, onNote = { noteFor = r }) }
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TodayButton("칸 없이 한 줄", Modifier.weight(1f)) { noteNew = true }
+                TodayButton("하루 전체 열기", Modifier.weight(1f)) {
+                    if (page != null && !page.isLog) onOpen(listOf(page.groupId, page.eventId, page.date))
+                    else vm.openTodayLog { onOpen(listOf(it.groupId, it.eventId, it.date)) }
+                }
+            }
+        }
+        backThen(today, books)?.let { (label, b, p) ->
+            Row(Modifier.fillMaxWidth().padding(top = 18.dp).clip(Corner).clickable { onRead(b, p) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                b.photos.firstOrNull()?.let { url ->
+                    coil3.compose.AsyncImage(model = url, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(52.dp).clip(Corner))
+                    Spacer(Modifier.width(12.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(label, fontSize = 14.sp, color = Palette.TextSoft)
+                    Text(if (b.isLog) "일상 · " + b.places.take(2).joinToString(", ") else b.event.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                Text("›", fontSize = 20.sp, color = Palette.TextSoft)
+            }
+        }
         HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(top = 20.dp))
     }
 }
 
-/** Title, the places in order, the first line someone wrote, and up to 4 photos. */
+/** One slot of today: time · place · stay, its photos and line, and [사진]·[한 줄] right where they go. */
 @Composable
-private fun DiaryBody(p: DiaryDay, recs: List<com.htb.carplan.shared.model.Record>) {
-    Text(if (p.isLog) "일상" else p.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-    // Each place once, in the order first reached (a day driven twice, or a test day, must not repeat the list).
-    val path = recs.map { it.place.name.ifBlank { "이름 없는 곳" } }.distinct()
-    if (recs.isNotEmpty()) Text(path.joinToString(" → ") + "  ·  ${path.size}곳", fontSize = 15.sp, color = Palette.ChipText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-    else Text("들른 곳 없음", fontSize = 15.sp, color = Palette.TextSoft)
-    recs.firstOrNull { it.note.isNotBlank() }?.let { Text("“${it.note}”", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 6.dp)) }
-    val all = recs.flatMap { it.photoUrls }
-    // A photo opens big (all of the day's photos, sideways); the rest of the card opens the day.
+private fun TodaySlot(r: com.htb.carplan.shared.model.Record, onPhoto: () -> Unit, onNote: () -> Unit) {
     var viewing by remember { mutableStateOf<Int?>(null) }
-    viewing?.let { com.htb.carplan.phone.ui.PhotoViewer(all, it) { viewing = null } }
-    if (all.isNotEmpty()) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        all.take(4).forEachIndexed { i, url -> coil3.compose.AsyncImage(model = url, contentDescription = "사진 크게 보기", contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(72.dp).clip(Corner).clickable { viewing = i }) }
-        if (all.size > 4) Text("+${all.size - 4}", fontSize = 15.sp, color = Palette.TextSoft)
+    viewing?.let { com.htb.carplan.phone.ui.PhotoViewer(r.photoUrls, it) { viewing = null } }
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            r.arrivedAt?.let { Text(android.text.format.DateFormat.format("HH:mm", it.toDate()).toString(), fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.width(52.dp)) }
+            Text(r.place.name.ifBlank { "이름 없는 곳" }, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.weight(1f, fill = false))
+            val stay = r.leftAt?.let { l -> r.arrivedAt?.let { a -> ((l.seconds - a.seconds) / 60).toInt() } }?.takeIf { it > 0 }
+            stay?.let { Text("  ${if (it >= 60) "${it / 60}시간 ${it % 60}분" else "${it}분"}", fontSize = 14.sp, color = Palette.TextSoft) }
+        }
+        Column(Modifier.padding(start = 52.dp)) {
+            if (r.note.isNotBlank()) Text("“${r.note}”", fontSize = 17.sp, color = Palette.TextStrong, modifier = Modifier.padding(top = 4.dp).clickable(onClick = onNote))
+            if (r.photoUrls.isNotEmpty()) Row(Modifier.padding(top = 8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                r.photoUrls.forEachIndexed { i, url -> coil3.compose.AsyncImage(model = url, contentDescription = "사진 크게 보기", contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(88.dp).clip(Corner).clickable { viewing = i }) }
+            }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SlotChip(if (r.photoUrls.isEmpty()) "사진" else "사진 더", onPhoto)
+                if (r.note.isBlank()) SlotChip("한 줄", onNote)
+            }
+        }
     }
 }
+
+@Composable
+private fun SlotChip(label: String, onClick: () -> Unit) {
+    Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Navy,
+        modifier = Modifier.clip(Corner).border(1.dp, Palette.Line, Corner).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 7.dp))
+}
+
+/** Secondary button: white with a thin grey edge (주요 버튼은 검정 채움 — 여기선 둘 다 같은 무게). */
+@Composable
+private fun TodayButton(label: String, modifier: Modifier, onClick: () -> Unit) {
+    androidx.compose.material3.OutlinedButton(onClick = onClick, modifier = modifier.height(52.dp), shape = Corner,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Palette.SheetEdge),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.TextStrong)) { Text(label, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+}
+
+/** A different question each day (the empty page asks instead of saying "nothing yet"). */
+private fun dayQuestion(d: LocalDate): String = listOf(
+    "오늘 제일 좋았던 곳은 어디였어요?",
+    "오늘 누구랑 같이 탔어요?",
+    "차 안에서 들은 노래가 있었나요?",
+    "다음에 또 오고 싶은 곳이 있었나요?",
+    "오늘 먹은 것 중 하나만 남긴다면?",
+    "창밖으로 본 풍경 한 장 남겨 볼까요?",
+    "오늘 하루를 한 줄로 남긴다면?",
+)[d.dayOfYear % 7]
+
+/** A page from the same day back then — a year, a month, then a week ago — for the 회상 줄 under today. */
+private fun backThen(today: LocalDate, books: List<DiaryBook>?): Triple<String, DiaryBook, DiaryDay>? {
+    val bs = books ?: return null
+    listOf(today.minusYears(1) to "1년 전 오늘", today.minusMonths(1) to "한 달 전 오늘", today.minusWeeks(1) to "지난주 오늘").forEach { (d, label) ->
+        bs.firstNotNullOfOrNull { b -> b.pages.firstOrNull { it.first.date == d.toString() }?.let { b to it.first } }?.let { (b, p) -> return Triple(label, b, p) }
+    }
+    return null
+}
+
 

@@ -69,7 +69,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 - 차 앱도 같은 규칙(`car/MainActivity.kt` 상단 색 상수). 세 칸은 세로 구분선으로, 질문은 검정 띠.
 - 폰 하단 바는 시스템식 평면 바(아이콘+글자, 위에 구분선). 떠 있는 둥근 바 아님.
 - **하루 일정은 레일 타임라인**(`phone/ui/Rail.kt`: `railLine`·`RailNode`·`speechBubble`): 노드 = 장소, 지난 칸 ✓ 회색, 다음 칸 파랑, 계획 칸 빈 고리, 코멘트는 노드 아래 말풍선. 여행 편집·그날 동선·차 화면이 같은 그림. 애니메이션: **주차 중엔 모든 전환을 부드럽게**(팀장 2026-10-31 — 차 `car/CarMotion.kt`: 0.25초 하나로 창은 살짝 커지며 나타남·전체 화면은 옆에서·띠와 알림 줄은 위→아래로 열고 닫힘·선택 색은 서서히·순서 바꾸기는 미끄러짐·탭과 달은 옆으로), **주행 중엔 전부 멈춤**(`LocalMotion` false, Pleos). 새 화면도 `CarEnter`·`CarAppear`·`carColor`·`carSize`로. 폰도 같은 0.25초(`phone/ui/Motion.kt` `Enter` — `CenterSheet`가 자동으로, 전체 화면은 `Entry.SCREEN`, 아래 탭은 옆으로). **손짓**(2026-11-01): 폰 전체 화면은 `BackScreen`으로 원래 화면 위에 겹쳐 띄움(뒤로 손짓을 따라 밀려남), 옆으로 넘기기는 `Modifier.sideSwipe`(달·날짜, 넘어갈 때 진동), 탭 다시 누르기는 `OnTabTapAgain`, 사진은 `PhotoViewer`. 차는 `monthSwipe`·`OnCarTabTapAgain`.
-- **입력·선택 창은 전부 화면 가운데 대화창**(`ui/CenterSheet.kt`): 연회색 바탕(`Palette.Sheet`) + 1dp 테두리(`SheetEdge`) + 그림자, 안의 카드·입력칸은 흰색. 아래에서 올라오는 바텀 시트 금지(차 화면에서 운전자 손이 안 닿음). 글자는 폰 기준보다 한 단계 크게(본문 17sp, 제목 22sp, 캘린더 날짜 17sp).
+- **입력·선택 창은 전부 화면 가운데 대화창**(`ui/CenterSheet.kt`): **흰 바탕**(`Palette.Sheet` = 흰색, 2026-11-11 팀장 "회색 팝업 안 맞음") + 1dp 테두리(`SheetEdge`) + 옅은 그림자. 제목 `SheetTitle`(22), 입력칸 `sheetFieldColors()`(연회색 `InputBg` 상자·밑줄 없음·4dp), 아래 버튼 `SheetActions`([취소] 흰+테두리, 주요 검정). Material 연보라 기본색은 `CarplanTheme`에서 전부 막음. 아래에서 올라오는 바텀 시트 금지(차 화면에서 운전자 손이 안 닿음). 글자는 폰 기준보다 한 단계 크게(본문 17sp, 제목 22sp, 캘린더 날짜 17sp).
 - 팀장이 예시 이미지를 주면 **참고용**이다. 그대로 베끼지 말고 우리 앱(일정이 차를 움직임)에 맞게 다시 설계하고, 어디를 참고할지 먼저 묻는다.
 - API 키는 팀장이 필요한 순간에 준다. 받으면 `local.properties`에만 넣는다.
 - `docs/Pleos_시작가이드.txt`는 수정하지 않는다.

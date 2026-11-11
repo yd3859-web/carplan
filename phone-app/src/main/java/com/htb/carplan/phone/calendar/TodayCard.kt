@@ -74,6 +74,8 @@ private fun nextDestination(upcoming: List<CalendarEvent>, today: LocalDate): Ca
     val now = LocalTime.now().toString().take(5)
     return MonthGrid.eventsOn(today, upcoming)
         .filter { it.event.categoryId != BuiltInCategory.CAR.id }
+        // 일상 기록 is where the car already stood, never where it goes next.
+        .filter { !it.event.id.startsWith("log-") }
         // A trip is a list of stops (shown on the rail), not a destination itself; the car asks about its stops.
         .filter { it.event.categoryId != BuiltInCategory.TRIP.id || it.event.place != null }
         .filter { it.event.startTime == null || it.event.startTime!! >= now }

@@ -172,7 +172,7 @@ fun QuickAddSheet(
 
     CenterSheet(onDismiss = onDismiss) {
         Column(Modifier.imePadding()) {
-            Text(if (isTrip) "여행 추가" else "일정 추가", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(bottom = 6.dp))
+            com.htb.carplan.phone.ui.SheetTitle(if (isTrip) "여행 추가" else "일정 추가", Modifier.padding(bottom = 14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextField(
                     value = title,
@@ -180,23 +180,18 @@ fun QuickAddSheet(
                         title = it
                         if (!categoryPicked) categoryId = if (looksLikeTrip(it)) BuiltInCategory.TRIP.id else BuiltInCategory.OTHER.id
                     },
-                    placeholder = { Text(if (isTrip) "어디로 떠나요? (여행 이름)" else "무슨 일정이에요?", fontSize = 26.sp, fontWeight = FontWeight.Bold) },
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold),
+                    placeholder = { Text(if (isTrip) "어디로 떠나요? (여행 이름)" else "무슨 일정이에요?", fontSize = 22.sp, fontWeight = FontWeight.SemiBold) },
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { save() }),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
-                    ),
+                    shape = Corner,
+                    colors = com.htb.carplan.phone.ui.sheetFieldColors(),
                     modifier = Modifier.weight(1f).focusRequester(titleFocus),
                 )
-                IconButton(onClick = ::save, enabled = title.isNotBlank()) {
-                    Icon(Icons.AutoMirrored.Filled.Send, "추가", tint = if (title.isNotBlank()) Palette.Navy else Palette.TextSoft)
-                }
             }
 
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 // The kind first: it decides what the rest of the row is (여행 = places one by one on the next screen).
                 if (fixedCategoryId == null) CategoryChip(CategoryColors.label(categoryId, categories), argb(CategoryColors.of(categoryId, categories))) { categorySheet = true }
                 if (!isTrip) Chip(Icons.Filled.Place, place?.name ?: "장소", active = place != null) { pickingPlace = true }
@@ -256,6 +251,7 @@ fun QuickAddSheet(
             checklist.forEachIndexed { i, item ->
                 SmallField(item, { checklist[i] = it }, "체크리스트 항목", onRemove = { checklist.removeAt(i) })
             }
+            com.htb.carplan.phone.ui.SheetActions(if (isTrip) "여행 만들기" else "추가", onAction = ::save, onCancel = onDismiss, enabled = title.isNotBlank())
         }
     }
 
@@ -350,7 +346,7 @@ private fun SmallField(value: String, onChange: (String) -> Unit, hint: String, 
             value, onChange, placeholder = { Text(hint, fontSize = 17.sp) }, singleLine = true, modifier = Modifier.weight(1f),
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp),
             shape = Corner,
-            colors = TextFieldDefaults.colors(focusedContainerColor = Palette.Background, unfocusedContainerColor = Palette.Background, focusedIndicatorColor = Palette.Navy, unfocusedIndicatorColor = Palette.SheetEdge),
+            colors = com.htb.carplan.phone.ui.sheetFieldColors(),
         )
         IconButton(onClick = onRemove) { Icon(Icons.Filled.Close, "지우기", tint = Palette.TextSoft) }
     }

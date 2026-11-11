@@ -363,6 +363,17 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
         .catch { emit(emptyMap()) }
 
+    /** 기록 일기장 (C1, 2026-11-11): who else was in that day's group — "함께 · 민지·서연" (none for the owner alone). */
+    suspend fun companionsOf(d: RecordDay): List<String> {
+        val me = owner.value?.uid
+        val g = runCatching { GroupRepository().observeGroup(d.groupId).first() }.getOrNull() ?: return emptyList()
+        if (g.solo) return emptyList()
+        return g.memberIds.filter { it != me }.map { commenterNames[it] ?: loadName(it) }.distinct()
+    }
+
+    /** A member's name (cached), for 또 갈래요 on a record. */
+    suspend fun memberName(uid: String): String = if (uid == owner.value?.uid) "나" else commenterNames[uid] ?: loadName(uid)
+
     /** The first photo of a day, for its calendar cell (one read per day, kept). */
     private val covers = HashMap<String, String?>()
     suspend fun coverOf(d: RecordDay): String? {

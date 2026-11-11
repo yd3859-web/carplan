@@ -17,9 +17,12 @@ object Palette {
     val Background = Color(0xFFFFFFFF)
     /** Input fields and pressed states only, never whole sections. */
     val Panel = Color(0xFFF4F5F7)
-    /** Dialogs sit on a light grey sheet with a visible edge so they read as a layer over the white page. */
-    val Sheet = Color(0xFFF0F2F5)
-    val SheetEdge = Color(0xFFC9CED4)
+    /**
+     * Dialogs are white like the page, lifted by a thin edge and a soft shadow (팀장 2026-11-11: 회색 팝업이 앱과 안 맞음 →
+     * 흰 창 + 회색 입력칸, 연보라 기본색 없앰).
+     */
+    val Sheet = Color(0xFFFFFFFF)
+    val SheetEdge = Color(0xFFD5D9DE)
     /** Primary (buttons, today marker). Kept under its old name so call sites stay. */
     val Navy = Color(0xFF111111)
     val NavySoft = Color(0xFF2B2F33)
@@ -55,6 +58,18 @@ fun CarplanTheme(content: @Composable () -> Unit) {
             onSurfaceVariant = Palette.ChipText,
             outline = Palette.Line,
             outlineVariant = Palette.Line,
+            // No Material lavender anywhere: fields, pickers and selected states take our greys and black.
+            surfaceContainerHighest = Palette.InputBg,
+            surfaceContainerLowest = Palette.Background,
+            surfaceVariant = Palette.InputBg,
+            surfaceTint = Color.Transparent,
+            primaryContainer = Palette.InputBg,
+            onPrimaryContainer = Palette.TextStrong,
+            secondaryContainer = Palette.InputBg,
+            onSecondaryContainer = Palette.TextStrong,
+            tertiary = Palette.Teal,
+            tertiaryContainer = Palette.InputBg,
+            onTertiaryContainer = Palette.TextStrong,
         ),
         shapes = Shapes(extraSmall = Corner, small = Corner, medium = Corner, large = Corner, extraLarge = Corner),
         content = content,

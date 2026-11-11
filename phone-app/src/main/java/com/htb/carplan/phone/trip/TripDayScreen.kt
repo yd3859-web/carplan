@@ -936,16 +936,14 @@ private fun UnplannedRow(
 }
 
 @Composable
-private fun NoteDialog(title: String = "한 줄", hint: String = "짧게 한 줄", initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+internal fun NoteDialog(title: String = "한 줄", hint: String = "짧게 한 줄", initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf(initial) }
     CenterSheet(onDismiss = onDismiss) {
         Column {
-            Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            TextField(text, { text = it }, placeholder = { Text(hint, fontSize = 17.sp) }, singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
-            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("취소", color = Palette.TextSoft, fontSize = 17.sp) }
-                Button(onClick = { onSave(text) }, enabled = text.isNotBlank() || initial.isNotBlank(), shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy)) { Text("저장", fontSize = 17.sp) }
-            }
+            com.htb.carplan.phone.ui.SheetTitle(title)
+            TextField(text, { text = it }, placeholder = { Text(hint, fontSize = 17.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, lineHeight = 26.sp),
+                shape = Corner, colors = com.htb.carplan.phone.ui.sheetFieldColors(), minLines = 2, maxLines = 4, modifier = Modifier.fillMaxWidth().padding(top = 14.dp))
+            com.htb.carplan.phone.ui.SheetActions("저장", onAction = { onSave(text) }, onCancel = onDismiss, enabled = text.isNotBlank() || initial.isNotBlank())
         }
     }
 }
