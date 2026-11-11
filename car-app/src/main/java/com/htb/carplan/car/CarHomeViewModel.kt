@@ -472,6 +472,21 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
     val demoAvailable: Boolean get() = BuildConfig.DEMO_PASSWORD.isNotBlank()
 
+    /**
+     * 시연 계정 (2026-11-11 팀장 "차랑 폰 연결도 미리"): a car with no owner yet becomes the demo account's car on its
+     * own — once per install, so [차주 연결 풀기] for trying the 6 digits does not snap straight back.
+     */
+    init {
+        viewModelScope.launch {
+            if (!demoAvailable) return@launch
+            val prefs = getApplication<Application>().getSharedPreferences("demo_link", android.content.Context.MODE_PRIVATE)
+            if (prefs.getBoolean("autoLinked", false)) return@launch
+            val c = car.filterNotNull().first()
+            prefs.edit().putBoolean("autoLinked", true).apply()
+            if (c.ownerUid == null && c.linkCode != null) linkDemoOwner()
+        }
+    }
+
     /** 시연 메뉴 "준비": the made-up friends get their fixed e-mail accounts. */
     fun pinFriends() {
         val d = demo() ?: return
