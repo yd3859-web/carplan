@@ -2,7 +2,6 @@
 
 package com.htb.carplan.car
 
-import android.Manifest
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
@@ -16,7 +15,6 @@ import com.htb.carplan.shared.model.DartScope
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -124,11 +122,10 @@ private val Disabled: Color @Composable get() = LocalCarColors.current.disabled
 class MainActivity : ComponentActivity() {
     private val vm: CarHomeViewModel by viewModels()
 
-    private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        permissions.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+        // No notification permission asked (팀장 2026-11-11): the only notification is TripSyncService's "일정 동기화"
+        // line, and a foreground service runs without it — the car speaks and shows bands instead.
         setContent {
             val forceDark by vm.previewDark.collectAsStateWithLifecycle()
             CarTheme(forceDark = forceDark) {
