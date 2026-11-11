@@ -29,3 +29,7 @@ firestore-debug.log
 .firebase/
 functions/node_modules/
 hosting/public/apk/
+
+# Word 잠금 파일과 참가 서류(연락처 들어 있음) — 올리지 않는다
+~$*
+docs/*.docx
