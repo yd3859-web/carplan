@@ -536,6 +536,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         if (photos.isEmpty()) { say("이미 채워져 있어요 · 사진 파일이 없는 빌드예요"); return }
         val db = FirebaseFirestore.getInstance()
         var added = 0
+        var failed: Throwable? = null
         for (key in prefs.getStringSet("events", emptySet()).orEmpty()) {
             val (g, e) = key.split("/")
             if (e.startsWith("due-")) continue
@@ -543,11 +544,16 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
             for (d in days) {
                 val recs = runCatching { db.collection(FirestorePaths.records(g, e, d)).get().await().toObjects(Record::class.java) }.getOrDefault(emptyList())
                 for (r in recs.filter { it.photoUrls.isEmpty() && it.note.isNotBlank() }) {
-                    repeat(if (r.note.length > 14) 2 else 1) { nextPhoto()?.let { runCatching { records.addPhoto(g, e, d, r.id, it) }.onSuccess { added++ } } }
+                    repeat(if (r.note.length > 14) 2 else 1) { nextPhoto()?.let { runCatching { records.addPhoto(g, e, d, r.id, it) }.onSuccess { added++ }.onFailure { err -> failed = failed ?: err } } }
                 }
             }
         }
-        say(if (added > 0) "사진 ${added}장 넣었어요" else "넣을 사진이 없어요 · 다 들어가 있어요")
+        failed?.let { android.util.Log.w("DemoSeed", "photo upload failed", it) }
+        say(when {
+            added > 0 -> "사진 ${added}장 넣었어요"
+            failed != null -> "사진 못 올렸어요 · ${failed?.message?.take(60)}"
+            else -> "넣을 사진이 없어요 · 다 들어가 있어요"
+        })
     }
 
     // ---------- pieces ----------
@@ -634,7 +640,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
     /** One photo on a record: uploaded when Storage takes it, else a web sample URL (test data only). */
     private suspend fun addPhoto(g: String, e: String, d: String, rid: String) {
         val bytes = nextPhoto()
-        if (bytes != null && !storageRefused && runCatching { records.addPhoto(g, e, d, rid, bytes) }.isSuccess) return
+        if (bytes != null && !storageRefused && runCatching { records.addPhoto(g, e, d, rid, bytes) }.onFailure { android.util.Log.w("DemoSeed", "photo upload failed", it) }.isSuccess) return
         storageRefused = true
         runCatching {
             FirebaseFirestore.getInstance().document("${FirestorePaths.records(g, e, d)}/$rid")

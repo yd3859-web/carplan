@@ -3,6 +3,7 @@ rules_version = '2';
 // 18장: 기록 사진은 records/{groupId}/{eventId}/{date}/{recordId}/{file}.
 // 그 그룹의 멤버와 멤버의 차(차 계정 uid = cars/{id}, ownerUid가 멤버)만 읽고 쓴다. 이미지 5MB까지.
 // firestore.get/exists를 쓰므로 Storage 서비스 계정에 Firestore 읽기 권한이 필요하다(배포 때 묻는 질문에 Y).
+// 2026-11-11: 권한이 없어 업로드가 403("User does not have permission")으로 막혀 있었음 → 다시 배포해 권한 받기.
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() { return request.auth != null; }
