@@ -45,7 +45,8 @@ import java.time.LocalDate
 data class TripRef(val groupId: String, val eventId: String, val date: String)
 
 /** One drive between two consecutive stops; [exact] = from Kakao Mobility, else a straight-line guess. */
-data class LegInfo(val seconds: Int, val meters: Int, val exact: Boolean)
+/** One drive of the plan. [ours] = how many real drives of our own car it comes from (A5), 0 = Kakao or a guess. */
+data class LegInfo(val seconds: Int, val meters: Int, val exact: Boolean, val ours: Int = 0)
 
 /** Kakao key present → real search; absent → the screen offers typing a name instead. */
 val kakao: KakaoApi by lazy { KakaoApi(BuildConfig.KAKAO_REST_KEY) }
@@ -452,15 +453,31 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
 
     private suspend fun refreshLegs(list: List<Stop>) {
         val out = LinkedHashMap<String, LegInfo>()
-        list.zipWithNext().forEach { (a, b) -> legFor(a.place, b.place)?.let { out[a.id] = it } }
+        list.zipWithNext().forEach { (a, b) -> legFor(a.place, b.place, a.time?.take(2)?.toIntOrNull())?.let { out[a.id] = it } }
         _legs.value = out
     }
 
-    /** Drive from [a] to [b]: Kakao Mobility when there is a key, otherwise a straight-line guess. */
-    private suspend fun legFor(a: Place, b: Place): LegInfo? {
+    /** A5: the real drive times kept in every group I am in (read once per screen; a new record shows next time). */
+    private var ourLegs: List<com.htb.carplan.shared.model.LegMemo>? = null
+    private suspend fun ourLegs(): List<com.htb.carplan.shared.model.LegMemo> = ourLegs ?: run {
+        val ids = (myGroups.value.map { it.id }.ifEmpty { runCatching { calendar.observeGroups(me()).first().map { it.id } }.getOrDefault(emptyList()) } + groupId).distinct()
+        recordsRepo.legMemos(ids).also { ourLegs = it }
+    }
+
+    /**
+     * Drive from [a] to [b] leaving around [hour]: our own car's real times first (A5 — 카카오는 처음 가는 길만), then
+     * Kakao Mobility when there is a key, otherwise a straight-line guess.
+     */
+    private suspend fun legFor(a: Place, b: Place, hour: Int? = null): LegInfo? {
         val straight = RouteMath.meters(a, b) ?: return null
-        val key = "${a.lat},${a.lng}>${b.lat},${b.lng}"
+        val key = "${a.lat},${a.lng}>${b.lat},${b.lng}@$hour"
         legCache[key]?.let { return it }
+        com.htb.carplan.shared.calendar.LegTimes.find(ourLegs(), a, b)?.let { m ->
+            com.htb.carplan.shared.calendar.LegTimes.minutes(m, hour)?.let { min ->
+                // Road length: Kakao's when it was asked before for this pair, else the straight line × 1.3 (RouteMath).
+                return LegInfo(min * 60, (straight * 1.3).toInt(), exact = false, ours = m.samples.size).also { legCache[key] = it }
+            }
+        }
         val leg = if (kakao.available) {
             runCatching { kakao.directions(a, b) }.map { LegInfo(it.seconds, it.meters, exact = true) }.getOrNull()
         } else null

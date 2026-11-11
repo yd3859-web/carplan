@@ -956,6 +956,7 @@ private fun LegLabel(leg: LegInfo?, driving: Boolean) {
     Text(
         when {
             leg == null -> "이동"
+            leg.ours > 0 -> "이동 약 ${minutes(leg.seconds)} · 우리 차 기록 ${leg.ours}번"
             leg.exact -> "이동 ${minutes(leg.seconds)} · ${km(leg.meters)}"
             else -> "이동 약 ${minutes(leg.seconds)} · ${km(leg.meters)} (직선)"
         },

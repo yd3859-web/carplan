@@ -23,6 +23,8 @@ object FirestorePaths {
     fun darts(groupId: String) = "${group(groupId)}/darts"
     /** 여행별 채팅방 (A안 2026-11-03): one room per group. */
     fun chat(groupId: String) = "${group(groupId)}/chat"
+    /** A5: real drive times between two places the group's car has gone ([com.htb.carplan.shared.calendar.LegTimes.key]). */
+    fun legs(groupId: String) = "${group(groupId)}/legs"
     /** Q58: the group's memo per Kakao place (또 갈래요 · 가 봄). */
     fun places(groupId: String) = "${group(groupId)}/places"
 

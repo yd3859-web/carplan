@@ -58,7 +58,37 @@ class RecordRepository(
             if (p.category.isNotBlank()) memo["category"] = p.category
             runCatching { db.document("${FirestorePaths.places(groupId)}/$id").set(memo, SetOptions.merge()).await() }
         }
+        runCatching { addLegSample(groupId, eventId, date, ref.id, record.copy(arrivedAt = record.arrivedAt ?: Timestamp.now())) }
         return ref.id
+    }
+
+    /**
+     * A5: the drive that ended at [record] — from leaving the day's slot before it (its leftAt) to arriving here — goes
+     * into the group's [LegMemo] for that pair of places, when it looks like a plain drive ([LegTimes.plausible]).
+     */
+    private suspend fun addLegSample(groupId: String, eventId: String, date: String, id: String, record: Record) {
+        val arrived = record.arrivedAt ?: return
+        val prev = db.collection(FirestorePaths.records(groupId, eventId, date)).get().await().toObjects(Record::class.java)
+            .filter { it.id != id && it.leftAt != null && it.leftAt!! <= arrived }
+            .maxByOrNull { it.leftAt!!.seconds } ?: return
+        val key = com.htb.carplan.shared.calendar.LegTimes.key(prev.place, record.place) ?: return
+        val meters = com.htb.carplan.shared.calendar.RouteMath.meters(prev.place, record.place) ?: return
+        if (meters < 200) return
+        val minutes = ((arrived.seconds - prev.leftAt!!.seconds) / 60).toInt()
+        if (!com.htb.carplan.shared.calendar.LegTimes.plausible(minutes, meters)) return
+        val hour = java.time.Instant.ofEpochSecond(prev.leftAt!!.seconds).atZone(java.time.ZoneId.of("Asia/Seoul")).hour
+        val ref = db.document("${FirestorePaths.legs(groupId)}/$key")
+        val old = runCatching { ref.get().await().toObject(com.htb.carplan.shared.model.LegMemo::class.java) }.getOrNull()
+        ref.set(com.htb.carplan.shared.model.LegMemo(
+            fromName = prev.place.name, fromLat = prev.place.lat, fromLng = prev.place.lng,
+            toName = record.place.name, toLat = record.place.lat, toLng = record.place.lng,
+            samples = com.htb.carplan.shared.calendar.LegTimes.append(old?.samples.orEmpty(), com.htb.carplan.shared.model.LegSample(minutes, hour, date)),
+        )).await()
+    }
+
+    /** A5: every real drive time these groups' cars have kept (one read per group, a few dozen docs at most). */
+    suspend fun legMemos(groupIds: List<String>): List<com.htb.carplan.shared.model.LegMemo> = groupIds.flatMap { g ->
+        runCatching { db.collection(FirestorePaths.legs(g)).get().await().toObjects(com.htb.carplan.shared.model.LegMemo::class.java) }.getOrDefault(emptyList())
     }
 
     /** Q58 [또 갈래요] on a record — on the record (count) and in the group's place memo (ranking). */

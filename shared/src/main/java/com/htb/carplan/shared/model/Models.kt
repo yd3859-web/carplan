@@ -322,6 +322,25 @@ data class DriveTrack(
 )
 
 /**
+ * groups/{gid}/legs/{key} — A5 (2026-11-11): how long this group's car really took between two places, the last few
+ * times ([com.htb.carplan.shared.calendar.LegTimes]). Written when a record is made (the gap since the slot before was
+ * left); the phone's plan uses it before any Kakao route.
+ */
+data class LegMemo(
+    @DocumentId val id: String = "",
+    val fromName: String = "",
+    val fromLat: Double = 0.0,
+    val fromLng: Double = 0.0,
+    val toName: String = "",
+    val toLat: Double = 0.0,
+    val toLng: Double = 0.0,
+    val samples: List<LegSample> = emptyList(),
+)
+
+/** One real drive of a [LegMemo]: minutes door to door, the hour it left (0–23, Korea), the day. */
+data class LegSample(val minutes: Int = 0, val hour: Int = 0, val date: String = "")
+
+/**
  * .../days/{date}/records/{id} — one stop the car actually made (13장): created by the car at
  * P + driver door (or P 5 min), linked to a planned stop when within 300 m of it, otherwise unplanned.
  */

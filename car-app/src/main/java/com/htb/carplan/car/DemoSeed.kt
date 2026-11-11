@@ -315,6 +315,19 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
             ),
         ))
 
+        // A5: the same four places as the 시연 trip ([demoTrip]), driven one Friday night — so today's plan shows
+        // "우리 차 기록" times instead of Kakao's.
+        novTrip(weekend, "금요일 밤 분당 드라이브", nov(6), listOf(listOf(
+            Stay(P("판교역", 37.3948, 127.1112, "경기 성남시 분당구 판교역로 160"), "19:00", "18:55", 20, "퇴근하고 모임", "다들 퇴근 시간 맞춰서 판교역에서", 1,
+                listOf("민지" to "나 6시 50분 도착", "지훈" to "난 7시 딱")),
+            Stay(P("율동공원", 37.3802, 127.1497, "경기 성남시 분당구 문정로 72"), "19:30", "19:28", 50, "밤 산책", "호수 분수 조명 켜져 있었다. 생각보다 사람 많음", 2,
+                listOf("서연" to "번지점프대 조명 예쁘다", "민지" to "다음엔 낮에 와서 오리배 타자"), again = listOf("서연")),
+            Stay(P("정자동 카페거리", 37.3660, 127.1060, "경기 성남시 분당구 정자일로"), "20:30", "20:35", 60, "늦은 저녁", "파스타 + 피자. 테라스 자리 추웠지만 분위기 최고", 2,
+                listOf("지훈" to "여기 화덕피자 진짜 맛있음", "나" to "주차는 건물 지하 2시간 무료"), parking = "건물 지하 B1"),
+            Stay(P("분당 중앙공원", 37.3726, 127.1302, "경기 성남시 분당구 성남대로 550"), "21:40", "21:46", 30, "마무리", "한 바퀴 걷고 각자 집으로", 1,
+                listOf("서연" to "다음 주말엔 전주!")),
+        )))
+
         say("11월 일상 기록 넣는 중")
         novDaily(nov(2), P("판교 테크노밸리 주차장", 37.4020, 127.1080, "경기 성남시 분당구 판교로"), "08:50", 540, "월요일. 카풀 첫날 준호 태우고 출근")
         novDaily(nov(3), P("셀프세차장 분당점", 37.3602, 127.1215, "경기 성남시 분당구 탄천로"), "20:10", 40, "가평 다녀온 흙 세차. 휠까지 닦음", 1)
@@ -401,7 +414,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         ))
 
         prefs.edit().putBoolean("done", true).putStringSet("events", made.toSet()).putStringSet("groups", setOf(weekend, carpool, family)).apply()
-        say("11월 채웠어요 · 지운 일정 ${gone}개 · 지난 여행 2개, 앞으로 여행 3개, 일상 기록 6칸" + if (sample > 0) " · 사진은 웹 샘플" else "")
+        say("11월 채웠어요 · 지운 일정 ${gone}개 · 지난 여행 3개, 앞으로 여행 3개, 일상 기록 6칸" + if (sample > 0) " · 사진은 웹 샘플" else "")
     }
 
     /** Erases every event of [gid] for good — its days and everything under them — except 차량 관리 records and next-dues. */
@@ -424,8 +437,11 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
             e.reference.delete().await()
             n++
         }
-        // The group's "가 봄 · 또 갈래요" memos came from those records.
+        // The group's "가 봄 · 또 갈래요" memos and real drive times (A5) came from those records.
         deleteAll(db, FirestorePaths.places(gid))
+        deleteAll(db, FirestorePaths.legs(gid))
+        // Old test chat (hundreds of lines) would show as "새 글 227" on every trip of the group.
+        deleteAll(db, FirestorePaths.chat(gid))
         return n
     }
 
