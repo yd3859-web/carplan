@@ -46,6 +46,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 ## 작업 방식
 - 지금은 팀장 혼자 만든다: **`main`에 바로 커밋하고 push**. 커밋 메시지에 장 번호를 쓴다(예: `phone 2장: 캘린더 월 보기`).
 - 나중에 작업을 나눌 때부터는 기능 하나 = 브랜치 하나 = PR 하나(`car/09-next-destination`)로 바꾼다.
+- **시연 계정**(2026-11-11, 심사위원·시연 영상용): 폰 첫 화면 [시연 계정으로 시작] → `owner@carplan-demo.app`(11월 데이터·차·그룹을 가진 원래 차주 계정에 이메일을 붙인 것, uid 그대로). 친구 6명도 `minji|junho|seoyeon|mom|jihoon|dad@carplan-demo.app`(차 `DemoSeed.friend`). 비밀번호는 `local.properties DEMO_PASSWORD`만(git 없음, 없으면 버튼 안 보임 → **제출 APK는 이 컴퓨터에서 빌드**). 차 6자리 화면 [시연 계정 차로 연결] = 폰 없이 그 차를 시연 계정 차로. 설정 탭 [시연 계정 · 바꾸기]. Firebase Auth 이메일/비밀번호 켬(Chrome). 알림 권한은 앱 첫 화면 뒤에 물음(로그인 화면 위 X).
 - 로그인(1장) 코드 완료(`phone/login/Login.kt`): 첫 실행은 익명 → 첫 화면에서 구글(Credential Manager, 익명 계정에 link → uid 유지)·나중에. **카카오 로그인은 안 만든다**(2026-10-30 팀장: 시연만 하면 되니 구글만). 구글 SHA-1(debug·release)은 Firebase에 이미 등록됨. Pleos 에뮬레이터엔 구글 서비스가 없어 실제 폰에서 확인.
 - 사용자는 한국어, 쉬운 말과 표·단계로 설명받기를 원한다.
 - 빌드 확인: `./gradlew assembleDebug`. 제출 APK: `./gradlew assembleRelease`.

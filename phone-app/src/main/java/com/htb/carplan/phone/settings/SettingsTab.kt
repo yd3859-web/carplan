@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.combinedClickable
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.htb.carplan.phone.BuildConfig
@@ -185,10 +186,18 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
         Section("계정")
         val provider = me?.provider
         if (provider == null) SettingRow("로그인", "아직 안 함 · 익명 ${session?.uid?.takeLast(4) ?: "…"}", hint = "구글로 연결하면 지금 데이터가 그대로 이어지고, 폰을 바꿔도 돼요.", action = "연결") { com.htb.carplan.phone.login.LoginGateBus.reopen.value = true }
-        else SettingRow("로그인", when (provider) { "google" -> "구글 계정"; else -> provider } + (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email?.let { " · $it" } ?: ""))
+        else SettingRow("로그인", when (provider) { "google" -> "구글 계정"; "demo" -> "시연 계정"; else -> provider } + (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email?.let { " · $it" } ?: ""))
+        // 시연 계정 (2026-11-11): an ordinary account can step into the filled demo account (it starts over as that one).
+        val loginVm: com.htb.carplan.phone.login.LoginViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        if (loginVm.demoAvailable && provider != "demo") SettingRow("시연 계정", "일정·여행·기록이 채워진 계정", action = "바꾸기") { loginVm.demo(ctx) }
+        loginVm.message.collectAsStateWithLifecycle().value?.let { Text(it, fontSize = 15.sp, color = Palette.Sunday) }
 
         Section("앱")
-        SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
+        // Long-press (once, on the owner's phone that holds the 시연 data): that anonymous account becomes the demo account.
+        androidx.compose.foundation.layout.Box(Modifier.combinedClickable(onClick = {}, onLongClick = { if (loginVm.demoAvailable && provider == null) loginVm.becomeDemo() })) {
+            SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
+        }
         Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))
         // 공공데이터·오픈데이터 출처 표시 (공공누리·OSM 조건).
         Text("데이터 출처 · 지도 © OpenStreetMap · 장소 카카오 · 유가 오피넷(한국석유공사) · 여행코스 한국관광공사 · 행정동 경계 행정안전부",

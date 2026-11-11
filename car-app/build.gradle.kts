@@ -30,6 +30,8 @@ android {
         versionName = "0.1.0"
         buildConfigField("String", "OPINET_KEY", "\"${localProps.getProperty("OPINET_KEY", "")}\"")
         // 11·12장: pickup order by total time, ETA to pickups / next stop (Kakao Mobility directions).
+        // 시연 계정 비밀번호 (local.properties만, git에 안 올림 — 2026-11-11 심사·시연 영상용).
+        buildConfigField("String", "DEMO_PASSWORD", "\"${localProps.getProperty("DEMO_PASSWORD", "")}\"")
         buildConfigField("String", "KAKAO_REST_KEY", "\"${localProps.getProperty("KAKAO_REST_KEY", "")}\"")
     }
 

@@ -14,13 +14,9 @@ import com.htb.carplan.phone.ui.AppRoot
 import com.htb.carplan.phone.ui.CarplanTheme
 
 class MainActivity : ComponentActivity() {
-    private val notifications = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Q02: notifications are the one permission asked at first start.
-        if (android.os.Build.VERSION.SDK_INT >= 33) notifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         lifecycleScope.launch {
             runCatching { SessionRepository().ensureSession() }.getOrNull()?.let { CarplanMessagingService.syncToken(it.uid) }
         }

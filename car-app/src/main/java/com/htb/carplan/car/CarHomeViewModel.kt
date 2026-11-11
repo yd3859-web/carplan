@@ -451,6 +451,33 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * 시연 계정 (2026-11-11): this car links itself to the demo owner — what typing the 6 digits on the demo phone does,
+     * done from the car (심사위원 에뮬에 폰이 없어도). The owner signs in on the side just for that write.
+     */
+    fun linkDemoOwner() {
+        val code = car.value?.linkCode ?: return
+        val pw = BuildConfig.DEMO_PASSWORD.takeIf { it.isNotBlank() } ?: return
+        viewModelScope.launch {
+            runCatching {
+                val ctx = getApplication<Application>()
+                val app = com.google.firebase.FirebaseApp.getApps(ctx).firstOrNull { it.name == "demoOwner" }
+                    ?: com.google.firebase.FirebaseApp.initializeApp(ctx, com.google.firebase.FirebaseApp.getInstance().options, "demoOwner")
+                val auth = com.google.firebase.auth.FirebaseAuth.getInstance(app)
+                val uid = auth.signInWithEmailAndPassword(com.htb.carplan.shared.data.DemoAccounts.OWNER, pw).await().user!!.uid
+                com.htb.carplan.shared.data.CarRepository(com.google.firebase.firestore.FirebaseFirestore.getInstance(app)).linkByCode(code, uid)
+                auth.signOut()
+            }.onSuccess { navigator.notify("시연 계정 차로 연결했어요") }.onFailure { _error.value = it.message; navigator.notify("연결 못 했어요 · ${it.message?.take(40)}") }
+        }
+    }
+    val demoAvailable: Boolean get() = BuildConfig.DEMO_PASSWORD.isNotBlank()
+
+    /** 시연 메뉴 "준비": the made-up friends get their fixed e-mail accounts. */
+    fun pinFriends() {
+        val d = demo() ?: return
+        viewModelScope.launch { runCatching { d.pinFriends() }.onSuccess { navigator.notify("친구 계정 ${it}개 고정했어요") }.onFailure { _error.value = it.message } }
+    }
+
     /** 시연 장면 2: friends sit down — "같이 타셨나요?" QR and the passenger count. */
     fun boardPassengers() = simulator.board()
 

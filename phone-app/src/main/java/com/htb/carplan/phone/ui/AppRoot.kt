@@ -77,6 +77,16 @@ fun AppRoot() {
         OnboardingScreen(onDone = { onboarding = false })
         return
     }
+    // Q02: notifications are the one permission asked — once the app's own screen is up, not over the login gate and
+    // the first-run guide (팀장 2026-11-11: 첫 화면 위에 시스템 창이 덮여서 보기 싫음).
+    val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            kotlinx.coroutines.delay(800)
+            askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val groupVm: GroupViewModel = viewModel()
     val pushTrip by InviteInbox.openTrip.collectAsStateWithLifecycle()
     // 손② (갤럭시 기본 앱): back on another tab goes to 캘린더 first; only 캘린더 leaves the app. Screens opened inside a

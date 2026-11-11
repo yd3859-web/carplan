@@ -87,6 +87,23 @@ class SessionRepository(
         return LinkResult(s.uid, switched)
     }
 
+    /**
+     * 시연 계정 (2026-11-11, 심사위원·시연 영상용): sign into the fixed demo owner — the account that holds the made-up
+     * 11월 (차 연결·그룹·여행·기록). This device's anonymous account is left behind.
+     */
+    suspend fun signInDemo(password: String): String {
+        auth.signInWithEmailAndPassword(DemoAccounts.OWNER, password).await()
+        cachedSession = null
+        return ensureSession().uid
+    }
+
+    /** Makes the current (anonymous) account the demo owner, keeping its uid and data: done once, on the owner's phone. */
+    suspend fun becomeDemo(password: String) {
+        val user = auth.currentUser ?: error("로그인 정보가 없어요")
+        user.linkWithCredential(com.google.firebase.auth.EmailAuthProvider.getCredential(DemoAccounts.OWNER, password)).await()
+        fillProfile(user.uid, null, null, "demo")
+    }
+
     fun isAnonymous(): Boolean = auth.currentUser?.isAnonymous != false
 
     /** Keep a real name over the "일행-1234" placeholder; never overwrite a name the user typed. */
@@ -109,4 +126,14 @@ class SessionRepository(
     suspend fun registerFcmToken(uid: String, token: String) {
         db.document(FirestorePaths.user(uid)).set(mapOf("fcmTokens" to com.google.firebase.firestore.FieldValue.arrayUnion(token)), com.google.firebase.firestore.SetOptions.merge()).await()
     }
+}
+
+/**
+ * 시연 계정 (2026-11-11): fixed e-mail addresses (the domain only names them; nothing is sent there). The password is
+ * in local.properties (DEMO_PASSWORD), never in git. [FRIENDS] are the made-up friends of the 시연 data, by index —
+ * 민지 0 · 준호 1 · 서연 2 · 엄마 3 · 지훈 4 · 아빠 5 ([com.htb.carplan.car] DemoSeed).
+ */
+object DemoAccounts {
+    const val OWNER = "owner@carplan-demo.app"
+    val FRIENDS = listOf("minji", "junho", "seoyeon", "mom", "jihoon", "dad").map { "$it@carplan-demo.app" }
 }

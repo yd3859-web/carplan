@@ -86,6 +86,24 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         confirmName.value = (g.displayName ?: "") to r.switchedAccount
     }
 
+    /** 시연 계정 (2026-11-11): only in builds that carry the demo password. */
+    val demoAvailable = com.htb.carplan.phone.BuildConfig.DEMO_PASSWORD.isNotBlank()
+
+    /** [시연 계정으로 시작]: straight into the filled demo account, then the app starts over as that account. */
+    fun demo(context: Context) = run("시연 계정") {
+        sessions.signInDemo(com.htb.carplan.phone.BuildConfig.DEMO_PASSWORD)
+        // Written to disk now (commit, not apply): the process ends right after.
+        prefs.edit().putBoolean("skipped", true).commit()
+        context.getSharedPreferences("onboarding", Context.MODE_PRIVATE).edit().putBoolean("done", true).commit()
+        restartApp(context)
+    }
+
+    /** 설정 (숨김, 차주 폰에서 한 번): this anonymous account — the one holding the 시연 data — becomes the demo account. */
+    fun becomeDemo() = run("시연 계정 만들기") {
+        sessions.becomeDemo(com.htb.carplan.phone.BuildConfig.DEMO_PASSWORD)
+        message.value = "이 계정이 시연 계정이 됐어요"
+    }
+
     fun saveName(name: String) = viewModelScope.launch {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
         if (name.isNotBlank()) runCatching { sessions.updateName(uid, name) }
@@ -129,6 +147,13 @@ fun LoginGate(vm: LoginViewModel) {
         ) { Text(if (busy) "로그인 중…" else "구글로 시작하기", fontSize = 17.sp) }
         message?.let { Text(it, fontSize = 15.sp, color = Palette.Sunday, modifier = Modifier.padding(top = 10.dp)) }
         Text("로그인하면 그룹·일정·기록이 계정에 묶여 폰을 바꿔도 이어져요. 지금 둘러보다가 설정 탭에서 연결해도 돼요.", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 14.dp))
+        if (vm.demoAvailable) androidx.compose.material3.OutlinedButton(
+            onClick = { vm.demo(context) }, enabled = !busy, shape = Corner,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Palette.SheetEdge),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Palette.TextStrong),
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(52.dp),
+        ) { Text("시연 계정으로 시작", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+        if (vm.demoAvailable) Text("일정·여행·기록이 채워진 계정으로 바로 둘러봐요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
         TextButton(onClick = vm::skip, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp)) { Text("나중에 할게요", color = Palette.TextSoft, fontSize = 16.sp) }
     }
 
@@ -154,4 +179,11 @@ fun LoginGate(vm: LoginViewModel) {
             }
         }
     }
+}
+
+/** A new account means every screen's data changed: the app starts again from the top (view models included). */
+fun restartApp(context: Context) {
+    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+    context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK))
+    Runtime.getRuntime().exit(0)
 }

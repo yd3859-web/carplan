@@ -206,7 +206,7 @@ private fun CarHome(vm: CarHomeViewModel) {
         notice?.let { lastNotice = it }
         CarAppear(notice != null) { Text(lastNotice, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp)) }
         if (car?.ownerUid == null) {
-            LinkCodeScreen(car?.linkCode)
+            LinkCodeScreen(car?.linkCode, onDemo = vm::linkDemoOwner.takeIf { vm.demoAvailable })
             return@Column
         }
         val today = LocalDate.now()
@@ -840,13 +840,20 @@ private fun Stat(label: String, value: String) {
 }
 
 @Composable
-private fun LinkCodeScreen(code: String?) {
+private fun LinkCodeScreen(code: String?, onDemo: (() -> Unit)? = null) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text("폰 앱 → 차량 탭에서 이 코드를 입력하세요", color = Soft, fontSize = 24.sp)
         Spacer(Modifier.height(24.dp))
         Text(code?.chunked(3)?.joinToString(" ") ?: "…", color = Ink, fontSize = 96.sp, fontWeight = FontWeight.Black, letterSpacing = 8.sp)
         Spacer(Modifier.height(16.dp))
         Text("이 차의 차주가 일정의 호스트가 됩니다", color = Soft, fontSize = 20.sp)
+        // 시연 계정 (2026-11-11): a judge's car, no phone needed — straight onto the filled demo account.
+        onDemo?.let {
+            Spacer(Modifier.height(40.dp))
+            OutlinedButton(onClick = it, shape = Corner, border = BorderStroke(1.dp, SheetEdge), modifier = Modifier.heightIn(min = 76.dp).width(420.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink)) { Text("시연 계정 차로 연결", fontSize = 24.sp, fontWeight = FontWeight.SemiBold) }
+            Text("일정·여행·기록이 채워진 시연 계정의 차가 돼요", color = Soft, fontSize = 20.sp, modifier = Modifier.padding(top = 10.dp))
+        }
     }
 }
 
@@ -1256,6 +1263,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
             var phoneCode by remember { mutableStateOf("") }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), itemVerticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                 DemoButton("차주 연결 풀기") { vm.unlinkOwner(); onDismiss() }
+                DemoButton("친구 계정 고정") { vm.pinFriends(); onDismiss() }
                 androidx.compose.material3.OutlinedTextField(phoneCode, { phoneCode = it.uppercase().take(8) }, singleLine = true, modifier = Modifier.width(220.dp),
                     placeholder = { Text("폰 친구 코드", fontSize = 20.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, color = Ink))
                 DemoButton("폰 계정 넣기") { if (phoneCode.length >= 4) { vm.bringInPhone(phoneCode); onDismiss() } }

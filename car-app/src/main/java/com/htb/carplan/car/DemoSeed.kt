@@ -530,9 +530,18 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
     private suspend fun friend(i: Int): Pair<String, FirebaseFirestore> {
         val app = FirebaseApp.getApps(context).firstOrNull { it.name == "demo$i" } ?: FirebaseApp.initializeApp(context, FirebaseApp.getInstance().options, "demo$i")
         val auth = FirebaseAuth.getInstance(app)
-        val uid = auth.currentUser?.uid ?: auth.signInAnonymously().await().user!!.uid
-        return uid to FirebaseFirestore.getInstance(app)
+        val pw = BuildConfig.DEMO_PASSWORD
+        val email = com.htb.carplan.shared.data.DemoAccounts.FRIENDS[i]
+        // 시연 계정 (2026-11-11): each friend is a fixed e-mail account, so any car (심사위원 에뮬 too) acts as the same
+        // 민지·서연·지훈 that are in the 시연 groups. An anonymous friend made earlier gets that e-mail attached once.
+        val user = auth.currentUser ?: if (pw.isNotBlank()) runCatching { auth.signInWithEmailAndPassword(email, pw).await().user }.getOrNull() else null
+        val signed = user ?: auth.signInAnonymously().await().user!!
+        if (signed.isAnonymous && pw.isNotBlank()) runCatching { signed.linkWithCredential(com.google.firebase.auth.EmailAuthProvider.getCredential(email, pw)).await() }
+        return signed.uid to FirebaseFirestore.getInstance(app)
     }
+
+    /** 시연 메뉴 "준비" [친구 계정 고정]: every made-up friend gets its fixed e-mail (on the car that made them). */
+    suspend fun pinFriends(): Int = (0..5).count { i -> runCatching { friend(i) }.isSuccess }
 
     suspend fun friendUid(i: Int): String = friend(i).first
 
@@ -657,10 +666,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
     // ---------- pieces ----------
 
     private suspend fun makeFriend(i: Int, name: String): String {
-        val app = FirebaseApp.getApps(context).firstOrNull { it.name == "demo$i" } ?: FirebaseApp.initializeApp(context, FirebaseApp.getInstance().options, "demo$i")
-        val auth = FirebaseAuth.getInstance(app)
-        val uid = auth.currentUser?.uid ?: auth.signInAnonymously().await().user!!.uid
-        val db = FirebaseFirestore.getInstance(app)
+        val (uid, db) = friend(i)
         db.document(FirestorePaths.user(uid)).set(User(name = name, friendCode = Codes.new())).await()
         // Friends both ways (18장: each side may write the "me" document in the other's list).
         db.document("${FirestorePaths.friends(ownerUid)}/$uid").set(Friend()).await()
