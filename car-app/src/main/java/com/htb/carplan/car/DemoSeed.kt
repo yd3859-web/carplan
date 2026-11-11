@@ -21,6 +21,7 @@ import com.htb.carplan.shared.model.MaintenanceItem
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.model.Record
 import com.htb.carplan.shared.model.User
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -501,6 +502,87 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
         made += "$soloGroupId/$eid"
         val rid = records.addRecord(soloGroupId, eid, ds, Record(place = p.place, unplanned = true, arrivedAt = stamp(date, at), leftAt = stamp(date, at, stay), note = note, createdBy = carId, parkedLat = p.lat, parkedLng = p.lng, parkingNote = parking))
         repeat(photos) { addPhoto(soloGroupId, eid, ds, rid) }
+    }
+
+    // ---------- 시연 영상 장면 (팀장 2026-11-11: 차 없이 컴으로만 찍으니, 차·다른 사람이 하는 일만 버튼으로) ----------
+
+    /**
+     * A made-up friend acting from their own phone: their own FirebaseApp signed in as them, so what they write is
+     * theirs (18장: only members write). The same index is the same account [refillNovember] made (민지 0 · 준호 1 ·
+     * 서연 2 · 엄마 3 · 지훈 4 · 아빠 5).
+     */
+    private suspend fun friend(i: Int): Pair<String, FirebaseFirestore> {
+        val app = FirebaseApp.getApps(context).firstOrNull { it.name == "demo$i" } ?: FirebaseApp.initializeApp(context, FirebaseApp.getInstance().options, "demo$i")
+        val auth = FirebaseAuth.getInstance(app)
+        val uid = auth.currentUser?.uid ?: auth.signInAnonymously().await().user!!.uid
+        return uid to FirebaseFirestore.getInstance(app)
+    }
+
+    suspend fun friendUid(i: Int): String = friend(i).first
+
+    /**
+     * 장면 1 [오늘 시험 여행]: today's drive with the 주말 친구들 (four places around 분당), so the friends can change
+     * it and talk under it from their own accounts. Returns "gid/eid".
+     */
+    suspend fun demoTrip(title: String): String {
+        val db = FirebaseFirestore.getInstance()
+        val mine = db.collection(FirestorePaths.GROUPS).whereArrayContains("memberIds", ownerUid).get().await().documents
+        val gid = circle(mine, "주말 친구들", listOf("민지" to 0, "서연" to 2, "지훈" to 4))
+        val ds = today.toString()
+        val key = event(gid, Event(categoryId = BuiltInCategory.TRIP.id, title = title, startDate = ds, endDate = ds, carId = carId))
+        val eid = key.substringAfter("/")
+        listOf(
+            Triple(P("판교역", 37.3948, 127.1112, "경기 성남시 분당구 판교역로 160"), "10:00", "여기서 모여요"),
+            Triple(P("율동공원", 37.3802, 127.1497, "경기 성남시 분당구 문정로 72"), "10:40", "호수 한 바퀴"),
+            Triple(P("정자동 카페거리", 37.3660, 127.1060, "경기 성남시 분당구 정자일로"), "12:30", "점심"),
+            Triple(P("분당 중앙공원", 37.3726, 127.1302, "경기 성남시 분당구 성남대로 550"), "15:00", "산책하고 해산"),
+        ).forEach { (p, t, m) -> trips.addStop(gid, eid, ds, p.place, t, m, ownerUid) }
+        return key
+    }
+
+    /**
+     * 장면 4 [민지가 칸 넣기] (10장): 민지, from her phone, puts a café in front of the next place — the car sees the
+     * day's version go up and re-routes; the phones show "민지님이 방금 수정". Says what went in.
+     */
+    suspend fun friendAddsStop(gid: String, eid: String, date: String): String? {
+        val (uid, db) = friend(0)
+        val repo = TripRepository(db)
+        // From the server, not this account's cache: a rewound take must not see the café it put in last time.
+        val live = db.collection(FirestorePaths.stops(gid, eid, date)).get(com.google.firebase.firestore.Source.SERVER).await()
+            .toObjects(com.htb.carplan.shared.model.Stop::class.java).filterNot { it.deleted }.sortedBy { it.order }
+        val next = live.indexOfFirst { !it.visited }.takeIf { it >= 0 } ?: return null
+        val pick = listOf(
+            P("백현동 카페거리", 37.3870, 127.1180, "경기 성남시 분당구 백현동"),
+            P("서현역 AK플라자", 37.3846, 127.1230, "경기 성남시 분당구 황새울로360번길 42"),
+            P("수내동 먹자골목", 37.3780, 127.1150, "경기 성남시 분당구 수내동"),
+        ).firstOrNull { c -> live.none { it.place.name == c.name } } ?: return null
+        val sid = repo.addStop(gid, eid, date, pick.place, null, "들렀다 가자", uid)
+        // Nothing driven yet: the first place is where everyone meets, so the café goes after it, not before.
+        val order = live.map { it.id }.toMutableList().apply { add(maxOf(next, 1).coerceAtMost(size), sid) }
+        repo.reorder(gid, eid, date, order, uid)
+        repo.addComment(gid, eid, date, sid, "여기 크로플 맛집이래! 잠깐만 들렀다 가자", uid)
+        return pick.name
+    }
+
+    /**
+     * 장면 5 [일행 코멘트·채팅]: the friends talk under the place the car heads to and in the trip's chat, each from
+     * their own account — the phone rail gets speech bubbles, the chat a few lines.
+     */
+    suspend fun friendsTalk(gid: String, eid: String, date: String, stopId: String, place: String) {
+        val (seoyeon, sdb) = friend(2)
+        val (jihoon, jdb) = friend(4)
+        val (minji, mdb) = friend(0)
+        TripRepository(sdb).addComment(gid, eid, date, stopId, "$place 주차장 입구 좁아요. 천천히!", seoyeon)
+        TripRepository(jdb).addComment(gid, eid, date, stopId, "나 5분 늦어… 먼저 들어가 있어", jihoon)
+        com.htb.carplan.shared.data.ChatRepository(mdb).send(gid, minji, "지금 어디쯤이야? 우리 거의 다 왔어", eid)
+        com.htb.carplan.shared.data.ChatRepository(jdb).send(gid, jihoon, "커피 내가 살게", eid)
+    }
+
+    /** 장면 6 [픽업 부탁] (11장): 지훈, from his phone, asks to be picked up at 수내역 — the car goes there first. */
+    suspend fun friendPickup(gid: String, eid: String, date: String) {
+        val (uid, db) = friend(4)
+        com.htb.carplan.shared.data.PickupRepository(db).setMine(gid, eid, date, uid, "지훈",
+            Place(name = "수내역 1번 출구", lat = 37.3784, lng = 127.1145, address = "경기 성남시 분당구 황새울로 지하 210"))
     }
 
     /**

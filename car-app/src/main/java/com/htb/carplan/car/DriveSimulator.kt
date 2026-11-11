@@ -77,6 +77,21 @@ class DriveSimulator(
     }
 
     fun stop() { job?.cancel(); job = null }
+
+    /**
+     * 시연 메뉴 [일행 탑승] (장면 2): the passenger seat and a rear seat fill up through the Virtual Console, as when
+     * friends get in — the car shows "같이 타셨나요?" QR and counts them. The app is told directly too (the emulator's
+     * seat listener barely fires).
+     */
+    fun board() {
+        scope.launch {
+            if (console.reachable()) {
+                console.heartbeat()
+                listOf("driver", "passenger", "rear_left").forEach { console.put("/vehicle/seat?kind=occupied&value=true&area=$it") }
+            }
+            monitor.simPassengerSeated()
+        }
+    }
     fun togglePause() = _state.update { it.copy(paused = !it.paused) }
     fun toggleSpeed() = _state.update { it.copy(speedX = if (it.speedX == 1) 2 else 1) }
 

@@ -282,6 +282,8 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .distinctUntilChanged()
         .combine(today) { ids, d -> ids to d }
         .flatMapLatest { (ids, d) -> calendar.observeEvents(ids, d.toString(), d.plusDays(7).toString()) }
+        // 일상 기록 is where the car already stood, not a plan for today (it lives in the 기록 tab).
+        .map { list -> list.filterNot { it.event.id.startsWith("log-") } }
         .catch { _error.value = it.message }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -439,12 +441,37 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun requestLocation() = router.requestCurrentLocation()
     fun lastLocation(): Pair<Double, Double>? = navigator.simLocation()
 
-    /** 시연 메뉴: a passenger waiting near Pangyo for today's trip (11장) — the simulation picks them up first. */
+    /** 시연 장면 6: 지훈 asks from his phone to be picked up near 백현동 (11장) — the simulation goes there first. */
     fun makeTestPickup() {
         val t = trip.value ?: return
+        val d = demo() ?: return
         viewModelScope.launch {
-            runCatching { PickupRepository().setMine(t.groupId, t.eventId, t.date, TEST_PICKUP_UID, "시험 일행", Place(name = "백현동 카페거리", lat = 37.3870, lng = 127.1180, address = "성남시 분당구 백현동")) }
+            runCatching { d.friendPickup(t.groupId, t.eventId, t.date) }
+                .onSuccess { navigator.notify("지훈이 픽업을 부탁했어요") }.onFailure { _error.value = it.message }
+        }
+    }
+
+    /** 시연 장면 2: friends sit down — "같이 타셨나요?" QR and the passenger count. */
+    fun boardPassengers() = simulator.board()
+
+    /** 시연 장면 4 (10장): 민지 puts a place in front of the next one from her phone → the car re-routes. */
+    fun friendAddsStop() {
+        val t = trip.value ?: run { navigator.notify("먼저 [오늘 시험 여행]을 만들어 주세요"); return }
+        val d = demo() ?: return
+        viewModelScope.launch {
+            runCatching { d.friendAddsStop(t.groupId, t.eventId, t.date) }
+                .onSuccess { if (it == null) navigator.notify("넣을 자리가 없어요 · 남은 칸이 없어요") }
                 .onFailure { _error.value = it.message }
+        }
+    }
+
+    /** 시연 장면 5: the friends talk under the place the car heads to, and in the trip chat. */
+    fun friendsTalk() {
+        val t = trip.value ?: run { navigator.notify("먼저 [오늘 시험 여행]을 만들어 주세요"); return }
+        val s = t.next ?: t.stops.lastOrNull { !it.deleted } ?: return
+        val d = demo() ?: return
+        viewModelScope.launch {
+            runCatching { d.friendsTalk(t.groupId, t.eventId, t.date, s.id, s.place.name) }.onFailure { _error.value = it.message }
         }
     }
 
@@ -610,37 +637,36 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun closeVoice() = navigator.closeVoice()
     fun debugArrive() = navigator.debugArrive()
 
-    /** 차에서 일정 만들기 (Q19), parked only. Goes to the owner's solo group. */
-    /** 시연 메뉴: a fresh trip today (or the same one rewound) (3 stops around Pangyo, this car) so the simulation always has something to play. */
+    /**
+     * 시연 장면 1 [오늘 시험 여행]: today's drive with the 주말 친구들, four places around 분당 ([DemoSeed.demoTrip]) — the
+     * title is an ordinary one because it shows in the video. Pressed again: the same trip back to its start (visits,
+     * stops friends added or took out, pickups, today's comments) instead of piling up another.
+     */
     fun makeTestTrip() {
         val u = owner.value ?: return
-        val id = carId.value ?: return
-        val today = LocalDate.now().toString()
-        // Played already today: rewind it instead of piling up another trip (the car would keep showing the finished one).
-        trip.value?.takeIf { it.title == "시험 여행" }?.let { t ->
+        val d = demo() ?: return
+        trip.value?.takeIf { it.title == DEMO_TRIP_TITLE || it.title == "시험 여행" }?.let { t ->
             viewModelScope.launch {
                 runCatching {
                     val trips = TripRepository()
-                    t.stops.filter { it.visited }.forEach { trips.setVisited(t.groupId, t.eventId, t.date, it.id, false, 0) }
-                    // Stops taken out with [칸 하나 빼기] come back too (the trip's own list hides deleted ones).
-                    trips.observeStops(t.groupId, t.eventId, t.date).first().filter { it.deleted }
-                        .forEach { trips.setDeleted(t.groupId, t.eventId, t.date, it.id, false, owner.value?.uid.orEmpty()) }
+                    val all = trips.observeStops(t.groupId, t.eventId, t.date).first()
+                    all.filter { it.visited }.forEach { trips.setVisited(t.groupId, t.eventId, t.date, it.id, false, 0) }
+                    // The plan as it was made: the owner's stops back, the ones friends put in out.
+                    all.forEach { s ->
+                        val mineStop = s.createdBy == u.uid
+                        if (s.deleted == mineStop) trips.setDeleted(t.groupId, t.eventId, t.date, s.id, !mineStop, u.uid)
+                    }
                     trips.setDayStatus(t.groupId, t.eventId, t.date, com.htb.carplan.shared.model.DayStatus.READY)
+                    t.pickups.forEach { p -> runCatching { PickupRepository().remove(t.groupId, t.eventId, t.date, p.uid) } }
                     runCatching { PickupRepository().remove(t.groupId, t.eventId, t.date, TEST_PICKUP_UID) }
-                }.onFailure { _error.value = it.message }
+                    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    db.collection(com.htb.carplan.shared.data.FirestorePaths.dayComments(t.groupId, t.eventId, t.date)).get().await().documents.forEach { it.reference.delete() }
+                }.onSuccess { navigator.notify("${t.title} 처음으로 돌렸어요") }.onFailure { _error.value = it.message }
             }
             return
         }
         viewModelScope.launch {
-            runCatching {
-                val eventId = calendar.addEvent(u.soloGroupId, Event(categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id, title = "시험 여행", startDate = today, endDate = today, carId = id, createdBy = u.uid))
-                val trips = TripRepository()
-                listOf(
-                    Triple(Place(name = "판교역", lat = 37.3948, lng = 127.1112), "10:00", "여기서 출발"),
-                    Triple(Place(name = "율동공원", lat = 37.3802, lng = 127.1497), "11:00", "산책"),
-                    Triple(Place(name = "정자역", lat = 37.3670, lng = 127.1085), "12:30", "점심"),
-                ).forEach { (place, time, memo) -> trips.addStop(u.soloGroupId, eventId, today, place, time, memo, u.uid) }
-            }.onFailure { _error.value = it.message }
+            runCatching { d.demoTrip(DEMO_TRIP_TITLE) }.onSuccess { navigator.notify("오늘 ${DEMO_TRIP_TITLE} 만들었어요 · 4곳") }.onFailure { _error.value = it.message }
         }
     }
 
@@ -755,5 +781,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         /** Marks the 시연 메뉴 test commute so the next press can replace it. */
         private const val TEST_COMMUTE_MEMO = "시연 메뉴 시험 출근"
         private const val TEST_PICKUP_UID = "test-passenger"
+        /** The 시연 trip's title: it shows in the video, so an ordinary one. */
+        const val DEMO_TRIP_TITLE = "분당 한 바퀴"
     }
 }

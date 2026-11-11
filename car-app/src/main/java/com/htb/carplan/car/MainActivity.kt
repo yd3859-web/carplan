@@ -1195,67 +1195,95 @@ private fun SimBar(sim: SimState, onPause: () -> Unit, onSpeed: () -> Unit, onSt
     HorizontalDivider(color = Line)
 }
 
-/** 20장: demo controls — fuel %, car type, fake drive, arrival. */
+/**
+ * 시연 메뉴 (팀장 2026-11-11: 차 없이 컴으로 시연 영상을 찍으니, 화면에서 직접 할 수 없는 것 — 차가 하는 일과 다른
+ * 사람이 하는 일 — 만). Laid out as the video's scenes, top to bottom; 일정 추가·일기 쓰기 are done on screen.
+ */
 @Composable
 private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit) {
     // Watched, not read once: the buttons follow the trip and guiding while the menu is open (lint, QA 2026-11-01).
     val guiding by vm.guiding.collectAsStateWithLifecycle()
     val trip by vm.trip.collectAsStateWithLifecycle()
-    CarDialog(onDismiss = onDismiss, title = "시연 메뉴", buttons = { CarCloseButton(onClick = onDismiss) }) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("연료/배터리  지금 ${v.fuelPercent?.toInt() ?: "—"}%  ·  ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"}", fontSize = 20.sp, color = Soft)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(10.0, 20.0, 50.0, 100.0).forEach { p -> FilterChip(selected = v.fuelPercent == p, onClick = { vm.setFuelOverride(p) }, shape = Corner, colors = chipColors(), label = { Text("${p.toInt()}%", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) }) }
-                    FilterChip(selected = false, onClick = { vm.setFuelOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = v.isEv == false, onClick = { vm.setEvOverride(false) }, shape = Corner, colors = chipColors(), label = { Text("연료차로", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
-                    FilterChip(selected = v.isEv == true, onClick = { vm.setEvOverride(true) }, shape = Corner, colors = chipColors(), label = { Text("전기차로", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
-                    FilterChip(selected = false, onClick = { vm.setEvOverride(null) }, shape = Corner, colors = chipColors(), label = { Text("실제값", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
-                }
-                HorizontalDivider(color = Line)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { vm.playSim(); onDismiss() }, shape = Corner, colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk)) { Text("시뮬레이션 재생", fontSize = 20.sp) }
-                    TextButton(onClick = { vm.playSimForPhone(); onDismiss() }) { Text("폰으로 보기 재생", color = Ink, fontSize = 20.sp) }
-                    TextButton(onClick = { vm.stopSim() }) { Text("멈춤", fontSize = 20.sp, color = Soft) }
-                    if (guiding) TextButton(onClick = { vm.debugArrive(); onDismiss() }) { Text("다음 칸 도착 처리", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.makeTestTrip() }) { Text(if (trip?.title == "시험 여행") "시험 여행 처음으로" else "오늘 시험 여행 만들기", fontSize = 20.sp, color = Ink) }
-                }
-                Text("오늘 여행을 처음부터: 타기 → D → 실제 도로로 이동 → P → 문 열고 내림. 기어·문·좌석은 Virtual Console로 보내요.", fontSize = 20.sp, color = Soft)
-                Text("연료 10~20%로 두면 주유 질문이 나와요. 전기차면 충전소 문구.", fontSize = 20.sp, color = Soft)
-                HorizontalDivider(color = Line)
-                FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { vm.makeTestCommute(); onDismiss() }) { Text("지금 출근 일정 만들기", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.removeTestCommute(); onDismiss() }) { Text("시험 출근 지우기", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.makeTestPickup(); onDismiss() }) { Text("시험 일행 픽업 등록", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.makeSecondTestTrip(); onDismiss() }) { Text("두 번째 여행", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.removeTestTrips(); onDismiss() }) { Text("시험 여행 지우기", fontSize = 20.sp, color = Ink) }
-                }
-                // Two months of made-up use (friends, groups, past trips with records and photos); pressed again it adds missing photos.
-                FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { vm.seedDemo(); onDismiss() }) { Text("오래 쓴 것처럼 채우기", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.seedMoreDemo(); onDismiss() }) { Text("여행 기록 더 채우기", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.refillNovember(); onDismiss() }) { Text("11월 다시 채우기", fontSize = 20.sp, color = Ink) }
-                    TextButton(onClick = { vm.clearDemo(); onDismiss() }) { Text("데모 지우기", fontSize = 20.sp, color = Ink) }
-                    // 다른 폰(새로 깐 앱의 새 계정)을 차주로 붙일 때: 연결을 풀면 차가 6자리 화면으로 돌아간다.
-                    TextButton(onClick = { vm.unlinkOwner(); onDismiss() }) { Text("차주 연결 풀기", fontSize = 20.sp, color = Ink) }
-                }
-                // A phone account (its 친구 코드 from 설정) into all of the owner's shared groups — e.g. after reinstalling the phone app.
-                var phoneCode by remember { mutableStateOf("") }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    androidx.compose.material3.OutlinedTextField(phoneCode, { phoneCode = it.uppercase().take(8) }, singleLine = true, modifier = Modifier.width(220.dp),
-                        placeholder = { Text("폰 친구 코드", fontSize = 20.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, color = Ink))
-                    TextButton(onClick = { vm.bringInPhone(phoneCode); onDismiss() }, enabled = phoneCode.length >= 4) { Text("폰 계정 넣기", fontSize = 20.sp, color = Ink) }
-                }
-                Text("출근: 매일 반복·장소 회사, 오늘 남은 여행이 없을 때 \"회사로 갈까요?\" / 픽업: 백현동에서 기다리는 일행, 시뮬이 먼저 태우러 감", fontSize = 20.sp, color = Soft)
-                HorizontalDivider(color = Line)
-                val split by vm.previewSplit.collectAsStateWithLifecycle()
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = split, onClick = { vm.previewSplit.value = !split }, shape = Corner, colors = chipColors(), label = { Text("반반 미리보기 (내비 옆 화면)", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
-                    val dark by vm.previewDark.collectAsStateWithLifecycle()
-                    FilterChip(selected = dark, onClick = { vm.previewDark.value = !dark }, shape = Corner, colors = chipColors(), label = { Text("다크 모드 미리보기 (밤)", fontSize = 20.sp, modifier = Modifier.padding(6.dp)) })
-                }
+    val demoTrip = trip?.title == CarHomeViewModel.DEMO_TRIP_TITLE
+    CarDialog(onDismiss = onDismiss, title = "시연 메뉴", width = 1100.dp, buttons = { CarCloseButton(onClick = onDismiss) }) {
+        Column(Modifier.heightIn(max = 780.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("촬영 순서대로 위에서부터 눌러요. 일정 추가·일기 쓰기는 화면에서 직접 해요.", fontSize = 20.sp, color = Soft)
+            DemoScene("0", "촬영 준비", "지난 여행·기록·친구가 있는 11월로 다시 채워요") {
+                DemoButton("11월 다시 채우기") { vm.refillNovember(); onDismiss() }
             }
+            DemoScene("1", "오늘 여행", "주말 친구들과 분당 4곳 · 다시 누르면 처음 상태로") {
+                DemoButton(if (demoTrip) "처음으로 돌리기" else "오늘 여행 만들기", primary = !demoTrip) { vm.makeTestTrip() }
+            }
+            DemoScene("2", "일행 탑승", "조수석·뒷좌석에 앉음 → \"같이 타셨나요?\" QR") {
+                DemoButton("일행 탑승") { vm.boardPassengers(); onDismiss() }
+            }
+            DemoScene("3", "주행", "D → 실제 도로로 이동 → 도착 → P → 문 열고 내림 (기어·문·좌석은 Virtual Console)") {
+                DemoButton("주행 재생", primary = true) { vm.playSim(); onDismiss() }
+                DemoButton("폰으로 보기 재생") { vm.playSimForPhone(); onDismiss() }
+                DemoButton("멈춤") { vm.stopSim() }
+                if (guiding) DemoButton("다음 칸 도착") { vm.debugArrive(); onDismiss() }
+            }
+            DemoScene("4", "친구가 일정 바꿈", "민지가 폰에서 다음 칸 앞에 카페를 넣음 → 차 경로가 바뀜") {
+                DemoButton("민지가 칸 넣기") { vm.friendAddsStop(); onDismiss() }
+            }
+            DemoScene("5", "일행 반응", "서연·지훈이 가는 곳에 코멘트, 여행 채팅에 한 줄씩") {
+                DemoButton("일행 코멘트·채팅") { vm.friendsTalk(); onDismiss() }
+            }
+            DemoScene("6", "데리러 가기", "지훈이 수내역에서 태워 달라고 함 → 차가 먼저 들름") {
+                DemoButton("픽업 부탁") { vm.makeTestPickup(); onDismiss() }
+            }
+            DemoScene("7", "연료", "지금 ${v.fuelPercent?.toInt() ?: "—"}% · ${if (v.isEv == true) "전기차" else if (v.isEv == false) "연료차" else "종류 모름"} · 15%면 주유·충전 질문") {
+                DemoButton("연료 15%", primary = true) { vm.setFuelOverride(15.0); onDismiss() }
+                DemoButton("100%") { vm.setFuelOverride(100.0) }
+                DemoButton("실제값") { vm.setFuelOverride(null) }
+                DemoButton(if (v.isEv == true) "연료차로" else "전기차로") { vm.setEvOverride(v.isEv != true) }
+            }
+            DemoScene("8", "하루 끝", "주행 재생이 마지막 곳에서 P + 문으로 끝나면 기록 칸이 생겨요 → 폰 기록 탭") {}
+            DemoScene("9", "아침 출근", "지금 시각 출근 일정 → \"회사로 갈까요?\"") {
+                DemoButton("출근 상황 만들기") { vm.makeTestCommute(); onDismiss() }
+                DemoButton("출근 지우기") { vm.removeTestCommute() }
+            }
+            DemoScene("10", "화면", "내비 옆 반반 · 밤 모드") {
+                val split by vm.previewSplit.collectAsStateWithLifecycle()
+                val dark by vm.previewDark.collectAsStateWithLifecycle()
+                DemoButton(if (split) "반반 끄기" else "반반 보기", primary = split) { vm.previewSplit.value = !split }
+                DemoButton(if (dark) "밤 모드 끄기" else "밤 모드", primary = dark) { vm.previewDark.value = !dark }
+            }
+            HorizontalDivider(color = Line, modifier = Modifier.padding(top = 12.dp))
+            Text("준비 (촬영 전에만)", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.padding(top = 12.dp))
+            // 다른 폰(새로 깐 앱의 새 계정)을 차주로 붙일 때: 연결을 풀면 차가 6자리 화면으로 돌아간다.
+            // A phone account (its 친구 코드 from 설정) into all of the owner's shared groups — e.g. after reinstalling the phone app.
+            var phoneCode by remember { mutableStateOf("") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), itemVerticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                DemoButton("차주 연결 풀기") { vm.unlinkOwner(); onDismiss() }
+                androidx.compose.material3.OutlinedTextField(phoneCode, { phoneCode = it.uppercase().take(8) }, singleLine = true, modifier = Modifier.width(220.dp),
+                    placeholder = { Text("폰 친구 코드", fontSize = 20.sp) }, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 22.sp, color = Ink))
+                DemoButton("폰 계정 넣기") { if (phoneCode.length >= 4) { vm.bringInPhone(phoneCode); onDismiss() } }
+            }
+        }
+    }
+}
+
+/** One scene of the 시연 영상: its number, what it shows, and the buttons for it in a row. */
+@Composable
+private fun DemoScene(no: String, title: String, hint: String, buttons: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(no, fontSize = 24.sp, fontWeight = FontWeight.Black, color = Ink, modifier = Modifier.width(44.dp))
+            Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
+        }
+        Text(hint, fontSize = 20.sp, color = Soft, modifier = Modifier.padding(start = 44.dp, top = 2.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(start = 44.dp, top = 10.dp)) { buttons() }
+    }
+}
+
+/** A 시연 메뉴 button, 76dp like every car button: black when it is the scene's main action, else white with an edge. */
+@Composable
+private fun DemoButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
+    if (primary) Button(onClick = onClick, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = OnInk)) {
+        Text(label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp))
+    } else OutlinedButton(onClick = onClick, shape = Corner, modifier = Modifier.heightIn(min = 76.dp), border = BorderStroke(1.dp, SheetEdge), colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink)) {
+        Text(label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp))
     }
 }
 
@@ -1374,7 +1402,7 @@ private fun CarDatePickDialog(initial: LocalDate, onPick: (LocalDate) -> Unit, o
             for (r in 0 until (lead + days + 6) / 7) Row {
                 for (col in 0 until 7) {
                     val n = r * 7 + col - lead + 1
-                    Box(Modifier.weight(1f).height(72.dp).padding(2.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).height(76.dp).padding(2.dp), contentAlignment = Alignment.Center) {
                         if (n in 1..days) {
                             val d = month.atDay(n)
                             val past = d < today
