@@ -89,7 +89,7 @@ class ChatActions(
 )
 
 /**
- * 여행별 채팅방 (정원 2026-11-03 A안). Words plus the app's cards — 다트·장소 ([칸으로]·[투표 후보로]),
+ * 여행별 채팅방 (팀장 2026-11-03 A안). Words plus the app's cards — 다트·장소 ([칸으로]·[투표 후보로]),
  * 투표 ([투표하기]·이긴 곳 [칸으로]), 칸 변경·코멘트 ([레일에서 보기]), 도착 ([사진·한 줄]), 하루 끝 ([하루 카드]).
  * [+] opens 장소·투표·다트·픽업 right from the chat. Full screen over the trip; the car never shows it.
  */

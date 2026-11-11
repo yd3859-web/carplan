@@ -75,7 +75,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
             .map { c -> c?.let { (commenterNames[it.uid] ?: loadName(it.uid)) to it.text } }
     }.catch { emit(null) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val commenterNames = HashMap<String, String>()
-    /** Every comment of today's trip by stop, oldest first — read-only on the car (정원 2026-10-31: 보기만, 남기기는 폰). */
+    /** Every comment of today's trip by stop, oldest first — read-only on the car (팀장 2026-10-31: 보기만, 남기기는 폰). */
     val dayComments: StateFlow<Map<String, List<StopComment>>> = trip.map { t -> t?.let { Triple(it.groupId, it.eventId, it.date) } }
         .distinctUntilChanged()
         .flatMapLatest { k ->
@@ -104,7 +104,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun goViaStation(st: com.htb.carplan.shared.net.GasStation) = navigator.goViaStation(st)
     val fuelUsage = navigator.fuelUsage
     val fuelSuggestion = navigator.fuelSuggestion
-    /** 주유하기 slot (정원 2026-10-31): recomputed when the trip or the car's fuel changes; straight line, no API. */
+    /** 주유하기 slot (팀장 2026-10-31): recomputed when the trip or the car's fuel changes; straight line, no API. */
     val fuelNeed: StateFlow<FuelNeed?> by lazy { combine(trip, CarRuntime.monitor(app).state, car) { t, v, c -> navigator.fuelNeed(t, v, c?.fuelAlertPercent?.toDouble() ?: 20.0) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null) }
     fun findFuelOnRoute() = navigator.findFuelOnRoute()
@@ -228,7 +228,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 시연 메뉴 [오래 쓴 것처럼 채우기] / [데모 지우기] (정원 2026-10-31). */
+    /** 시연 메뉴 [오래 쓴 것처럼 채우기] / [데모 지우기] (팀장 2026-10-31). */
     private fun demo(): DemoSeed? {
         val u = owner.value ?: return null
         val c = car.value ?: return null
@@ -327,7 +327,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         .catch { _error.value = it.message; emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // ── ⑤ 기록·차량 탭 (주차 중, 정원 2026-10-31): the same data as the phone's 기록·차량 tabs, read on the car.
+    // ── ⑤ 기록·차량 탭 (주차 중, 팀장 2026-10-31): the same data as the phone's 기록·차량 tabs, read on the car.
     /** Days that can hold records: trips (each day of them up to today) and 일상 기록, the last year, newest first. */
     val recordDays: StateFlow<List<RecordDay>> = owner
         .flatMapLatest { u ->
@@ -498,7 +498,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * 정원 2026-10-31: no trip today → no empty group; the QR makes the passenger the owner's friend, so the next
+     * 팀장 2026-10-31: no trip today → no empty group; the QR makes the passenger the owner's friend, so the next
      * event invites them with one tap (초대 = 일정, 친구 = 한 번만). The link is the same /i/ invite link.
      */
     val ownerFriendCode: String? get() = owner.value?.friendCode?.ifBlank { null }
@@ -520,7 +520,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 같이 탈 사람 탭: names only (no chat, 정원 2026-10-31). Today's trip group without the owner, and the owner's friends. */
+    /** 같이 탈 사람 탭: names only (no chat, 팀장 2026-10-31). Today's trip group without the owner, and the owner's friends. */
     val memberNames: StateFlow<List<String>> = qrGroup
         .map { g -> g?.memberIds.orEmpty().filter { it != owner.value?.uid }.map { commenterNames[it] ?: loadName(it) } }
         .catch { emit(emptyList()) }
@@ -577,7 +577,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
     val tripsToday = navigator.tripsToday
     fun chooseTrip(groupId: String, eventId: String) = navigator.chooseTrip(groupId, eventId)
 
-    /** 차 캘린더에서 일정 → 여행으로 바꾸기 (정원 2026-11-04): its place becomes the first stop; today's opens on 오늘. */
+    /** 차 캘린더에서 일정 → 여행으로 바꾸기 (팀장 2026-11-04): its place becomes the first stop; today's opens on 오늘. */
     fun convertToTrip(item: CalendarEvent) {
         val owner = ownerUid ?: return
         viewModelScope.launch {
@@ -699,7 +699,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ── ③ 여행 칸 편집 (주차 중, 정원 2026-10-31): the same writes as the phone's trip editor; each bumps the day's version.
+    // ── ③ 여행 칸 편집 (주차 중, 팀장 2026-10-31): the same writes as the phone's trip editor; each bumps the day's version.
     private val kakao = com.htb.carplan.shared.net.KakaoApi(BuildConfig.KAKAO_REST_KEY)
 
     /** One Kakao keyword search per press, near the car (API 한도: no search-as-you-type). Empty = name only. */

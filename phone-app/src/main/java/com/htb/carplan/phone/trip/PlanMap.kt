@@ -39,7 +39,7 @@ import kotlin.math.sinh
 import kotlin.math.tan
 
 /**
- * 경로 미리보기 (정원 2026-11-04): the day's places numbered on the map with the road between them — just the route, no
+ * 경로 미리보기 (팀장 2026-11-04): the day's places numbered on the map with the road between them — just the route, no
  * moving car ("차량 움직이는 거 없애고 경로만, 확대 가능하게"). Pinch or double-tap to zoom, drag to move, [+]/[−], and
  * [전체] back to the whole day. 픽업 자리 are on the route too, first ("픽업하는 사람 위치를 경로에도").
  */

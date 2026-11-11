@@ -149,7 +149,7 @@ data class Group(
     val inviteCode: String = "",
     val solo: Boolean = false,
     /**
-     * 초대 = 일정 (정원 2026-10-31): set when this group is one event's own group (made by the first invite).
+     * 초대 = 일정 (팀장 2026-10-31): set when this group is one event's own group (made by the first invite).
      * A shared group without it is a "자주 타는 사람" 묶음 (카풀·가족) — picked to invite its people at once.
      */
     val forEvent: String? = null,
@@ -288,7 +288,7 @@ data class Stop(
     /** Passed over on purpose ("건너뛰기", 차 음성 명령): done for the route, but not "다녀옴". */
     val skipped: Boolean = false,
     /**
-     * 픽업 칸 (정원 2026-11-09): this slot is where member [pickupUid] waits to be picked up — an ordinary slot in the
+     * 픽업 칸 (팀장 2026-11-09): this slot is where member [pickupUid] waits to be picked up — an ordinary slot in the
      * day's order (several pickups, 동선 정렬), kept in step with pickups/{uid} by [PickupRepository].
      */
     val pickupUid: String? = null,
@@ -434,7 +434,7 @@ data class Dart(
 enum class ChatKind { TEXT, DART, VOTE_OPEN, VOTE_CLOSED, PLACE, CHANGE, PICKUP, ARRIVED, DAY_DONE, COMMENT }
 
 /**
- * groups/{gid}/chat/{id} — 여행별 채팅방 (정원 2026-11-03 A안): one room per group, so a trip's own group
+ * groups/{gid}/chat/{id} — 여행별 채팅방 (팀장 2026-11-03 A안): one room per group, so a trip's own group
  * (초대 = 일정) is that trip's room. Phone only shows it; the car may post a 다트 card while parked.
  */
 data class ChatMessage(

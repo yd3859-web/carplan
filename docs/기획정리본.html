@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-/* Layout: 고속도로 노선 문서 — 장마다 녹색 안내판 머리와 노선 방패 번호, 결정은 상태 표지(정함·미정·참고·제외)와 정원의 원문을 함께 싣는다 */
+/* Layout: 고속도로 노선 문서 — 장마다 녹색 안내판 머리와 노선 방패 번호, 결정은 상태 표지(정함·미정·참고·제외)와 팀장의 원문을 함께 싣는다 */
 :root{
   --bg:#ECEFEC; --surface:#F8FAF8; --line:#C8D0CB; --line-soft:#DEE4E0;
   --ink:#132019; --ink-2:#38483F; --ink-3:#64736A;
@@ -142,9 +142,9 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 <header class="head">
   <p class="eyebrow">HTB · 현대자동차그룹 차량용 앱 공모전 · 2판 · 2026-10-29</p>
   <h1>차량용 캘린더<span class="shield">이름 미정</span></h1>
-  <p class="lede">정원이 교정지 1판·2판에 답한 것과 대화에서 정한 것만 모은 총정리다. 대부분의 세부는 만들면서 정하기로 했다. 그래서 정하지 않은 것은 채우지 않고 "미정"으로 남겼다.</p>
+  <p class="lede">팀장이 교정지 1판·2판에 답한 것과 대화에서 정한 것만 모은 총정리다. 대부분의 세부는 만들면서 정하기로 했다. 그래서 정하지 않은 것은 채우지 않고 "미정"으로 남겼다.</p>
   <div class="status">
-    <span><span class="tag t-ok">정함</span>정원이 직접 정한 것</span>
+    <span><span class="tag t-ok">정함</span>팀장이 직접 정한 것</span>
     <span><span class="tag t-open">미정</span>아직 고르지 않았거나 만들면서 정할 것</span>
     <span><span class="tag t-chk">확인</span>기술로 되는지 알아봐야 하는 것</span>
     <span><span class="tag t-ref">참고</span>조사한 자료. 결정이 아니다</span>
@@ -163,7 +163,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <p>현대자동차그룹 차량용 앱 공모전에 낼 앱의 기획을 한곳에 모은 문서다. 근거는 세 가지다. 대화에서 모은 아이디어, <strong>교정지 1판</strong>(질문 36개 중 35개 답), <strong>교정지 2판</strong>(질문 35개 중 20개 답).</p>
     <p>이 판은 결정 내용만 남기고 교정지 원문 답변은 뺀 정리본이다. 아직 답하지 않은 질문은 12장 "풀어야 할 것"에 모았다.</p>
     <p>장마다 메모 칸이 있다. 적어 두면 Claude가 다음 판을 만들 때 읽고 반영한다.</p>
-    <p><strong>2판(2026-10-29)</strong>은 팀원의 교정지 답을 정원 기획과 비교해 반영했다. 정원 기획과 부딪히지 않는 9가지는 정원이 모두 추가하기로 해서 각 장에 넣었다(<span class="ref">팀원</span> 표시). 정원 기획과 다른 답은 정원 기준으로 넣지 않았다. 정원 기획으로 답이 안 되는 4가지는 12장 맨 위에 메모 칸과 함께 모았다.</p>
+    <p><strong>2판(2026-10-29)</strong>은 팀원의 교정지 답을 팀장 기획과 비교해 반영했다. 팀장 기획과 부딪히지 않는 9가지는 팀장이 모두 추가하기로 해서 각 장에 넣었다(<span class="ref">팀원</span> 표시). 팀장 기획과 다른 답은 팀장 기준으로 넣지 않았다. 팀장 기획으로 답이 안 되는 4가지는 12장 맨 위에 메모 칸과 함께 모았다.</p>
   </div>
   <div class="memo" data-k="m00"><div class="memo-h"><span>메모 · 00 이 문서는</span><span class="memo-s"></span></div><textarea id="m00" placeholder="이 장에 대해…"></textarea></div>
 </section>
@@ -183,7 +183,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 
 <!-- 02 -->
 <section class="sec" id="s02">
-  <header class="sign"><span class="route">02</span><h2>하루의 흐름</h2><p>정원의 기능 메모 순서대로, 정한 기능만 배치했다</p></header>
+  <header class="sign"><span class="route">02</span><h2>하루의 흐름</h2><p>팀장의 기능 메모 순서대로, 정한 기능만 배치했다</p></header>
   <div class="flow" role="list">
     <div class="stop" role="listitem"><span class="stop-k">출발 전</span><h4>여행 계획</h4><ul><li>초대하고 그룹 만들기</li><li>그룹 일정 함께 편집</li><li>투표</li><li>다트로 동네 뽑기</li></ul><a href="#s04">04장 →</a></div>
     <div class="stop" role="listitem"><span class="stop-k">출발</span><h4>픽업</h4><ul><li>총 소요 시간 기준 픽업 순서</li><li>동승자가 차 위치를 실시간으로 봄</li></ul><a href="#s05">05장 →</a></div>
@@ -267,7 +267,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 
   <h3>주유</h3>
   <div class="ds">
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">현재 기름양에 따라 주유 여부를 추천한다. 기준은 <strong>유저가 설정에서 조절</strong>하고, 기본값은 정원과 Claude가 정한다.</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">현재 기름양에 따라 주유 여부를 추천한다. 기준은 <strong>유저가 설정에서 조절</strong>하고, 기본값은 팀장과 Claude가 정한다.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">가는 길의 최저가 주유소를 추천한다. 데이터는 <strong>쓸 수 있는 건 다 쓴다</strong>(오피넷 전국 주유소 + 한국도로공사 휴게소 주유소).</p></div></div>
     <div class="d"><span class="tag t-chk">확인</span><div class="d-b"><p class="d-t">내연기관 연료량을 읽을 수 있는지는 Pleos가 제공하는 것 안에서 확인한다.</p></div></div>
     <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">주유 알림 기본값은 12장에서 정한다.</p></div></div>
@@ -297,7 +297,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">코멘트는 언제든 쓸 수 있지만, 칸이 <strong>활성화되는 건 도착해서 시동이 꺼졌을 때</strong>다.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">이동 중에 코멘트를 쓸 수 있는 건 <strong>운전자를 뺀 사람</strong>이다.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>그룹 전체가 코멘트를 공유</strong>한다. 혼자여도 쓸 수 있다. 하루 기록을 <strong>영상이나 이미지 하나로 뽑아주는 기능</strong>을 넣는다.</p></div></div>
-    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">휴게소인지 아는 방법: 시동이 꺼진 위치 좌표를 카카오 로컬 API(좌표→주소 변환, 장소 검색)에 넣으면 근처 장소 이름을 찾을 수 있다. 정원은 "내비를 껐다 켜면 출발지가 휴게소"로 아는 방법도 떠올렸다.</p></div></div>
+    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">휴게소인지 아는 방법: 시동이 꺼진 위치 좌표를 카카오 로컬 API(좌표→주소 변환, 장소 검색)에 넣으면 근처 장소 이름을 찾을 수 있다. 팀장은 "내비를 껐다 켜면 출발지가 휴게소"로 아는 방법도 떠올렸다.</p></div></div>
   </div>
   <div class="memo" data-k="m07"><div class="memo-h"><span>메모 · 07 도착과 기록</span><span class="memo-s"></span></div><textarea id="m07" placeholder="이 장에 대해…"></textarea></div>
 </section>
@@ -309,7 +309,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">차 화면에서는 <strong>내비를 띄우고, 캘린더와 일정표를 본다</strong>.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정에 따른 목적지를 직접 입력하지 않는다. <strong>"다음 목적지로 갈까요?" 질문 하나</strong>로 바로 경로 안내가 시작된다. 혼자 탈 때도 쓴다.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">평소 출근하는 시간이면 <strong>출근지를 바로 목적지로 설정</strong>해 준다.</p></div></div>
-    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">차 화면 역할이 이 정도로 충분한가. 정원은 차만의 기능이 있어서 괜찮다고 보지만, 결국 차로 이어지는 앱이라 문제일지 고민 중이다.</p></div></div>
+    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">차 화면 역할이 이 정도로 충분한가. 팀장은 차만의 기능이 있어서 괜찮다고 보지만, 결국 차로 이어지는 앱이라 문제일지 고민 중이다.</p></div></div>
     <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t"><strong>대회를 더 찾아본 결과.</strong> 심사 항목과 배점은 공개된 곳을 찾지 못했다. 알려진 건 11월 기획서 서류 심사, 12월 앱 시연 평가뿐이다. 대신 Pleos 공식 설계 가이드가 차 화면의 방향을 정해 준다.</p>
       <ul class="note" style="margin:4px 0 0;padding-left:1.1em;display:grid;gap:3px">
         <li>주행에 필요한 정보를 짧고 분명하게 보여주고, 자주 쓰는 기능은 첫 화면에 둔다. 메뉴는 단순하게.</li>
@@ -585,7 +585,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     </tbody>
   </table></div>
   <div class="ds">
-    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">총상금 5,100만 원, 10팀. 대학생/일반 부문 각 2,400만 원, 아이디어 특별상 300만 원. 정원은 <strong>대학생 부문</strong>이다. 개인 또는 최대 5인 팀.</p></div></div>
+    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">총상금 5,100만 원, 10팀. 대학생/일반 부문 각 2,400만 원, 아이디어 특별상 300만 원. 팀장은 <strong>대학생 부문</strong>이다. 개인 또는 최대 5인 팀.</p></div></div>
     <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">영상·GitHub·APK 같은 개발 산출물은 1차에서는 선택이지만 내면 가산점이 있다. 1차를 통과하면 2차 PT 전까지 필수다.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">데모는 해낸다.</p></div></div>
   </div>
@@ -613,15 +613,15 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 <section class="sec" id="s12">
   <header class="sign"><span class="route">12</span><h2>풀어야 할 것</h2><p>대부분 만들면서 정한다. 기술 확인이 필요한 것은 먼저 확인한다</p></header>
   <h3>팀원 답과 비교해서 정할 것</h3>
-  <p class="note">정원 기획으로는 답이 나오지 않는 것들이다. 항목마다 메모 칸에 정한 것을 적어 두면 다음 판에 반영한다.</p>
+  <p class="note">팀장 기획으로는 답이 나오지 않는 것들이다. 항목마다 메모 칸에 정한 것을 적어 두면 다음 판에 반영한다.</p>
   <div class="open">
-    <div class="o"><span class="ref">팀원 D1</span><b>이동 구간도 타임라인에 넣을까</b><p>팀원은 "장소 하나하나 타임라인, 이동 시간은 따로"라고 했다. 정원의 기록 칸은 시동이 꺼진 장소마다 생겨서, 이동 중에 쓴 코멘트가 어느 칸에 들어가는지 정해져 있지 않다. 장소 칸 사이에 이동 구간 칸을 두면 이 문제가 풀린다.</p></div>
+    <div class="o"><span class="ref">팀원 D1</span><b>이동 구간도 타임라인에 넣을까</b><p>팀원은 "장소 하나하나 타임라인, 이동 시간은 따로"라고 했다. 팀장의 기록 칸은 시동이 꺼진 장소마다 생겨서, 이동 중에 쓴 코멘트가 어느 칸에 들어가는지 정해져 있지 않다. 장소 칸 사이에 이동 구간 칸을 두면 이 문제가 풀린다.</p></div>
     <div class="memo" data-k="t1"><div class="memo-h"><span>메모 · 이동 구간 타임라인</span><span class="memo-s"></span></div><textarea id="t1" placeholder="넣을지, 넣으면 어떻게 보일지…"></textarea></div>
-    <div class="o"><span class="ref">팀원 C2 · 2판 C10</span><b>주유 알림 기본값</b><p>팀원은 "남은 양으로 목적지까지 갈 수 있는지"라고 했다. 거리 기준으로 가면 기본값은 "목적지까지 갈 수 있는가"가 된다. 기준은 정원이 정한 대로 유저가 설정에서 바꿀 수 있다.</p></div>
+    <div class="o"><span class="ref">팀원 C2 · 2판 C10</span><b>주유 알림 기본값</b><p>팀원은 "남은 양으로 목적지까지 갈 수 있는지"라고 했다. 거리 기준으로 가면 기본값은 "목적지까지 갈 수 있는가"가 된다. 기준은 팀장이 정한 대로 유저가 설정에서 바꿀 수 있다.</p></div>
     <div class="memo" data-k="t2"><div class="memo-h"><span>메모 · 주유 알림 기본값</span><span class="memo-s"></span></div><textarea id="t2" placeholder="거리 기준이 맞는지, 다른 기준인지…"></textarea></div>
-    <div class="o"><span class="ref">팀원 C3</span><b>최저가 주유소를 찾는 범위</b><p>정원의 원래 메모는 "가는 길의 최저 주유소"(경로 위)이고, 팀원은 "현재 위치에서 5km 이내, 부족하면 10·20km로 넓히기"(반경)다. 둘 중 하나인지, 둘 다인지.</p></div>
+    <div class="o"><span class="ref">팀원 C3</span><b>최저가 주유소를 찾는 범위</b><p>팀장의 원래 메모는 "가는 길의 최저 주유소"(경로 위)이고, 팀원은 "현재 위치에서 5km 이내, 부족하면 10·20km로 넓히기"(반경)다. 둘 중 하나인지, 둘 다인지.</p></div>
     <div class="memo" data-k="t3"><div class="memo-h"><span>메모 · 주유소 찾는 범위</span><span class="memo-s"></span></div><textarea id="t3" placeholder="경로 위 / 현재 위치 반경 / 둘 다…"></textarea></div>
-    <div class="o"><span class="ref">팀원 E1 · 2판 E3</span><b>데모에서 보여줄 장면</b><p>팀원 안은 캘린더 개인 일정 관리, 여행 일정 관리, 동승자와의 상호작용이다. 정원은 아직 정하지 않았다. 이번에 추가한 "다음 목적지로 갈까요?"(08장)처럼 차 화면에서만 일어나는 장면을 넣을지도 같이 정한다. PT는 12/3~4.</p></div>
+    <div class="o"><span class="ref">팀원 E1 · 2판 E3</span><b>데모에서 보여줄 장면</b><p>팀원 안은 캘린더 개인 일정 관리, 여행 일정 관리, 동승자와의 상호작용이다. 팀장은 아직 정하지 않았다. 이번에 추가한 "다음 목적지로 갈까요?"(08장)처럼 차 화면에서만 일어나는 장면을 넣을지도 같이 정한다. PT는 12/3~4.</p></div>
     <div class="memo" data-k="t4"><div class="memo-h"><span>메모 · 데모 장면</span><span class="memo-s"></span></div><textarea id="t4" placeholder="데모에서 꼭 보여줄 장면 1~3개…"></textarea></div>
   </div>
 
@@ -636,7 +636,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="o"><span class="ref">새로 나옴</span><b>시동 상태를 읽을 수 있나 <span class="tag t-off">없다</span></b><p>시동 속성이 없고, Virtual Console에서 전원을 꺼도 앱까지 오지 않는다. 기어 P단은 즉시 온다.</p></div>
     <div class="o"><span class="ref">새로 나옴</span><b>일행이 바꾼 일정이 차 내비에 반영되나 <span class="tag t-ok">된다</span></b><p>차 앱은 인터넷으로 서버에 직접 붙고, 앱이 뒤에 있어도 내비 경로를 바꿀 수 있다. 연결된 폰이 하나여도 상관없다.</p></div>
   </div>
-  <h3>정원이 정할 것</h3>
+  <h3>팀장이 정할 것</h3>
   <div class="open">
     <div class="o"><span class="ref">새로 나옴</span><b>기록 칸이 생기는 기준</b><p>시동 상태는 앱이 받을 수 없다고 확인됐다. "기어를 P단에 넣을 때"로 정하는 것을 추천한다. 신호등에서 P단에 넣는 경우처럼 잠깐 선 곳을 거를 최소 시간도 같이 정한다.</p></div>
     <div class="o"><span class="ref">새로 나옴</span><b>시연할 차의 연료 종류</b><p>에뮬레이터는 전기차이고 연료량은 고정값이다. 전기차 충전 장면으로 할지, 연료 값을 앱에서 임시로 넣어 주유 장면을 보여줄지.</p></div>

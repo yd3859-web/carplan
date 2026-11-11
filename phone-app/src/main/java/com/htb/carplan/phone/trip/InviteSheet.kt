@@ -44,7 +44,7 @@ import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.data.InviteLinks
 
 /**
- * [같이 갈 사람] (초대 = 일정, 정원 2026-10-31): who is coming, friends one tap each, a 묶음 (자주 타는 사람) all at
+ * [같이 갈 사람] (초대 = 일정, 팀장 2026-10-31): who is coming, friends one tap each, a 묶음 (자주 타는 사람) all at
  * once, and someone new by QR · link · friend code. The first invite gives the event its own group; the screen
  * follows it there (TripDayViewModel.movedTo).
  */

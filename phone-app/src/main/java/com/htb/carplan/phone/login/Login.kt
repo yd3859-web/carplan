@@ -55,7 +55,7 @@ import kotlinx.coroutines.launch
 object LoginGateBus { val reopen = MutableStateFlow(false) }
 
 /**
- * 1장: 구글로 시작하기 · 나중에 (카카오는 뺌, 2026-10-30 정원: 시연만 하면 되니 구글만). The app is usable anonymously from the first second (익명 로그인);
+ * 1장: 구글로 시작하기 · 나중에 (카카오는 뺌, 2026-10-30 팀장: 시연만 하면 되니 구글만). The app is usable anonymously from the first second (익명 로그인);
  * logging in links that account so every group, event and record stays under the same uid.
  */
 class LoginViewModel(app: Application) : AndroidViewModel(app) {

@@ -56,7 +56,7 @@ import kotlin.math.sinh
 import kotlin.math.tan
 
 /**
- * 픽업 자리 지도에서 찍기 (정원 2026-11-04: "지도 켜서 내 위치 실시간으로, 찍어서"). The map opens on where I am, the dot
+ * 픽업 자리 지도에서 찍기 (팀장 2026-11-04: "지도 켜서 내 위치 실시간으로, 찍어서"). The map opens on where I am, the dot
  * follows me (GPS/network every 2 s), drag to move the map, tap to put the pickup pin; [내 위치로] puts it where I
  * stand. The pin's address comes from Kakao once it settles (one call), and [여기로 정하기] makes it the pickup.
  * [이름으로 찾기] is still there for a known place.

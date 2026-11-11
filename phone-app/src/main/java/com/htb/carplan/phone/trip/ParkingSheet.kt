@@ -37,7 +37,7 @@ import com.htb.carplan.shared.net.KakaoCategory
 import kotlinx.coroutines.launch
 
 /**
- * 12장 "주차장 찾아봐 주세요" (정원 2026-11-04: 알림을 누르면 바로 근처 주차장, 목적지에서 가까운 순). The parking lots around
+ * 12장 "주차장 찾아봐 주세요" (팀장 2026-11-04: 알림을 누르면 바로 근처 주차장, 목적지에서 가까운 순). The parking lots around
  * the place the car is about to reach — measured from that place, not from the phone — nearest first. A passenger
  * can post one to the trip chat (the driver hears about it there) or open it in a map app. One Kakao call per open.
  */

@@ -148,7 +148,7 @@ internal const val TILE_URL = "https://tile.openstreetmap.org/%d/%d/%d.png"
 internal const val TILE_ATTRIBUTION = "© OpenStreetMap"
 
 /**
- * Flat grey look (정원 11/2 참고 이미지: 회색 바탕·흰 길·건물 윤곽만) without a styled-tile key: the OSM tile with its
+ * Flat grey look (팀장 11/2 참고 이미지: 회색 바탕·흰 길·건물 윤곽만) without a styled-tile key: the OSM tile with its
  * colour taken out and lifted towards white, so roads read white-ish and blocks light grey, and our blue route stands out.
  */
 private val FlatMap = androidx.compose.ui.graphics.ColorFilter.colorMatrix(

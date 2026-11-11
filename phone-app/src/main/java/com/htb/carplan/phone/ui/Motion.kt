@@ -29,7 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 
 /**
- * Phone motion, the same language as the car (car/CarMotion.kt, 정원 2026-10-31 "순간이동 말고 부드럽게"): one length
+ * Phone motion, the same language as the car (car/CarMotion.kt, 팀장 2026-10-31 "순간이동 말고 부드럽게"): one length
  * everywhere — a window grows in slightly, a full screen slides in from the right, tabs slide sideways.
  */
 const val MOTION_MS = 250

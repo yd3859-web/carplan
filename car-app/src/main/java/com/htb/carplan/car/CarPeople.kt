@@ -37,7 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.htb.carplan.shared.data.InviteLinks
 
 /**
- * 같이 탈 사람 탭 (④, 정원 2026-10-31: 차에서 초대는 QR로만, 채팅 같은 건 폰에). Left: one QR — today's trip if
+ * 같이 탈 사람 탭 (④, 팀장 2026-10-31: 차에서 초대는 QR로만, 채팅 같은 건 폰에). Left: one QR — today's trip if
  * there is one (shared on the first press), else the owner's friend QR. Right: who is on today's trip and the
  * owner's friends, names only.
  */

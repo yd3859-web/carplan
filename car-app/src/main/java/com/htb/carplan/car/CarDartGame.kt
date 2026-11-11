@@ -106,7 +106,7 @@ fun CarDartGame(
 ) {
     val dart by vm.dart.collectAsStateWithLifecycle()
 
-    // Every opening is a fresh board (정원 2026-11-02): the dart waits at the bottom for the player.
+    // Every opening is a fresh board (팀장 2026-11-02): the dart waits at the bottom for the player.
     // An older result already in the room is not shown; throws made while the game is open are (mine or a friend's).
     var oldKey by remember { mutableStateOf<String?>(null) }
     var baselineDone by remember { mutableStateOf(false) }
@@ -127,7 +127,7 @@ fun CarDartGame(
     LaunchedEffect(Unit) { vm.ensureRegions(); regionsReady = true }
     var scope by remember { mutableStateOf(DartScope.NATIONAL) }
     var region by remember { mutableStateOf("서울특별시") }
-    // Q56: "내 위치 N km" — the driver picks N (정원 2026-10-31).
+    // Q56: "내 위치 N km" — the driver picks N (팀장 2026-10-31).
     var radiusKm by remember { mutableStateOf(100.0) }
     // Q56 3: the car's position comes from the navigation (asked once when the game opens), not the car document.
     val live by vm.live.collectAsStateWithLifecycle()
@@ -145,7 +145,7 @@ fun CarDartGame(
         resetTick++
     }
     var flying by remember { mutableStateOf(false) }
-    // 지도 가리기 (정원 2026-11-03): throw blind, the map shows once the dart sticks.
+    // 지도 가리기 (팀장 2026-11-03): throw blind, the map shows once the dart sticks.
     var hideMap by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
@@ -412,7 +412,7 @@ private fun DotMapBoard(
         val springBack = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
         val grabRadius = with(density) { 120.dp.toPx() }
         val minPull = with(density) { 40.dp.toPx() }
-        // The dart sways left and right in a fan (정원 2026-11-03): you can't aim at a place, only pick the moment and the power.
+        // The dart sways left and right in a fan (팀장 2026-11-03): you can't aim at a place, only pick the moment and the power.
         val swingMax = 50f
         var swingDeg by remember { mutableStateOf(0f) }
         LaunchedEffect(Unit) {
@@ -428,7 +428,7 @@ private fun DotMapBoard(
         val reveal = remember { Animatable(if (hideMap) 0f else 1f) }
         LaunchedEffect(stuck != null, hideMap) { if (stuck != null || !hideMap) reveal.animateTo(1f, tween(700)) else reveal.snapTo(0f) }
 
-        // Out of range = a miss (정원 2026-11-04, 폰 다트와 같게): not a pick — it says so and the dart comes back.
+        // Out of range = a miss (팀장 2026-11-04, 폰 다트와 같게): not a pick — it says so and the dart comes back.
         var missed by remember { mutableStateOf(false) }
         val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
         val warnColor = LocalCarColors.current.warn; val cBg = LocalCarColors.current.bg

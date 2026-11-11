@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-/* Layout: 고속도로 노선 문서 — 장마다 녹색 안내판 머리와 노선 방패 번호, 결정은 상태 표지(정함·미정·참고·제외)와 정원의 원문을 함께 싣는다 */
+/* Layout: 고속도로 노선 문서 — 장마다 녹색 안내판 머리와 노선 방패 번호, 결정은 상태 표지(정함·미정·참고·제외)와 팀장의 원문을 함께 싣는다 */
 :root{
   --bg:#ECEFEC; --surface:#F8FAF8; --line:#C8D0CB; --line-soft:#DEE4E0;
   --ink:#132019; --ink-2:#38483F; --ink-3:#64736A;
@@ -142,9 +142,9 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 <header class="head">
   <p class="eyebrow">HTB · 현대자동차그룹 차량용 앱 공모전 · 2판 · 2026-10-29</p>
   <h1>차량용 캘린더<span class="shield">이름 미정</span></h1>
-  <p class="lede">정원이 교정지 1판·2판에 답한 것과 대화에서 정한 것만 모은 총정리다. 대부분의 세부는 만들면서 정하기로 했다. 그래서 정하지 않은 것은 채우지 않고 "미정"으로 남겼다.</p>
+  <p class="lede">팀장이 교정지 1판·2판에 답한 것과 대화에서 정한 것만 모은 총정리다. 대부분의 세부는 만들면서 정하기로 했다. 그래서 정하지 않은 것은 채우지 않고 "미정"으로 남겼다.</p>
   <div class="status">
-    <span><span class="tag t-ok">정함</span>정원이 직접 정한 것</span>
+    <span><span class="tag t-ok">정함</span>팀장이 직접 정한 것</span>
     <span><span class="tag t-open">미정</span>아직 고르지 않았거나 만들면서 정할 것</span>
     <span><span class="tag t-chk">확인</span>기술로 되는지 알아봐야 하는 것</span>
     <span><span class="tag t-ref">참고</span>조사한 자료. 결정이 아니다</span>
@@ -161,9 +161,9 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   <header class="sign"><span class="route">00</span><h2>이 문서는</h2><p>무엇을 담고, 어떻게 읽는가</p></header>
   <div class="prose">
     <p>현대자동차그룹 차량용 앱 공모전에 낼 앱의 기획을 한곳에 모은 문서다. 근거는 세 가지다. 대화에서 모은 아이디어, <strong>교정지 1판</strong>(질문 36개 중 35개 답), <strong>교정지 2판</strong>(질문 35개 중 20개 답).</p>
-    <p>각 결정 아래에는 정원이 적은 원문을 그대로 붙였고, 오른쪽 번호는 그 답이 나온 교정지 항목이다(예: <span class="ref">1판 G2</span>). 2판에서 답하지 않은 질문은 "만들면서 정한다"는 정원의 방침에 따라 12장 "풀어야 할 것"에 모았다.</p>
+    <p>각 결정 아래에는 팀장이 적은 원문을 그대로 붙였고, 오른쪽 번호는 그 답이 나온 교정지 항목이다(예: <span class="ref">1판 G2</span>). 2판에서 답하지 않은 질문은 "만들면서 정한다"는 팀장의 방침에 따라 12장 "풀어야 할 것"에 모았다.</p>
     <p>장마다 메모 칸이 있다. 적어 두면 Claude가 다음 판을 만들 때 읽고 반영한다.</p>
-    <p><strong>2판(2026-10-29)</strong>은 팀원의 교정지 답을 정원 기획과 비교해 반영했다. 정원 기획과 부딪히지 않는 9가지는 정원이 모두 추가하기로 해서 각 장에 넣었다(<span class="ref">팀원</span> 표시). 정원 기획과 다른 답은 정원 기준으로 넣지 않았다. 정원 기획으로 답이 안 되는 4가지는 12장 맨 위에 메모 칸과 함께 모았다.</p>
+    <p><strong>2판(2026-10-29)</strong>은 팀원의 교정지 답을 팀장 기획과 비교해 반영했다. 팀장 기획과 부딪히지 않는 9가지는 팀장이 모두 추가하기로 해서 각 장에 넣었다(<span class="ref">팀원</span> 표시). 팀장 기획과 다른 답은 팀장 기준으로 넣지 않았다. 팀장 기획으로 답이 안 되는 4가지는 12장 맨 위에 메모 칸과 함께 모았다.</p>
   </div>
   <div class="memo" data-k="m00"><div class="memo-h"><span>메모 · 00 이 문서는</span><span class="memo-s"></span></div><textarea id="m00" placeholder="이 장에 대해…"></textarea></div>
 </section>
@@ -176,14 +176,14 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">캘린더로 일정을 <strong>정리하고 공유</strong>한다. 그 카테고리 안에 여행이라는 틀이 있다. 여행에 포커스가 많이 들어가긴 한다.</p><p class="said"><q>여행에 포커스보다 캘린더로 일정을 정리하고 공유하고 그 카태고리안에 여행이라는틀이 있다는것 물론 여행에 포커스가 많이 들어가긴할듯</q> <span class="ref">1판 G2</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">카테고리는 <strong>여행, 차량 관리, 다른 일정</strong>. 기본적인 캘린더의 틀을 따른다.</p><p class="said"><q>여행 차량관리, 다른 일정도 넣을수있게 기본적인 캘린더의 틀을 따른다 생각해</q> <span class="ref">2판 G10</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>혼자 타는 경우도 포함</strong>한다. 핵심은 캘린더로 뻗어가는 확장성의 부드러움.</p><p class="said"><q>혼자 타는 경우도 물론넣음 핵심은 캘린더로 뻗어가는 확장성의 부드러움</q> <span class="ref">1판 G4</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">카테고리는 <strong>사용자가 직접 추가</strong>할 수 있다(출퇴근, 여가 등).</p><p class="said"><q>사용자의 편의에 따라 항목을 추가할 수 있게</q> <span class="ref">팀원 G2</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">카테고리는 <strong>사용자가 직접 추가</strong>할 수 있다(출퇴근, 여가 등).</p><p class="said"><q>사용자의 편의에 따라 항목을 추가할 수 있게</q> <span class="ref">팀원 G2</span> · 팀장이 추가하기로 함</p></div></div>
   </div>
   <div class="memo" data-k="m01"><div class="memo-h"><span>메모 · 01 어떤 앱인가</span><span class="memo-s"></span></div><textarea id="m01" placeholder="이 장에 대해…"></textarea></div>
 </section>
 
 <!-- 02 -->
 <section class="sec" id="s02">
-  <header class="sign"><span class="route">02</span><h2>하루의 흐름</h2><p>정원의 기능 메모 순서대로, 정한 기능만 배치했다</p></header>
+  <header class="sign"><span class="route">02</span><h2>하루의 흐름</h2><p>팀장의 기능 메모 순서대로, 정한 기능만 배치했다</p></header>
   <div class="flow" role="list">
     <div class="stop" role="listitem"><span class="stop-k">출발 전</span><h4>여행 계획</h4><ul><li>초대하고 그룹 만들기</li><li>그룹 일정 함께 편집</li><li>투표</li><li>다트로 동네 뽑기</li></ul><a href="#s04">04장 →</a></div>
     <div class="stop" role="listitem"><span class="stop-k">출발</span><h4>픽업</h4><ul><li>총 소요 시간 기준 픽업 순서</li><li>동승자가 차 위치를 실시간으로 봄</li></ul><a href="#s05">05장 →</a></div>
@@ -221,7 +221,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   <h3>그룹 일정</h3>
   <div class="ds">
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정 한 칸은 <strong>장소 + 메모</strong>(뭐 먹을지, 뭐 할지).</p><p class="said"><q>장소와 메모(뭐먹을지 뭐할지 등등 적는거 )</q> <span class="ref">1판 B4</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정 칸에 <strong>시간</strong>도 넣는다. 일정 한 칸은 <strong>장소 + 시간 + 메모</strong>.</p><p class="said"><q>장소, 시간, 메모까지만.</q> <span class="ref">팀원 B4</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정 칸에 <strong>시간</strong>도 넣는다. 일정 한 칸은 <strong>장소 + 시간 + 메모</strong>.</p><p class="said"><q>장소, 시간, 메모까지만.</q> <span class="ref">팀원 B4</span> · 팀장이 추가하기로 함</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>모두가 편집</strong>할 수 있다. 기본은 누구나 추가·제거하고, 제거하면 일정이 바뀌었다는 알림이 간다.</p><p class="said"><q>기본은 누구나 마음대로 추가 제거(제거시 일정 변경되었다는 알림)</q> <span class="ref">1판 B3</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">하루 일정을 <strong>한 번에 경유지로</strong> 넣고, 하나가 바뀌면 거기에 맞게 새로 갱신한다.</p><p class="said"><q>하루일정을 한번에 경유지에 넣고 일정중 하나면 변경될시 그거에맞게 새로 갱신</q> <span class="ref">1판 B5</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">동선 최소 순서는 <strong>사용자가 선택</strong>할 때만 적용한다. 여행마다 자기들만의 순서가 있으니 강제하지 않는다. 화면에 <strong>[동선 최소로 정렬]</strong> 버튼으로 넣는다(2026-10-29: 프로토 구분 없이 전부 만들기로 함).</p><p class="said"><q>사용자가 선택하게 하자 여행이 갈장소 순서가 본인들만의 순서가 있을수있으니까 우리가 강제 최소화는 아닌거같고 … 일단이건 프로토에서 만들기능은아닌듯</q> <span class="ref">2판 B16</span></p></div></div>
@@ -231,7 +231,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   <h3>투표</h3>
   <div class="ds">
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">투표는 <strong>여러 명의 의견을 받고 싶을 때 쓰는 선택 기능</strong>이다. 투표 대상은 유저가 정한다.</p><p class="said"><q>그냥 기능임 지들쓰고싶을떄쓰는 여러명의 의견받고싶을때 쓰는</q> <span class="ref">2판 B12</span> · <q>유저가 정하게 해</q> <span class="ref">1판 B8</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">투표는 <strong>과반이면 마감</strong>하고, <strong>동점이면 둘 다 후보</strong>에 넣는다.</p><p class="said"><q>과반수 시 마감. 동점이면 둘다 후보군에 넣기</q> <span class="ref">팀원 B8</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">투표는 <strong>과반이면 마감</strong>하고, <strong>동점이면 둘 다 후보</strong>에 넣는다.</p><p class="said"><q>과반수 시 마감. 동점이면 둘다 후보군에 넣기</q> <span class="ref">팀원 B8</span> · 팀장이 추가하기로 함</p></div></div>
     <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">처음 쓰는 사람에게 보여줄 기본 투표 예시는 만들면서 정한다.</p><p class="said"><q>만들면서정해</q> <span class="ref">2판 B13</span></p></div></div>
   </div>
 
@@ -240,7 +240,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">여행지가 미정일 때 다트를 던진다. 범위는 <strong>선택</strong>: 전국 / 내 위치에서 100km 이내 / 지역(예: 대구 안에서 랜덤).</p><p class="said"><q>전국 기준, 내위치에서 100키로이내 지역이 대구면 대구내에서 랜덤 이런식으로 범위를 정할수있게</q> <span class="ref">1판 B9</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">다트는 <strong>동네</strong>가 뽑히고, 장소는 추천 정도만 한다.</p><p class="said"><q>동네가 뽑히는거고 장소나 이런건 추천정도만</q> <span class="ref">1판 B10</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>차 화면에서 다 같이</strong>, 또는 출발 전 <strong>앱에서 실시간으로 다 같이</strong> 던진다.</p><p class="said"><q>화면에서 다같이 또는 앱에서 출발전에 는 실시간으로 다같이</q> <span class="ref">1판 B11</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정을 짜는 중이면 <strong>한 사람이 폰으로</strong> 던질 수도 있다.</p><p class="said"><q>여행 일정을 짜는 중이라면 한 사람 폰으로 던질 수도 있음</q> <span class="ref">팀원 B11</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정을 짜는 중이면 <strong>한 사람이 폰으로</strong> 던질 수도 있다.</p><p class="said"><q>여행 일정을 짜는 중이라면 한 사람 폰으로 던질 수도 있음</q> <span class="ref">팀원 B11</span> · 팀장이 추가하기로 함</p></div></div>
   </div>
   <div class="memo" data-k="m04"><div class="memo-h"><span>메모 · 04 여행 계획</span><span class="memo-s"></span></div><textarea id="m04" placeholder="이 장에 대해…"></textarea></div>
 </section>
@@ -252,7 +252,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">픽업 순서는 내비로 계산해 정해준다. 기준은 <strong>최종 목적지까지 걸리는 총시간</strong>.</p><p class="said"><q>최종 목적지와의 거리가 가까운순으로 하면좋을거같긴한데 결국 걸리는 총시간을 계산해서 하는 식으로 하면될거같음</q> <span class="ref">2판 A7</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">픽업 장소는 <strong>동승자가 선택한 위치</strong>.</p><p class="said"><q>동승자가 선택한 위치에서</q> <span class="ref">1판 A2</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">동승자는 앱에서 카카오택시처럼 <strong>경로와 움직이는 차</strong>를 본다.</p><p class="said"><q>카카오 택시 택시오는거처럼 경로보여주고 차가 움직이는거 보여주는거</q> <span class="ref">1판 A5</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">동승자에게 <strong>남은 시간과 거리</strong>도 보여준다.</p><p class="said"><q>목적지가 설정되면 동승자에게도 남은 시간이 뜨게</q> <span class="ref">팀원 A1</span> · <q>전부</q> <span class="ref">팀원 A5</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">동승자에게 <strong>남은 시간과 거리</strong>도 보여준다.</p><p class="said"><q>목적지가 설정되면 동승자에게도 남은 시간이 뜨게</q> <span class="ref">팀원 A1</span> · <q>전부</q> <span class="ref">팀원 A5</span> · 팀장이 추가하기로 함</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>차 위치만 실시간</strong>이고, 동승자 위치는 지정한 장소만 표시한다.</p><p class="said"><q>동승자의 위치는 실시간 반응이아닌 지정장소만 뜨고 차량위치만 실시간 제공</q> <span class="ref">1판 A4</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">공유는 동승자가 <strong>"탔어요" 버튼</strong>을 누르거나, 차가 픽업 장소에 <strong>실제로 도착한 뒤 10분</strong>이 지나면 끝난다.</p><p class="said"><q>동승자가 탔다는 버튼 누르거나 도착시간 +10분뒤 부터 종료</q> <span class="ref">1판 A4</span> · <q>엉 그방법으로</q> <span class="ref">2판 A8 실제 도착 기준</span></p></div></div>
     <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">메모의 ((카카오네비))는 <strong>참고 대상</strong>이다. 연동하려는 것이 아니다.</p><p class="said"><q>참고대상</q> <span class="ref">2판 A6</span></p></div></div>
@@ -267,7 +267,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 
   <h3>주유</h3>
   <div class="ds">
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">현재 기름양에 따라 주유 여부를 추천한다. 기준은 <strong>유저가 설정에서 조절</strong>하고, 기본값은 정원과 Claude가 정한다.</p><p class="said"><q>유저가 설정으로 조절가능하게 하고 우리가기본값을 정해주자</q> <span class="ref">1판 C2</span></p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">현재 기름양에 따라 주유 여부를 추천한다. 기준은 <strong>유저가 설정에서 조절</strong>하고, 기본값은 팀장과 Claude가 정한다.</p><p class="said"><q>유저가 설정으로 조절가능하게 하고 우리가기본값을 정해주자</q> <span class="ref">1판 C2</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">가는 길의 최저가 주유소를 추천한다. 데이터는 <strong>쓸 수 있는 건 다 쓴다</strong>(오피넷 전국 주유소 + 한국도로공사 휴게소 주유소).</p><p class="said"><q>쓸수있는건다쓰자</q> <span class="ref">2판 C11</span></p></div></div>
     <div class="d"><span class="tag t-chk">확인</span><div class="d-b"><p class="d-t">내연기관 연료량을 읽을 수 있는지는 Pleos가 제공하는 것 안에서 확인한다.</p><p class="said"><q>필리오스에서 제공해주는 모든걸 다 쓸수있어서 거기서 가능할지 봐야함</q> <span class="ref">2판 C9</span></p></div></div>
     <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">주유 알림 기본값. 2판 답이 "ㅇㅇㅇㅇㅇㅇ"라서 거리 기준에 동의한 것인지 확인이 필요하다. 팀원 답과 함께 12장에서 정한다.</p><p class="said"><q>ㅇㅇㅇㅇㅇㅇ</q> <span class="ref">2판 C10</span></p></div></div>
@@ -277,7 +277,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   <div class="ds">
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">주차장 정보를 가져올 수 있으면 거기서 고르게 하고, 안 되면 <strong>도착 몇 분 전 동승자에게 주차장을 찾아보라고 유도</strong>한다.</p><p class="said"><q>동승자가 주차장 찾아보게끔 유도? 도착몇분전에 주차장정보를 찾아봐주세요 이런식으로 묻거나 우리가 쓸수있는네비 sdk에서 가져올수있으면 거기서 선택하게끔</q> <span class="ref">1판 C5</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">카페 등 추천은 <strong>근처 탐색</strong>이다. 일정을 짤 때 <strong>카테고리를 눌러</strong> 현재 위치 기준으로 추천받는다.</p><p class="said"><q>추천은 그냥 근처탐색이긴한데 일정ㄷ짤때 카테고리 눌러서 추천받아볼수있게 금 지금 현재위치기준으로 가능할려나</q> <span class="ref">1판 C6</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">쓰는 장면 예시: 카페에 자리가 없으면 <strong>차로 돌아와 카페 카테고리로 근처를 추천</strong>받는다. 기획서·데모의 시나리오로 쓴다.</p><p class="said"><q>카페에 자리가 없을때 차로 돌아와서 카페 카테고리의 추천을 받을 수 있게 함</q> <span class="ref">팀원 C6</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">쓰는 장면 예시: 카페에 자리가 없으면 <strong>차로 돌아와 카페 카테고리로 근처를 추천</strong>받는다. 기획서·데모의 시나리오로 쓴다.</p><p class="said"><q>카페에 자리가 없을때 차로 돌아와서 카페 카테고리의 추천을 받을 수 있게 함</q> <span class="ref">팀원 C6</span> · 팀장이 추가하기로 함</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일행이 다른 곳에 가고 싶으면 <strong>바로 수정</strong>할 수 있고, 수정하면 <strong>내비 경로도 바로 갱신</strong>된다.</p><p class="said"><q>어쨋든 바로 수정가능이고 수정하면 바로 네비 경로도 그에 맞게 최신화</q> <span class="ref">1판 B7</span></p></div></div>
   </div>
 
@@ -295,9 +295,9 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">기록은 <strong>시동이 꺼질 때</strong> 생긴다. 하루 전체를 쓰는 일기장이 아니라, 밥집에 가면 밥집 칸, 카페로 옮기면 카페 칸처럼 <strong>이동마다 칸</strong>이 생기고 사진이나 짧은 글을 남긴다. 하루로 보면 <strong>타임라인</strong>이 된다.</p><p class="said"><q>이동마다 칸을 제공하고 그곳에 사진이나 짧은 글을 남길수있고 그걿 하루로 봤을때 타임라인처럼 하루의 기록이 남는것</q> <span class="ref">1판 G3</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정에 없던 곳도 남는다. 중간에 <strong>휴게소</strong>에서 멈추면 휴게소 칸이 생긴다. 늘 일정대로 흘러가지 않으니까.</p><p class="said"><q>중간에 휴계소에서 멈췄으면 그걸 바탕으로 휴게소 타임라인이 생겨서 넣을수도있는거지 늘 일정대로ㅓ 흘러가진 않으니까</q> <span class="ref">1판 D1</span></p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">코멘트는 언제든 쓸 수 있지만, 칸이 <strong>활성화되는 건 도착해서 시동이 꺼졌을 때</strong>다.</p><p class="said"><q>언제든 쓸수있는데 코멘트칸이 활성화되는건 각 도착해서 시동이 꺼졋을때를 기준으로</q> <span class="ref">1판 D2</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">이동 중에 코멘트를 쓸 수 있는 건 <strong>운전자를 뺀 사람</strong>이다.</p><p class="said"><q>운전자 외에는 이동중에도 쓸 수 있게.</q> <span class="ref">팀원 D2</span> · 정원이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">이동 중에 코멘트를 쓸 수 있는 건 <strong>운전자를 뺀 사람</strong>이다.</p><p class="said"><q>운전자 외에는 이동중에도 쓸 수 있게.</q> <span class="ref">팀원 D2</span> · 팀장이 추가하기로 함</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>그룹 전체가 코멘트를 공유</strong>한다. 혼자여도 쓸 수 있다. 하루 기록을 <strong>영상이나 이미지 하나로 뽑아주는 기능</strong>을 넣는다.</p><p class="said"><q>그룹 참가자 전체가 코멘트를 공유하는 방식이 재밌을듯 혼자라면 혼자서라도 사용가능하고 그걸 추출해서 영상이나 하나의 이미지로 뽑아주는 기능도 좋을듯</q> <span class="ref">1판 D3</span></p></div></div>
-    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">휴게소인지 아는 방법: 시동이 꺼진 위치 좌표를 카카오 로컬 API(좌표→주소 변환, 장소 검색)에 넣으면 근처 장소 이름을 찾을 수 있다. 정원은 "내비를 껐다 켜면 출발지가 휴게소"로 아는 방법도 떠올렸다.</p><p class="said">D1에서 정원이 다른 방식을 찾아보자고 해서 Claude가 조사한 내용 <span class="ref">1판 D1</span></p></div></div>
+    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">휴게소인지 아는 방법: 시동이 꺼진 위치 좌표를 카카오 로컬 API(좌표→주소 변환, 장소 검색)에 넣으면 근처 장소 이름을 찾을 수 있다. 팀장은 "내비를 껐다 켜면 출발지가 휴게소"로 아는 방법도 떠올렸다.</p><p class="said">D1에서 팀장이 다른 방식을 찾아보자고 해서 Claude가 조사한 내용 <span class="ref">1판 D1</span></p></div></div>
   </div>
   <div class="memo" data-k="m07"><div class="memo-h"><span>메모 · 07 도착과 기록</span><span class="memo-s"></span></div><textarea id="m07" placeholder="이 장에 대해…"></textarea></div>
 </section>
@@ -307,9 +307,9 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   <header class="sign"><span class="route">08</span><h2>차 화면</h2><p>차 안에서는 무엇을 하나</p></header>
   <div class="ds">
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">차 화면에서는 <strong>내비를 띄우고, 캘린더와 일정표를 본다</strong>.</p><p class="said"><q>차 화면에서는 네비를 뛰어주고 일정표를 키고나 할수있지 … 우리앱으로 캘린더를 키고 일정표를 볼수있다는거 정도?</q> <span class="ref">1판 G5</span></p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정에 따른 목적지를 직접 입력하지 않는다. <strong>"다음 목적지로 갈까요?" 질문 하나</strong>로 바로 경로 안내가 시작된다. 혼자 탈 때도 쓴다.</p><p class="said"><q>일정에 따른 목적지를 직접 입력하는 것이 아닌 다음 목적지로 가겠냐는 질문 하나로 바로 경로 안내가 될 수 있을거 같아서 좋다고 생각</q> <span class="ref">팀원 G4</span> · 정원이 추가하기로 함</p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">평소 출근하는 시간이면 <strong>출근지를 바로 목적지로 설정</strong>해 준다.</p><p class="said"><q>출퇴근 시에도 이 시간에 출근 하는 사람이면 바로 출근지로 복적지를 설정해주면 편할거 같음.</q> <span class="ref">팀원 G4</span> · 정원이 추가하기로 함</p></div></div>
-    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">차 화면 역할이 이 정도로 충분한가. 정원은 차만의 기능이 있어서 괜찮다고 보지만, 결국 차로 이어지는 앱이라 문제일지 고민 중이다.</p><p class="said"><q>차량용앱이기에 차만의 기능들이 있기에 괜찮지않을까라 생각하긴하는데 결국차로 이어지는거라서 이건 문제일까싶음 대회에대해좀더 찾아봐 너가</q> <span class="ref">2판 G6</span></p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">일정에 따른 목적지를 직접 입력하지 않는다. <strong>"다음 목적지로 갈까요?" 질문 하나</strong>로 바로 경로 안내가 시작된다. 혼자 탈 때도 쓴다.</p><p class="said"><q>일정에 따른 목적지를 직접 입력하는 것이 아닌 다음 목적지로 가겠냐는 질문 하나로 바로 경로 안내가 될 수 있을거 같아서 좋다고 생각</q> <span class="ref">팀원 G4</span> · 팀장이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">평소 출근하는 시간이면 <strong>출근지를 바로 목적지로 설정</strong>해 준다.</p><p class="said"><q>출퇴근 시에도 이 시간에 출근 하는 사람이면 바로 출근지로 복적지를 설정해주면 편할거 같음.</q> <span class="ref">팀원 G4</span> · 팀장이 추가하기로 함</p></div></div>
+    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">차 화면 역할이 이 정도로 충분한가. 팀장은 차만의 기능이 있어서 괜찮다고 보지만, 결국 차로 이어지는 앱이라 문제일지 고민 중이다.</p><p class="said"><q>차량용앱이기에 차만의 기능들이 있기에 괜찮지않을까라 생각하긴하는데 결국차로 이어지는거라서 이건 문제일까싶음 대회에대해좀더 찾아봐 너가</q> <span class="ref">2판 G6</span></p></div></div>
     <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t"><strong>대회를 더 찾아본 결과.</strong> 심사 항목과 배점은 공개된 곳을 찾지 못했다. 알려진 건 11월 기획서 서류 심사, 12월 앱 시연 평가뿐이다. 대신 Pleos 공식 설계 가이드가 차 화면의 방향을 정해 준다.</p>
       <ul class="note" style="margin:4px 0 0;padding-left:1.1em;display:grid;gap:3px">
         <li>주행에 필요한 정보를 짧고 분명하게 보여주고, 자주 쓰는 기능은 첫 화면에 둔다. 메뉴는 단순하게.</li>
@@ -347,8 +347,8 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 
   <h3>개발 구성</h3>
   <div class="ds">
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>안드로이드만</strong> 만든다. 아이폰은 뺀다. 1차 합격이 먼저라 플랫폼을 하나로 줄인다. 기획서에는 "iOS 확장 예정"으로 적는다.</p><p class="said">정원 결정 · 2026-10-29</p></div></div>
-    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">차 앱과 폰 앱 모두 <strong>Kotlin + Jetpack Compose</strong>. 대회 개발 환경이 "Java 또는 Kotlin"이고, 같은 언어를 쓰면 두 앱이 데이터 형식과 서버 연동 코드를 같이 쓸 수 있다. 바이브코딩으로 만들기 때문에 한 언어·한 저장소·공식 SDK만 쓰는 구성이 AI가 덜 틀리고 고치기도 쉽다.</p><p class="said">정원 결정 · 바이브코딩으로 만든다</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t"><strong>안드로이드만</strong> 만든다. 아이폰은 뺀다. 1차 합격이 먼저라 플랫폼을 하나로 줄인다. 기획서에는 "iOS 확장 예정"으로 적는다.</p><p class="said">팀장 결정 · 2026-10-29</p></div></div>
+    <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">차 앱과 폰 앱 모두 <strong>Kotlin + Jetpack Compose</strong>. 대회 개발 환경이 "Java 또는 Kotlin"이고, 같은 언어를 쓰면 두 앱이 데이터 형식과 서버 연동 코드를 같이 쓸 수 있다. 바이브코딩으로 만들기 때문에 한 언어·한 저장소·공식 SDK만 쓰는 구성이 AI가 덜 틀리고 고치기도 쉽다.</p><p class="said">팀장 결정 · 바이브코딩으로 만든다</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">서버는 <strong>Firebase</strong>. 핵심인 실시간 동기화(그룹 일정 → 차)와 푸시 알림이 둘 다 Firebase 안에서 끝나고, 안드로이드 SDK가 구글 공식이다. 로그인은 <strong>구글 로그인과 카카오 로그인</strong>. 카카오는 Cloud Functions로 Firebase 커스텀 토큰을 만든다.</p><p class="said">카카오 로그인은 Firebase에서 기본 지원이 안 돼 서버 함수가 필요하다. 꼭 필요해지면 그때 붙인다</p></div></div>
   </div>
   <div class="tbl"><table>
@@ -583,7 +583,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     </tbody>
   </table></div>
   <div class="ds">
-    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">총상금 5,100만 원, 10팀. 대학생/일반 부문 각 2,400만 원, 아이디어 특별상 300만 원. 정원은 <strong>대학생 부문</strong>이다. 개인 또는 최대 5인 팀.</p></div></div>
+    <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">총상금 5,100만 원, 10팀. 대학생/일반 부문 각 2,400만 원, 아이디어 특별상 300만 원. 팀장은 <strong>대학생 부문</strong>이다. 개인 또는 최대 5인 팀.</p></div></div>
     <div class="d"><span class="tag t-ref">참고</span><div class="d-b"><p class="d-t">영상·GitHub·APK 같은 개발 산출물은 1차에서는 선택이지만 내면 가산점이 있다. 1차를 통과하면 2차 PT 전까지 필수다.</p></div></div>
     <div class="d"><span class="tag t-ok">정함</span><div class="d-b"><p class="d-t">데모는 해낸다.</p><p class="said"><q>해내면된다</q> <span class="ref">1판 E1</span></p></div></div>
   </div>
@@ -601,8 +601,8 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
   </div>
   <h3>교정지 전에 나온 아이디어</h3>
   <div class="ds">
-    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">고속도로 등에서 시동이 켜진 채 오래 멈춰 있을 때, 간단한 물음으로 동반자와의 대화를 유도하기. 기능 메모와 교정지 답에는 없다.</p><p class="said">대화에서 정원이 낸 아이디어 · 넣을지 정하지 않았다</p></div></div>
-    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">차 안에서 사진 찍기. 차 실내 카메라 API는 없어서, 기록에 붙는 사진(07장)은 폰 사진이 된다.</p><p class="said">대화에서 정원이 물어본 아이디어</p></div></div>
+    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">고속도로 등에서 시동이 켜진 채 오래 멈춰 있을 때, 간단한 물음으로 동반자와의 대화를 유도하기. 기능 메모와 교정지 답에는 없다.</p><p class="said">대화에서 팀장이 낸 아이디어 · 넣을지 정하지 않았다</p></div></div>
+    <div class="d"><span class="tag t-open">미정</span><div class="d-b"><p class="d-t">차 안에서 사진 찍기. 차 실내 카메라 API는 없어서, 기록에 붙는 사진(07장)은 폰 사진이 된다.</p><p class="said">대화에서 팀장이 물어본 아이디어</p></div></div>
   </div>
   <div class="memo" data-k="m11"><div class="memo-h"><span>메모 · 11 뺀 것과 남은 아이디어</span><span class="memo-s"></span></div><textarea id="m11" placeholder="이 장에 대해…"></textarea></div>
 </section>
@@ -611,15 +611,15 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
 <section class="sec" id="s12">
   <header class="sign"><span class="route">12</span><h2>풀어야 할 것</h2><p>대부분 만들면서 정한다. 기술 확인이 필요한 것은 먼저 확인한다</p></header>
   <h3>팀원 답과 비교해서 정할 것</h3>
-  <p class="note">정원 기획으로는 답이 나오지 않는 것들이다. 항목마다 메모 칸에 정한 것을 적어 두면 다음 판에 반영한다.</p>
+  <p class="note">팀장 기획으로는 답이 나오지 않는 것들이다. 항목마다 메모 칸에 정한 것을 적어 두면 다음 판에 반영한다.</p>
   <div class="open">
-    <div class="o"><span class="ref">팀원 D1</span><b>이동 구간도 타임라인에 넣을까</b><p>팀원은 "장소 하나하나 타임라인, 이동 시간은 따로"라고 했다. 정원의 기록 칸은 시동이 꺼진 장소마다 생겨서, 이동 중에 쓴 코멘트가 어느 칸에 들어가는지 정해져 있지 않다. 장소 칸 사이에 이동 구간 칸을 두면 이 문제가 풀린다.</p></div>
+    <div class="o"><span class="ref">팀원 D1</span><b>이동 구간도 타임라인에 넣을까</b><p>팀원은 "장소 하나하나 타임라인, 이동 시간은 따로"라고 했다. 팀장의 기록 칸은 시동이 꺼진 장소마다 생겨서, 이동 중에 쓴 코멘트가 어느 칸에 들어가는지 정해져 있지 않다. 장소 칸 사이에 이동 구간 칸을 두면 이 문제가 풀린다.</p></div>
     <div class="memo" data-k="t1"><div class="memo-h"><span>메모 · 이동 구간 타임라인</span><span class="memo-s"></span></div><textarea id="t1" placeholder="넣을지, 넣으면 어떻게 보일지…"></textarea></div>
-    <div class="o"><span class="ref">팀원 C2 · 2판 C10</span><b>주유 알림 기본값</b><p>팀원은 "남은 양으로 목적지까지 갈 수 있는지"라고 했다. 정원의 2판 답 "ㅇㅇㅇㅇㅇㅇ"가 같은 뜻(거리 기준)이라면 기본값은 "목적지까지 갈 수 있는가"가 된다. 기준은 정원이 정한 대로 유저가 설정에서 바꿀 수 있다.</p></div>
+    <div class="o"><span class="ref">팀원 C2 · 2판 C10</span><b>주유 알림 기본값</b><p>팀원은 "남은 양으로 목적지까지 갈 수 있는지"라고 했다. 팀장의 2판 답 "ㅇㅇㅇㅇㅇㅇ"가 같은 뜻(거리 기준)이라면 기본값은 "목적지까지 갈 수 있는가"가 된다. 기준은 팀장이 정한 대로 유저가 설정에서 바꿀 수 있다.</p></div>
     <div class="memo" data-k="t2"><div class="memo-h"><span>메모 · 주유 알림 기본값</span><span class="memo-s"></span></div><textarea id="t2" placeholder="거리 기준이 맞는지, 다른 기준인지…"></textarea></div>
-    <div class="o"><span class="ref">팀원 C3</span><b>최저가 주유소를 찾는 범위</b><p>정원의 원래 메모는 "가는 길의 최저 주유소"(경로 위)이고, 팀원은 "현재 위치에서 5km 이내, 부족하면 10·20km로 넓히기"(반경)다. 둘 중 하나인지, 둘 다인지.</p></div>
+    <div class="o"><span class="ref">팀원 C3</span><b>최저가 주유소를 찾는 범위</b><p>팀장의 원래 메모는 "가는 길의 최저 주유소"(경로 위)이고, 팀원은 "현재 위치에서 5km 이내, 부족하면 10·20km로 넓히기"(반경)다. 둘 중 하나인지, 둘 다인지.</p></div>
     <div class="memo" data-k="t3"><div class="memo-h"><span>메모 · 주유소 찾는 범위</span><span class="memo-s"></span></div><textarea id="t3" placeholder="경로 위 / 현재 위치 반경 / 둘 다…"></textarea></div>
-    <div class="o"><span class="ref">팀원 E1 · 2판 E3</span><b>데모에서 보여줄 장면</b><p>팀원 안은 캘린더 개인 일정 관리, 여행 일정 관리, 동승자와의 상호작용이다. 정원은 아직 정하지 않았다. 이번에 추가한 "다음 목적지로 갈까요?"(08장)처럼 차 화면에서만 일어나는 장면을 넣을지도 같이 정한다. PT는 12/3~4.</p></div>
+    <div class="o"><span class="ref">팀원 E1 · 2판 E3</span><b>데모에서 보여줄 장면</b><p>팀원 안은 캘린더 개인 일정 관리, 여행 일정 관리, 동승자와의 상호작용이다. 팀장은 아직 정하지 않았다. 이번에 추가한 "다음 목적지로 갈까요?"(08장)처럼 차 화면에서만 일어나는 장면을 넣을지도 같이 정한다. PT는 12/3~4.</p></div>
     <div class="memo" data-k="t4"><div class="memo-h"><span>메모 · 데모 장면</span><span class="memo-s"></span></div><textarea id="t4" placeholder="데모에서 꼭 보여줄 장면 1~3개…"></textarea></div>
   </div>
 
@@ -633,7 +633,7 @@ td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowra
     <div class="o"><span class="ref">새로 나옴</span><b>시동 상태를 읽을 수 있나 <span class="tag t-off">없다</span></b><p>시동 속성이 없고, Virtual Console에서 전원을 꺼도 앱까지 오지 않는다. 기어 P단은 즉시 온다.</p></div>
     <div class="o"><span class="ref">새로 나옴</span><b>일행이 바꾼 일정이 차 내비에 반영되나 <span class="tag t-ok">된다</span></b><p>차 앱은 인터넷으로 서버에 직접 붙고, 앱이 뒤에 있어도 내비 경로를 바꿀 수 있다. 연결된 폰이 하나여도 상관없다.</p></div>
   </div>
-  <h3>정원이 정할 것</h3>
+  <h3>팀장이 정할 것</h3>
   <div class="open">
     <div class="o"><span class="ref">새로 나옴</span><b>기록 칸이 생기는 기준</b><p>시동 상태는 앱이 받을 수 없다고 확인됐다. "기어를 P단에 넣을 때"로 정하는 것을 추천한다. 신호등에서 P단에 넣는 경우처럼 잠깐 선 곳을 거를 최소 시간도 같이 정한다.</p></div>
     <div class="o"><span class="ref">새로 나옴</span><b>시연할 차의 연료 종류</b><p>에뮬레이터는 전기차이고 연료량은 고정값이다. 전기차 충전 장면으로 할지, 연료 값을 앱에서 임시로 넣어 주유 장면을 보여줄지.</p></div>

@@ -33,7 +33,7 @@ object Schedule {
     }
 
     /**
-     * The day as it is actually going (정원 2026-10-31: times are expectations, not promises — running late just
+     * The day as it is actually going (팀장 2026-10-31: times are expectations, not promises — running late just
      * pushes the rest of the day). [nextId] is the stop the car is driving to and [nextEta] when the navigation
      * expects to get there; it shows that time. When it is [minLateMinutes] or more after the typed time, every
      * later stop with a typed time moves by the same amount. Arriving early moves nothing (more time there).

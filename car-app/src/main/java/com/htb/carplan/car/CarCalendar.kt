@@ -59,7 +59,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import java.time.format.TextStyle
 import java.util.Locale
 
-/** 주차 중 차 화면의 탭 (정원 2026-10-31: 폰 앱 기능을 차에도). Driving shows only [TODAY], no bar. */
+/** 주차 중 차 화면의 탭 (팀장 2026-10-31: 폰 앱 기능을 차에도). Driving shows only [TODAY], no bar. */
 enum class CarTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     TODAY("오늘", Icons.Filled.Home),
     CALENDAR("캘린더", Icons.Filled.DateRange),
@@ -106,7 +106,7 @@ fun Modifier.monthSwipe(key: Any, onPrev: () -> Unit, onNext: () -> Unit): Modif
 }
 
 /**
- * The tab bar (정원 2026-10-31, 넷플릭스 하단 바 참고): one rounded bar floating at the bottom centre,
+ * The tab bar (팀장 2026-10-31, 넷플릭스 하단 바 참고): one rounded bar floating at the bottom centre,
  * icon over label, the chosen tab on a grey rounded patch. The bar is the one place that is round —
  * it reads as "move between screens", not as content.
  */
@@ -117,7 +117,7 @@ fun CarTabBar(tab: CarTab, onTab: (CarTab) -> Unit, modifier: Modifier = Modifie
     // Same colours as the rest of the screen (Pleos light/dark): a white bar by day, the popup grey by night.
     val bar = if (c.dark) c.sheet else c.bg
     val chosen = if (c.dark) c.sheetEdge else c.sheet
-    // The grey patch slides to the chosen tab (정원 2026-10-31: 순간이동 말고 옆으로 흐르게). Tabs are one width so it can.
+    // The grey patch slides to the chosen tab (팀장 2026-10-31: 순간이동 말고 옆으로 흐르게). Tabs are one width so it can.
     // Five tabs: they must fit the half screen too (≈ 830 dp).
     val tabW = if (LocalCompact.current) 148.dp else 200.dp
     val gap = 4.dp
@@ -200,7 +200,7 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                 Text("오늘", color = c.ink, fontSize = 24.sp)
             }
         }
-        // What the colours mean (정원 2026-10-31: 개수 대신 무슨 일정인지 — 여행과 차량 관리는 다른 색).
+        // What the colours mean (팀장 2026-10-31: 개수 대신 무슨 일정인지 — 여행과 차량 관리는 다른 색).
         if (!compact) Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             (BuiltInCategory.entries.map { it.id } + categories.map { it.id }).forEach { id ->
                 Box(Modifier.width(8.dp).height(24.dp).background(Color(CategoryColors.of(id, categories))))
@@ -242,11 +242,11 @@ private fun MonthBlock(vm: CarHomeViewModel, picked: LocalDate, onPick: (LocalDa
                         Box(Modifier.weight(1f).fillMaxHeight().padding(2.dp)) {
                             if (n in 1..days) {
                                 val d = month.atDay(n)
-                                // What the user registered shows, repeating ones too; the 시연 메뉴 test commute doesn't (정원 2026-10-31).
+                                // What the user registered shows, repeating ones too; the 시연 메뉴 test commute doesn't (팀장 2026-10-31).
                                 val dayEvents = byDay[d].orEmpty()
                                 val isPicked = d == picked
                                 // The chosen day gets a thick frame, the same as the 기록 tab (디자인 평가 2026-11-04: one look for
-                                // "chosen" across the car), fading in (정원 2026-10-31: 부드럽게); today a thin one.
+                                // "chosen" across the car), fading in (팀장 2026-10-31: 부드럽게); today a thin one.
                                 val frame by carColor(if (isPicked) c.ink else if (d == today) c.soft else c.bg, "cellFrame")
                                 val onCell = c.ink
                                 Column(
@@ -299,7 +299,7 @@ private fun DayBlock(vm: CarHomeViewModel, picked: LocalDate, onAdd: (LocalDate)
             dayEvents.forEach { item ->
                 val e = item.event
                 val kind = CategoryColors.label(e.categoryId, categories)
-                // Tap = what can be done with it (여행으로 바꾸기 · 지우기), 정원 2026-11-04.
+                // Tap = what can be done with it (여행으로 바꾸기 · 지우기), 팀장 2026-11-04.
                 Row(Modifier.fillMaxWidth().clickable { acting = item }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.padding(end = 12.dp).width(6.dp).height(56.dp).background(Color(CategoryColors.of(e.categoryId, categories))))
                     Text(e.startTime ?: "종일", color = c.soft, fontSize = 24.sp, modifier = Modifier.width(96.dp))

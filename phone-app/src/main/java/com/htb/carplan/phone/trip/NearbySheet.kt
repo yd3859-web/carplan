@@ -38,7 +38,7 @@ import com.htb.carplan.shared.model.Stop
 import com.htb.carplan.shared.net.KakaoCategory
 
 /**
- * 칸 근처 맛집·명소 (정원 2026-11-04: "등록된 위치에 따른 맛집·관광명소 추천"). Around one stop of the day: 맛집 / 카페 /
+ * 칸 근처 맛집·명소 (팀장 2026-11-04: "등록된 위치에 따른 맛집·관광명소 추천"). Around one stop of the day: 맛집 / 카페 /
  * 관광지, the group's 또 갈래요·가 봄 first, then nearest, with how far each is from the stop. [다음 칸으로] puts the place
  * right after this stop (not at the end); [지도] opens it in a map app.
  */

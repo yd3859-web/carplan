@@ -51,7 +51,7 @@ import androidx.compose.animation.core.tween
 private val Corner = RoundedCornerShape(4.dp)
 
 /**
- * ③ 여행 칸 편집 (주차 중만, 정원 2026-10-31: 차에서도 폰 수준으로). Left: today's places in route order — tap one to
+ * ③ 여행 칸 편집 (주차 중만, 팀장 2026-10-31: 차에서도 폰 수준으로). Left: today's places in route order — tap one to
  * change its time, [위]/[아래] to move it, [빼기] to take it out (one [되살리기] right after). Right: add a place
  * (one search per press) or, with a place chosen, its arrival time. Writes go straight to Firestore, so the phones
  * and the route (10장) follow.

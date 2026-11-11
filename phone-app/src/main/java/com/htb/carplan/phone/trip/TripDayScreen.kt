@@ -268,7 +268,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                 IconButton(onClick = { exportMenu = true }, enabled = exporting == null) { Icon(Icons.Filled.MoreVert, "더보기", tint = Palette.TextStrong) }
                 exporting?.let { Text(it, fontSize = 13.sp, color = Palette.TextSoft, modifier = Modifier.align(Alignment.BottomCenter)) }
                 androidx.compose.material3.DropdownMenu(exportMenu, onDismissRequest = { exportMenu = false }) {
-                    // 여행 정보 고치기 (정원 2026-11-04): 제목·날짜.
+                    // 여행 정보 고치기 (팀장 2026-11-04): 제목·날짜.
                     androidx.compose.material3.DropdownMenuItem({ Text("여행 정보 고치기") }, onClick = { exportMenu = false; tripInfoOpen = true })
                     if (records.isEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보낼 기록이 아직 없어요", color = Palette.TextSoft) }, onClick = { exportMenu = false })
                     if (records.isNotEmpty()) androidx.compose.material3.DropdownMenuItem({ Text("내보내기 · 이미지 1장") }, onClick = {
@@ -318,7 +318,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             ToolChip(if (pickups.isEmpty()) "픽업" else "픽업 · ${pickups.size}명") { pickupOpen = true }
             ToolChip("투표") { voteOpen = true }
             ToolChip("다트 · 동네 뽑기") { dartOpen = true }
-            // 정원 2026-11-09: 일정 짜면서도 추천 — 받은 칸들을 이 날에 바로 넣는다.
+            // 팀장 2026-11-09: 일정 짜면서도 추천 — 받은 칸들을 이 날에 바로 넣는다.
             ToolChip("AI 추천") { aiOpen = true }
             // 12장: parking around the next place — also what the "주차장 찾아봐 주세요" push opens.
             if (stops.any { !it.visited && !it.deleted }) ToolChip("주차장") { parkingAround = (stops.firstOrNull { it.id == day?.parkingHintStopId && !it.visited } ?: stops.first { !it.visited && !it.deleted }).id }
@@ -343,10 +343,10 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             }
         }
 
-        // 경로 미리보기 (정원 2026-11-04): the day's route on a map over the rail. On a phone the list needs the room, so the
+        // 경로 미리보기 (팀장 2026-11-04): the day's route on a map over the rail. On a phone the list needs the room, so the
         // map folds up as the list is pushed up and opens again when it is pulled down at the top.
         val roads by vm.roads.collectAsStateWithLifecycle()
-        // 픽업 자리 = ordinary slots in the day (정원 2026-11-09: "기존 일정들이랑 동일하게 주소가 떠 있고") — they move,
+        // 픽업 자리 = ordinary slots in the day (팀장 2026-11-09: "기존 일정들이랑 동일하게 주소가 떠 있고") — they move,
         // sort by 동선 and go to the car in that order. Only a pickup with no slot of its own (older days) keeps the line on top.
         val waitingPicks = pickups.filter { p -> p.status == com.htb.carplan.shared.model.PickupStatus.WAITING && stops.none { it.pickupUid == p.uid } }.sortedBy { it.order }
         val hasMap = waitingPicks.any { it.place.lat != 0.0 } || stops.any { !it.deleted && (it.place.lat != 0.0 || it.place.lng != 0.0) }
@@ -470,7 +470,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
             }
             if (!locked) item(key = "add") {
                 Column {
-                    // One [장소 추가] only — the bottom button (정원 2026-11-04: the rail's own "+ 장소 추가" doubled it).
+                    // One [장소 추가] only — the bottom button (팀장 2026-11-04: the rail's own "+ 장소 추가" doubled it).
                     if (stops.isEmpty()) Text("아래 [장소 추가]로 첫 장소를 넣어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(start = RAIL_W, top = 8.dp, bottom = 4.dp))
                     TextButton(onClick = { manualRecord = true }, modifier = Modifier.padding(start = RAIL_W)) { Text("기록 칸 직접 추가 (차 없이 세운 곳)", color = Palette.TextSoft, fontSize = 15.sp) }
                 }
@@ -487,7 +487,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
                     }
                 }
             }
-            // 하루 전체 이동 (정원 2026-11-10 "하루 일정 볼 때 가장 아래에 전체 이동거리"): 칸 사이 구간을 모두 더한다.
+            // 하루 전체 이동 (팀장 2026-11-10 "하루 일정 볼 때 가장 아래에 전체 이동거리"): 칸 사이 구간을 모두 더한다.
             val dayLegs = stops.dropLast(1).mapNotNull { legs[it.id] }
             if (stops.size >= 2 && dayLegs.isNotEmpty()) item(key = "day-total") {
                 Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
@@ -539,7 +539,7 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     if (inviteOpen) InviteSheet(vm, onDismiss = { inviteOpen = false })
     if (voteOpen) VoteSheet(ref.groupId, ref.eventId, date, nameOf = { vm.nameOf(it) }, onPickPlace = { cb -> placeQuery = ""; placePicker = cb }, onDismiss = { voteOpen = false; voteSeed = null; voteSeeds = emptyList() }, seed = voteSeed, seeds = voteSeeds)
     if (aiOpen) me?.let { u ->
-        // 일정이 이미 어느 동네면(첫 칸 주소) 그 동네 채우기부터, 아니면 새 동네 추천 (정원 2026-11-09).
+        // 일정이 이미 어느 동네면(첫 칸 주소) 그 동네 채우기부터, 아니면 새 동네 추천 (팀장 2026-11-09).
         val live = stops.filterNot { it.deleted }
         com.htb.carplan.phone.record.NextTripSheet(
             u,
@@ -629,7 +629,7 @@ private fun TimelineStop(
     onNote: (Record) -> Unit = {},
     onParking: (Record) -> Unit = {},
     onAskChat: (() -> Unit)? = null,
-    /** 칸 근처 맛집·명소 (정원 2026-11-04). */
+    /** 칸 근처 맛집·명소 (팀장 2026-11-04). */
     onNearby: (() -> Unit)? = null,
 ) {
     val belowFill by animateFloatAsState(if (railBelowPassed) 1f else 0f, tween(450), label = "railFill")
@@ -644,7 +644,7 @@ private fun TimelineStop(
             drawAbove = index > 0,
         )
         Column(Modifier.weight(1f).padding(bottom = if (isLast) 4.dp else 0.dp)) {
-            // Long-press the card itself to drag it (정원 2026-11-04: only the small rail dot used to work).
+            // Long-press the card itself to drag it (팀장 2026-11-04: only the small rail dot used to work).
             StopBox(stop, state, estimate, editedBy, dragging, locked, { open = !open }, onRemove, onTimeTap, record, handle = if (locked) Modifier else modifier)
             record?.let { r -> RecordStrip(r, locked, editable = open, onAddPhoto = { onAddPhoto(r) }, onRemovePhoto = { onRemovePhoto(r, it) }, onNote = { onNote(r) }, onParking = { onParking(r) }) }
             val shownComments = if (open) comments else comments.takeLast(1)
@@ -655,7 +655,7 @@ private fun TimelineStop(
                     if (!locked) Text("코멘트 남기기", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 8.dp, start = 10.dp).speechBubble(ghost = true).clickable { open = true }.padding(horizontal = 14.dp, vertical = 8.dp))
                     if (hidden > 0) TextButton(onClick = { open = true }, modifier = Modifier.padding(top = 8.dp)) { Text("코멘트 ${hidden}개 더", fontSize = 15.sp, color = Palette.TextSoft) }
                     // 디자인 평가 2026-11-04: one quiet action per stop when folded; 채팅에 묻기 is in the opened stop.
-                    // 근처 맛집·명소: what is around this place, right under it (정원 2026-11-04).
+                    // 근처 맛집·명소: what is around this place, right under it (팀장 2026-11-04).
                     if (onNearby != null) TextButton(onClick = onNearby, modifier = Modifier.padding(top = 8.dp)) { Text("근처 맛집·명소", fontSize = 15.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                     if (locked && record != null) Spacer(Modifier.height(8.dp))
                 }

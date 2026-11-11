@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-D7 기억장치 수집 (정원 2026-11-09): 한국관광공사 TourAPI의 "여행코스"(contentTypeId=25)를 받아
+D7 기억장치 수집 (팀장 2026-11-09): 한국관광공사 TourAPI의 "여행코스"(contentTypeId=25)를 받아
 phone-app/src/main/assets/courses.txt(여행상식.md 형식)로 만든다. 지금 파일은 손으로 정리한 30곳 —
 이 스크립트가 성공하면 그 결과로 교체·확장한다(손 정리 줄은 보존하고 뒤에 덧붙임).
 
-쓰는 법 (키는 정원이 공공데이터포털 data.go.kr에서 "한국관광공사_국문 관광정보 서비스" 활용신청):
+쓰는 법 (키는 팀장이 공공데이터포털 data.go.kr에서 "한국관광공사_국문 관광정보 서비스" 활용신청):
   1) local.properties 에 TOURAPI_KEY=일반인증키(Decoding)  또는 환경변수 TOURAPI_KEY
   2) python3 tools/fetch_courses.py
 주의: 2026-11-09 기준 키가 없어 실행은 못 해 봄. 엔드포인트가 다르면 BASE/파라미터만 고치면 된다.

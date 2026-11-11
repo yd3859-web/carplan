@@ -94,7 +94,7 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * 6장 다트 — 전체 화면 게임 (정원 2026-10-30). No map tiles: the map *is* the 3,559 읍·면·동 centres drawn
+ * 6장 다트 — 전체 화면 게임 (팀장 2026-10-30). No map tiles: the map *is* the 3,559 읍·면·동 centres drawn
  * as dots, so Korea appears as a dot picture that we can animate freely. Pull the dart back, let go, it arcs
  * in with a shadow, sticks with a shake, a ripple lights up the 동네 around it, and the name rises from below.
  * Everyone in the group sees the same throw land (shared dart room).
@@ -108,7 +108,7 @@ fun DartGame(
     val vm: VoteDartViewModel = viewModel(key = "dart-$groupId-$eventId", factory = voteVmFactory(groupId, eventId, date))
     val dart by vm.dart.collectAsStateWithLifecycle()
 
-    // Every opening is a fresh board (정원 2026-11-02): the dart waits at the bottom for the player.
+    // Every opening is a fresh board (팀장 2026-11-02): the dart waits at the bottom for the player.
     // An older result already in the room is not shown; throws made while the game is open are (mine or a friend's).
     var oldKey by remember { mutableStateOf<String?>(null) }
     var baselineDone by remember { mutableStateOf(false) }
@@ -157,7 +157,7 @@ fun DartGame(
         resetTick++
     }
     var flying by remember { mutableStateOf(false) }
-    // 지도 가리기 (정원 2026-11-03): throw blind, the map shows once the dart sticks.
+    // 지도 가리기 (팀장 2026-11-03): throw blind, the map shows once the dart sticks.
     var hideMap by remember { mutableStateOf(false) }
     var voteSeed by remember { mutableStateOf<com.htb.carplan.shared.model.Place?>(null) }
 
@@ -467,7 +467,7 @@ private fun DotMapBoard(
         val springBack = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
         val grabRadius = with(density) { 120.dp.toPx() }
         val minPull = with(density) { 40.dp.toPx() }
-        // The dart sways left and right in a fan (정원 2026-11-03): you can't aim at a place, only pick the moment and the power.
+        // The dart sways left and right in a fan (팀장 2026-11-03): you can't aim at a place, only pick the moment and the power.
         val swingMax = 50f
         var swingDeg by remember { mutableStateOf(0f) }
         LaunchedEffect(Unit) {
@@ -483,7 +483,7 @@ private fun DotMapBoard(
         val reveal = remember { Animatable(if (hideMap) 0f else 1f) }
         LaunchedEffect(stuck != null, hideMap) { if (stuck != null || !hideMap) reveal.animateTo(1f, tween(700)) else reveal.snapTo(0f) }
 
-        // Out of range = a miss (정원 2026-11-04: "범위 밖으로 던져진 것도 여행지로 처리돼 — 안 넘어가게"): 내 위치 = inside
+        // Out of range = a miss (팀장 2026-11-04: "범위 밖으로 던져진 것도 여행지로 처리돼 — 안 넘어가게"): 내 위치 = inside
         // the km circle, 지역 = inside that 시·도, 전국 = on land. A miss is not a pick: it says so and the dart comes back.
         var missed by remember { mutableStateOf(false) }
         val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -699,7 +699,7 @@ private fun DotMapBoard(
                                 (launchAt.y + dir.y * reach * power + shake.y).coerceIn(boardH * 0.02f, boardH * 0.98f),
                             )
                             // Released from where it was drawn back: the dart snaps forward out of the band.
-                            // 테스트·심사용 (정원 2026-11-10): 바다나 범위 밖으로 가도 무효로 돌려보내지 않고 가장 가까운 범위 안 동네에 꽂는다.
+                            // 테스트·심사용 (팀장 2026-11-10): 바다나 범위 밖으로 가도 무효로 돌려보내지 않고 가장 가까운 범위 안 동네에 꽂는다.
                             val target = if (inRange(aimed)) aimed else landBack(aimed)
                             val ok = true
                             missed = !ok // known before it flies, so the hit itself already looks like a miss

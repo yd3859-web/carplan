@@ -71,7 +71,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     val next: Stop? get() = remaining.firstOrNull()
     /** The pickup the car goes to first: a front one, or the next slot when it is a pickup slot. */
     val nextPickup: Pickup? get() = frontPickups.firstOrNull() ?: next?.pickupUid?.let { u -> waitingPickups.firstOrNull { it.uid == u } }
-    /** 정원 2026-11-09: a pickup slot is driven to in its own place in the order, as a pickup (arrival = "픽업 장소예요"). */
+    /** 팀장 2026-11-09: a pickup slot is driven to in its own place in the order, as a pickup (arrival = "픽업 장소예요"). */
     fun entry(s: Stop): NaviEntry = s.pickupUid?.takeIf { u -> waitingPickups.any { it.uid == u } }?.let { NaviEntry(NaviEntry.Kind.PICKUP, it, s.place) } ?: NaviEntry(NaviEntry.Kind.STOP, s.id, s.place)
     /** Everything still to drive to, in order: front pickups, then the slots. */
     fun routeEntries(): List<NaviEntry> = frontPickups.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + remaining.filter { it.place.hasCoords() }.map(::entry)
@@ -84,7 +84,7 @@ data class VoiceState(val listening: Boolean = false, val choices: Boolean = fal
 
 /** The day in fuel for [eventId]: km still to drive, % it uses, % left on arrival. */
 data class FuelUsage(val eventId: String, val km: Int, val usedPercent: Int, val leftPercent: Int, val ev: Boolean, val short: Boolean = false)
-/** A temporary 주유하기 slot on the rail (정원 2026-10-31): after [afterStopId] (null = before the next place) the tank runs short. */
+/** A temporary 주유하기 slot on the rail (팀장 2026-10-31): after [afterStopId] (null = before the next place) the tank runs short. */
 data class FuelNeed(val eventId: String, val afterStopId: String?, val percentThen: Int?, val ev: Boolean)
 /** Where to fill up on the way (Q55): the station, which stop it comes after, fuel % by then, 원 saved vs. now. */
 data class FuelSuggestion(val eventId: String, val station: GasStation, val afterStopId: String?, val afterName: String?, val percentThen: Int?, val saving: Int?, val chosen: Boolean = false)
@@ -116,11 +116,11 @@ data class NaviLive(
 
 /**
  * The question currently on screen. [reason] ROUTE_CHANGE (10장) carries [message] like
- * "정원님이 서현역을 뺐어요" and the buttons read 바꾸기 / 그대로 instead of 가기 / 나중에.
+ * "팀장님이 서현역을 뺐어요" and the buttons read 바꾸기 / 그대로 instead of 가기 / 나중에.
  */
 data class NextPrompt(
     val stop: Stop, val reason: PromptReason, val listening: Boolean = false, val heard: String? = null, val message: String? = null,
-    /** 차 화면 원칙 (정원 2026-10-31): not a question — spoken once, one big button ([button]) does the finding, nothing to answer. */
+    /** 차 화면 원칙 (팀장 2026-10-31): not a question — spoken once, one big button ([button]) does the finding, nothing to answer. */
     val single: Boolean = false, val button: String? = null,
     /** ★1: "지금 출발하면 10:12 도착" under a start or commute question. */
     val sub: String? = null,
@@ -191,7 +191,7 @@ class TripNavigator(
     private var routedPlan: List<Stop> = emptyList()
     private var routedVersion = -1L
     /** A change the driver has not accepted yet; asked again at the next P (Q24). */
-    /** 10장 (정원 2026-10-31): changes go to the navigation by themselves; [원래대로] puts this route back for a while. */
+    /** 10장 (팀장 2026-10-31): changes go to the navigation by themselves; [원래대로] puts this route back for a while. */
     private var previousRoute: List<Place> = emptyList()
     private var previousVersion = -1L
     /** The plan version the driver reverted: the navigation keeps the old route until the plan changes again. */
@@ -372,7 +372,7 @@ class TripNavigator(
     /** Brings carplan back in front (set by [CarRuntime]); the navigation pops up when it gets a route while idle. */
     var bringToFront: () -> Unit = {}
     /**
-     * [출발]·[가기] (정원 2026-11-05 "네비로 넘어가서 다시 안 돌아와"): the route goes to the navigation and carplan stays on
+     * [출발]·[가기] (팀장 2026-11-05 "네비로 넘어가서 다시 안 돌아와"): the route goes to the navigation and carplan stays on
      * screen. 반반 cannot be forced — Pleos (ConnectWindowUtil) resets an app's launch bounds to the whole app area, 2026-11-05
      * 에뮬 확인 — so the driver gets the ⋮ hint; already side by side, the navigation is on screen anyway.
      */
@@ -713,7 +713,7 @@ class TripNavigator(
         _voice.value = VoiceState()
         val t = trip.value
         when (cmd) {
-            // 정원 2026-11-04: by the day's plan, not just where the car stands — fuel = cheapest along today's places,
+            // 팀장 2026-11-04: by the day's plan, not just where the car stands — fuel = cheapest along today's places,
             // parking = around the place the car is going to now.
             VoiceCommand.FUEL -> { scope.launch { voice.say(if (carState.isEv == true) "충전소를 찾을게요." else "오늘 갈 길에서 싼 주유소를 찾을게요.") }; fuelPlan?.let { goViaStation(it) } ?: findFuelForDay() }
             VoiceCommand.PARKING -> {
@@ -955,12 +955,12 @@ class TripNavigator(
             // Straight line ×1.3 per leg (Kakao only for place recommendations; the 30 km reserve covers the error).
             val legs = straightLegs(t)
             val ev = carState.isEv == true
-            // Always: what the day takes (정원 2026-10-31) — a line on the screen, no voice when it is enough.
+            // Always: what the day takes (팀장 2026-10-31) — a line on the screen, no voice when it is enough.
             val short = FuelPlan.shortfall(legs, reach, ROUTE_MARGIN_KM * 1000)
             FuelPlan.usage(legs.sumOf { it.meters }, fuel, reach)?.let { u ->
                 _fuelUsage.value = FuelUsage(t.eventId, (u.meters / 1000).toInt(), u.usedPercent.toInt().coerceAtLeast(1), u.leftPercent.toInt(), ev, short = short != null)
             }
-            // 정원 2026-10-31: only when it runs short, or the tank is at/below half somewhere today — and then
+            // 팀장 2026-10-31: only when it runs short, or the tank is at/below half somewhere today — and then
             // only from where it is at half (nobody fills up at 85 %).
             val total = legs.sumOf { it.meters }
             val perPercent = FuelPlan.metersPerPercent(fuel, reach)
@@ -1010,7 +1010,7 @@ class TripNavigator(
     }
 
     /**
-     * [주유소] (정원 2026-11-04: "일정 중 최저가 주유소"): Opinet prices around the car and around each place still to go
+     * [주유소] (팀장 2026-11-04: "일정 중 최저가 주유소"): Opinet prices around the car and around each place still to go
      * today (up to 4 calls), cheapest first, each saying which place it is near. EV: chargers around the next place.
      * No trip / no Opinet key: the stations near the car, as before.
      */
@@ -1169,7 +1169,7 @@ class TripNavigator(
         if (t.day?.parkingHintStopId != n.id) { scope.launch { runCatching { trips.setParkingHint(t.groupId, t.eventId, t.date, n.id) } }; askParking(n) }
     }
 
-    /** A pickup slot (정원 2026-11-09) is reached like any slot: ticked, and the route topped up behind it. */
+    /** A pickup slot (팀장 2026-11-09) is reached like any slot: ticked, and the route topped up behind it. */
     private suspend fun tickPickupSlot(t: TodayTrip, uid: String) {
         val slot = t.stops.firstOrNull { it.pickupUid == uid && !it.visited } ?: return
         val after = t.remaining.filterNot { it.id == slot.id }
@@ -1326,7 +1326,7 @@ class TripNavigator(
     }
 
     /**
-     * 10장 (정원 2026-10-31, Q23·Q24 바꿈): no question — the navigation takes the new plan right away, the car says
+     * 10장 (팀장 2026-10-31, Q23·Q24 바꿈): no question — the navigation takes the new plan right away, the car says
      * what changed, and [원래대로] stays on screen for [REVERT_WINDOW_MS] to put the old route back.
      */
     private fun applyChange(t: TodayTrip, who: String, diff: String) {

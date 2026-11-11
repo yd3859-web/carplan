@@ -39,7 +39,7 @@
 <div class="wrap">
 
 <h1>carplan — 지금까지 만든 것</h1>
-<p class="sub">2026-11-02 기준 (10/31 = 차 앱, 11/1 = 폰 앱 ①~⑥·손짓·하루 통째로 써 보기, 11/2 = 현대 내비 순정 연동·시간/날짜 고르기·자동 주유 기록·픽업 지도). 바뀐 곳은 <span class="tag ok">11/1</span> <span class="tag ok">11/2</span> 표시. "무슨 기능이 있고, 눌렀을 때 뒤에서 어떻게 돌아가는지"를 정원이 이해하기 위한 정리. 기능 명세 원본은 <code>작동시나리오.html</code>, 직접 돌려볼 목록은 <code>테스트체크리스트.md</code>.</p>
+<p class="sub">2026-11-02 기준 (10/31 = 차 앱, 11/1 = 폰 앱 ①~⑥·손짓·하루 통째로 써 보기, 11/2 = 현대 내비 순정 연동·시간/날짜 고르기·자동 주유 기록·픽업 지도). 바뀐 곳은 <span class="tag ok">11/1</span> <span class="tag ok">11/2</span> 표시. "무슨 기능이 있고, 눌렀을 때 뒤에서 어떻게 돌아가는지"를 팀장이 이해하기 위한 정리. 기능 명세 원본은 <code>작동시나리오.html</code>, 직접 돌려볼 목록은 <code>테스트체크리스트.md</code>.</p>
 
 <div class="toc">
   <a href="#big">0 전체 그림</a><a href="#login">1 로그인</a><a href="#cal">2 캘린더</a><a href="#trip">3 여행·레일</a><a href="#group">4·7 그룹·초대·차 연결</a><a href="#vote">5·6 투표·다트</a><a href="#navi">현대 내비 순정 연동</a><a href="#car">8·9 차 화면·다음 목적지</a><a href="#cardesign">차 디자인·반반·움직임</a><a href="#gesture">폰 움직임·손짓</a><a href="#change">10 일정 변경→내비</a><a href="#pickup">11 픽업</a><a href="#fuel">12 주유</a><a href="#record">13·14 기록</a><a href="#maint">15 차량 관리</a><a href="#commute">16 출퇴근</a><a href="#push">17 알림</a><a href="#data">18 데이터·규칙</a><a href="#keys">19 키</a><a href="#demo">20 시연</a><a href="#left">남은 것</a>
@@ -128,7 +128,7 @@
 
 <!-- ============================================================ -->
 <h2 id="navi">현대 내비 순정 연동 <span class="tag ok">11/2</span> <span class="tag ok">에뮬 확인</span></h2>
-<p>현대 차 앱이니 <b>할 수 있는 건 전부 현대 내비(NaviHelper SDK)로</b>, 카카오는 장소 추천·목록에만 최소로(정원 11/2). SDK를 직접 열어 쓸 수 있는 기능을 확인했다.</p>
+<p>현대 차 앱이니 <b>할 수 있는 건 전부 현대 내비(NaviHelper SDK)로</b>, 카카오는 장소 추천·목록에만 최소로(팀장 11/2). SDK를 직접 열어 쓸 수 있는 기능을 확인했다.</p>
 <table>
 <tr><th style="width:200px">무엇</th><th>순정(현대 내비)</th><th>카카오·오피넷</th></tr>
 <tr><td>경유지·목적지 넣기, 도착 신호</td><td>그대로 (경유지 2 + 목적지, 도착마다 채움)</td><td>—</td></tr>
@@ -292,7 +292,7 @@ groups/{gid}                     이름, memberIds[], ownerUid(만든 사람), i
   /places/{kakaoId}              그룹 장소 메모: 이름, againBy[](또 갈래요), visited(가 봄)
   /events/log-{날짜}             여행 없는 날의 "일상 기록" 일정(나만 그룹)   /events/due-{항목}  차량 관리 예정(자동)
 </pre>
-<p><b>보안 규칙</b>(<code>firestore.rules</code>, 23가지 경우 에뮬레이터 테스트 통과, 배포는 정원이): 그룹 문서는 로그인한 누구나 읽기(초대 코드 조회용)지만, 그 아래 일정·칸·코멘트·기록·픽업·투표·다트는 <b>멤버와 멤버의 차</b>만. 차 계정은 uid가 <code>cars/{id}</code>인 걸로 알아보고 차주 권한을 준다. 그룹 수정은 멤버는 이름·초대·나가기, 그룹장만 내보내기, 멤버 아닌 사람은 "나만 추가"(코드 참여)만. users는 본인(+본인 차), cars는 차 자신·차주·주인 없는 차만. 친구 목록은 본인 + <b>본인 차</b>(10/31 고침, <b>배포 전</b>). 사진(Storage)은 그룹 멤버와 멤버의 차만, 이미지 5MB까지 — 지금 업로드가 403으로 거부됨(Storage 규칙이 Firestore를 읽는 권한 확인 필요).</p>
+<p><b>보안 규칙</b>(<code>firestore.rules</code>, 23가지 경우 에뮬레이터 테스트 통과, 배포는 팀장이): 그룹 문서는 로그인한 누구나 읽기(초대 코드 조회용)지만, 그 아래 일정·칸·코멘트·기록·픽업·투표·다트는 <b>멤버와 멤버의 차</b>만. 차 계정은 uid가 <code>cars/{id}</code>인 걸로 알아보고 차주 권한을 준다. 그룹 수정은 멤버는 이름·초대·나가기, 그룹장만 내보내기, 멤버 아닌 사람은 "나만 추가"(코드 참여)만. users는 본인(+본인 차), cars는 차 자신·차주·주인 없는 차만. 친구 목록은 본인 + <b>본인 차</b>(10/31 고침, <b>배포 전</b>). 사진(Storage)은 그룹 멤버와 멤버의 차만, 이미지 5MB까지 — 지금 업로드가 403으로 거부됨(Storage 규칙이 Firestore를 읽는 권한 확인 필요).</p>
 
 <!-- ============================================================ -->
 <h2 id="keys">19 · 외부 서비스 · 키</h2>
@@ -313,7 +313,7 @@ groups/{gid}                     이름, memberIds[], ownerUid(만든 사람), i
 <tr><th style="width:190px">버튼</th><th>하는 일</th></tr>
 <tr><td>연료 10/20/50/100%, 연료차/전기차</td><td>연료·차 종류 강제(주유 기능 확인용)</td></tr>
 <tr><td>시뮬레이션 재생 (<code>DriveSimulator</code>)</td><td>앱이 에뮬 안 Virtual Console(127.0.0.1:8088)에 기어·속도·문을 직접 보내고, 위치는 카카오 도로 좌표로 이동 → 타기 → D → 이동 → 도착 → P → 문 열고 내림. 확인용(시연 대본 아님)</td></tr>
-<tr><td>시험 여행·처음으로 / 두 번째 여행 / 시험 여행 지우기 / 시험 출근(만들기·지우기) / 시험 일행 픽업</td><td>각 장 확인용 데이터. <span class="tag ok">11/1</span> [시험 여행 지우기] = 오늘 "시험 여행"·"시험 여행 2"만 지움(차가 정원 실제 계정에 연결돼 있어서)</td></tr>
+<tr><td>시험 여행·처음으로 / 두 번째 여행 / 시험 여행 지우기 / 시험 출근(만들기·지우기) / 시험 일행 픽업</td><td>각 장 확인용 데이터. <span class="tag ok">11/1</span> [시험 여행 지우기] = 오늘 "시험 여행"·"시험 여행 2"만 지움(차가 팀장 실제 계정에 연결돼 있어서)</td></tr>
 <tr><td>오래 쓴 것처럼 채우기 (<code>DemoSeed</code>)</td><td>두 달 쓴 것처럼: 친구 4명(각자 익명 계정), 그룹 3개, 지난 여행 5개(칸·기록·한 줄·주차·친구 코멘트), 일상 기록, 주유 6번·정비 이력·보험 갱신일, 평일 출근, 앞으로 일정 7개. 사진은 macOS 기본 풍경 10장(debug만). 다시 누르면 빠진 사진만 채움. [데모 지우기]는 일정만 지움</td></tr>
 <tr><td>반반 / 다크 모드 미리보기</td><td>화면 모양 확인</td></tr>
 </table>
@@ -323,8 +323,8 @@ groups/{gid}                     이름, memberIds[], ownerUid(만든 사람), i
 <h2 id="left">남은 것</h2>
 <table>
 <tr><th style="width:230px">무엇</th><th>누가</th><th>메모</th></tr>
-<tr><td>사진 업로드 403 풀기</td><td>정원</td><td>Storage 권한 → <code>firebase deploy --only storage,firestore:rules</code>(Storage가 Firestore 읽는 권한 물으면 Y) → 사진·차 친구 목록 해결, 그 뒤 [오래 쓴 것처럼 채우기] 한 번 더</td></tr>
-<tr><td>실폰 확인</td><td>정원</td><td>새 <code>phone-app-debug.apk</code> 설치 → 구글 로그인·캘린더(달 넘기기), 푸시 6종·이동 중 알림·<span class="tag ok">11/2</span> 픽업 지도 차 모양 움직임(폰 두 대), 일정 알림, 사진, 손짓(뒤로 손가락 따라가기·사진 확대·진동·끌기와 옆으로 밀기)</td></tr>
+<tr><td>사진 업로드 403 풀기</td><td>팀장</td><td>Storage 권한 → <code>firebase deploy --only storage,firestore:rules</code>(Storage가 Firestore 읽는 권한 물으면 Y) → 사진·차 친구 목록 해결, 그 뒤 [오래 쓴 것처럼 채우기] 한 번 더</td></tr>
+<tr><td>실폰 확인</td><td>팀장</td><td>새 <code>phone-app-debug.apk</code> 설치 → 구글 로그인·캘린더(달 넘기기), 푸시 6종·이동 중 알림·<span class="tag ok">11/2</span> 픽업 지도 차 모양 움직임(폰 두 대), 일정 알림, 사진, 손짓(뒤로 손가락 따라가기·사진 확대·진동·끌기와 옆으로 밀기)</td></tr>
 <tr><td>폰 시간 고르기</td><td>Claude</td><td>폰 빠른 일정·칸 도착 시각은 아직 시·분 입력칸 → 차처럼 휠로 바꿀지</td></tr>
 <tr><td>폰 일반 일정 상세</td><td>Claude</td><td>여행 아닌 일정(치과·회식)엔 상세 화면이 없어서 초대 창도 아직 없음</td></tr>
 <tr><td>작은 것</td><td>Claude</td><td>빠른 일정 장소 검색을 가까운 순으로(위치 권한), 칸 추가 함수 하나로(묶음 3, 보류), 출퇴근 학습 띠·[나중에] 확인</td></tr>

@@ -213,7 +213,7 @@ fun CalendarScreen(vm: CalendarViewModel = viewModel()) {
             )
         }
     }
-    // 일정 고치기 (정원 2026-11-04) — and [여행으로 바꾸기] opens the new trip's first day for more places.
+    // 일정 고치기 (팀장 2026-11-04) — and [여행으로 바꾸기] opens the new trip's first day for more places.
     editing?.let { item ->
         EventEditSheet(
             item = item, categories = categories, onAddCategory = vm::addCategory,

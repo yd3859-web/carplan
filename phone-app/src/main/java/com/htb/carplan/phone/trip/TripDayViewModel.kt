@@ -177,7 +177,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
         recordsRepo.addRecord(groupId, eventId, _date.value, Record(place = Place(name = name.trim()), unplanned = true, createdBy = me()))
     }
 
-    // ---------- 같이 갈 사람 (초대 = 일정, 친구 = 한 번, 그룹 = 자주 타는 사람 묶음 — 정원 2026-10-31) ----------
+    // ---------- 같이 갈 사람 (초대 = 일정, 친구 = 한 번, 그룹 = 자주 타는 사람 묶음 — 팀장 2026-10-31) ----------
 
     private val myGroups: StateFlow<List<Group>> = uid.filterNotNull()
         .flatMapLatest { calendar.observeGroups(it) }
@@ -268,7 +268,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     private val legCache = HashMap<String, LegInfo>()
 
     /**
-     * 경로 미리보기 (정원 2026-11-04): the road between each two places of the day for the map over the rail. Kakao
+     * 경로 미리보기 (팀장 2026-11-04): the road between each two places of the day for the map over the rail. Kakao
      * Mobility once per pair of places (kept), a straight line without a key or on failure. Only after the stops settle
      * (a drag fires many changes): 1.5 s quiet first.
      */
@@ -348,7 +348,7 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     }
 
     /**
-     * 근처 맛집·명소 (정원 2026-11-04: 등록된 위치에 따른 맛집·관광명소 추천): places of [category] within 2 km of [stop],
+     * 근처 맛집·명소 (팀장 2026-11-04: 등록된 위치에 따른 맛집·관광명소 추천): places of [category] within 2 km of [stop],
      * the group's 또 갈래요 / 가 봄 first, then nearest; places already on the day are left out. One Kakao call per stop
      * and kind, kept while the screen lives (API 한도).
      */

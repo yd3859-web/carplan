@@ -52,7 +52,7 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
         db.collection(FirestorePaths.events(groupId)).add(event).await().id
 
     /**
-     * 일정 고치기 (정원 2026-11-04: 캘린더에 등록한 일정을 고칠 방법이 없었음): title, category, dates, time and place of
+     * 일정 고치기 (팀장 2026-11-04: 캘린더에 등록한 일정을 고칠 방법이 없었음): title, category, dates, time and place of
      * an existing event. Fields not named stay as they are.
      */
     suspend fun updateEvent(groupId: String, eventId: String, title: String, categoryId: String, startDate: String, endDate: String, allDay: Boolean, startTime: String?, place: com.htb.carplan.shared.model.Place?) {
@@ -63,7 +63,7 @@ class CalendarRepository(private val db: FirebaseFirestore = FirebaseFirestore.g
     }
 
     /**
-     * An ordinary event becomes a trip (정원 2026-11-04: "바다여행"을 다른 일정으로 등록해 경유지를 못 넣었음): category 여행,
+     * An ordinary event becomes a trip (팀장 2026-11-04: "바다여행"을 다른 일정으로 등록해 경유지를 못 넣었음): category 여행,
      * all-day, and its place — if it had one — becomes the first stop of the first day, so more places can follow.
      */
     suspend fun convertToTrip(groupId: String, event: com.htb.carplan.shared.model.Event, byUid: String) {

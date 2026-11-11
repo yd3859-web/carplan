@@ -3,7 +3,7 @@ package com.htb.carplan.shared.calendar
 import kotlin.math.roundToInt
 
 /**
- * D1 취향 정리 (정원 2026-11-06, "다음 여행 추천"): what the group's own records say this user likes — the raw
+ * D1 취향 정리 (팀장 2026-11-06, "다음 여행 추천"): what the group's own records say this user likes — the raw
  * material the AI (D4) gets instead of the records themselves (no names, no notes, no photos). Pure Kotlin so
  * both apps and the tests can use it.
  */
@@ -51,7 +51,7 @@ object TasteBuild {
                 (name.length >= 3 && name.endsWith("항") && !name.endsWith("공항")) -> "바다"
             has("놀이", "테마파크", "워터", "아쿠아리움", "동물원", "키즈") -> "놀이"
             has("박물관", "미술관", "전시", "유적", "한옥", "민속", "과학관") -> "문화"
-            has("산 ", "수목원", "휴양림", "공원", "계곡", "폭포", "호수", "숲", "정원", "섬") || name.endsWith("산") -> "자연"
+            has("산 ", "수목원", "휴양림", "공원", "계곡", "폭포", "호수", "숲", "팀장", "섬") || name.endsWith("산") -> "자연"
             else -> null
         }
     }

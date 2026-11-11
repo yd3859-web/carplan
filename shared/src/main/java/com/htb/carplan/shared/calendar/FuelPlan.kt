@@ -48,7 +48,7 @@ object FuelPlan {
     fun afterName(legs: List<Leg>, s: Shortfall): String? = if (s.legIndex == 0) null else legs[s.legIndex - 1].to.place.name
 
     /**
-     * The day in fuel (정원 2026-10-31: 출발할 때 전체 사용량): [totalMeters] still to drive, as % of the tank,
+     * The day in fuel (팀장 2026-10-31: 출발할 때 전체 사용량): [totalMeters] still to drive, as % of the tank,
      * and what is left on arrival. Null when the car does not tell fuel and range.
      */
     fun usage(totalMeters: Double, fuelPercent: Double?, reachMeters: Double?): Usage? {
@@ -100,7 +100,7 @@ object FuelPlan {
         return last
     }
 
-    /** Nobody fills up at 85 % (정원 2026-10-31): suggestions only once the tank is at or below this. */
+    /** Nobody fills up at 85 % (팀장 2026-10-31): suggestions only once the tank is at or below this. */
     const val SUGGEST_BELOW_PERCENT = 50.0
 
     /**

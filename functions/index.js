@@ -105,7 +105,7 @@ exports.onParkingHint = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}
   const { gid, eid, date } = event.params;
   const [ev, stop] = await Promise.all([db.doc(`groups/${gid}/events/${eid}`).get(), db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${stopId}`).get()]);
   const tokens = await groupTokens(gid, ev.get("driverUid"));
-  // kind/stopId: tapping it opens the phone's 주차장 찾기 around that stop, nearest first (정원 2026-11-04).
+  // kind/stopId: tapping it opens the phone's 주차장 찾기 around that stop, nearest first (팀장 2026-11-04).
   await push(tokens, "주차장 찾아봐 주세요", `${stop.get("place")?.name || "다음 장소"} 도착 5분 전이에요 · 눌러서 근처 주차장 보기`, { groupId: gid, eventId: eid, date, kind: "parking", stopId });
 });
 
@@ -226,7 +226,7 @@ exports.chatOnComment = onDocumentCreated("groups/{gid}/events/{eid}/days/{date}
   await chatCard(gid, `comment-${cid}`, { uid: c.uid || "", kind: "COMMENT", text: c.text, refId: c.stopId || null, lines: [stop?.get("place")?.name || "칸"], eventId: eid, date });
 });
 
-// ---------- D4 다음 여행 추천 (정원 2026-11-06) ----------
+// ---------- D4 다음 여행 추천 (팀장 2026-11-06) ----------
 // 폰이 보낸 취향 요약(장소 이름·지역·숫자만, 개인정보 없음)으로 Claude가 다음 여행 동네와 하루 동선을 고른다.
 // 키는 서버 비밀값(ANTHROPIC_API_KEY)에만: `firebase functions:secrets:set ANTHROPIC_API_KEY` 후 재배포.
 // 폰은 받은 장소를 카카오로 실제 있는지 확인한 뒤에만 보여 준다. 하루 10번(uid 기준).

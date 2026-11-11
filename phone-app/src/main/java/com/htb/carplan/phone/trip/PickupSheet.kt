@@ -50,10 +50,10 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     val stops by vm.stops.collectAsStateWithLifecycle()
     vm.names.collectAsStateWithLifecycle().value
     var searching by remember { mutableStateOf(false) }
-    // 정원 2026-11-04: the pickup spot is picked on a map around where I am (search by name is one tap away inside).
+    // 팀장 2026-11-04: the pickup spot is picked on a map around where I am (search by name is one tap away inside).
     var mapPicking by remember { mutableStateOf(false) }
     val mine = pickups.firstOrNull { it.uid == me }
-    // 위치 공유 (정원 2026-11-09): only the car's position, only while it comes to pick someone up, only after the driver
+    // 위치 공유 (팀장 2026-11-09): only the car's position, only while it comes to pick someone up, only after the driver
     // said yes — and only the person waiting for it sees the car (friends already on board do not need it).
     val sharing = day?.pickupSharing == true
     val waitingForCar = mine?.status == PickupStatus.WAITING
@@ -77,7 +77,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
     // Where the car is on that road: driven part, the rest, and the direction it points.
     val progress = remember(route, carPos) { carPos?.let { routeProgress(route, it) } }
 
-    // 카카오T처럼 (정원 11/2): while the car is coming for me, the whole screen is the map with the car gliding along.
+    // 카카오T처럼 (팀장 11/2): while the car is coming for me, the whole screen is the map with the car gliding along.
     var showSheet by remember { mutableStateOf(false) }
     if (carPos != null && target != null && mine.status == PickupStatus.WAITING && !showSheet) {
         val driver = car?.ownerUid?.let { vm.names.value[it] }?.ifBlank { null } ?: "운전자"
@@ -142,7 +142,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
                 }
             }
             HorizontalDivider(color = Palette.Line, modifier = Modifier.padding(vertical = 10.dp))
-            // 정원 2026-11-09: pickups are slots in the day — their order is the rail's (drag, 동선 정렬), not set here.
+            // 팀장 2026-11-09: pickups are slots in the day — their order is the rail's (drag, 동선 정렬), not set here.
             Text("태우러 갈 사람 · 순서는 일정에서 끌거나 동선 정렬로", fontSize = 15.sp, color = Palette.TextSoft)
             if (pickups.isEmpty()) Text("아직 태우러 갈 사람이 없어요", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
             pickups.forEach { p ->

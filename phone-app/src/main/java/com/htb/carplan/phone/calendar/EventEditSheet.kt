@@ -53,7 +53,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
- * 일정 고치기 (정원 2026-11-04: "캘린더에서 등록했을 때 여행을 수정하는 기능이 없네"). Title, category, dates, time and
+ * 일정 고치기 (팀장 2026-11-04: "캘린더에서 등록했을 때 여행을 수정하는 기능이 없네"). Title, category, dates, time and
  * place of an event already on the calendar. An event that is not a trip gets [여행으로 바꾸기]: it becomes a trip, its
  * place the first stop, and the trip's day opens so more places can be added (경유지 여러 개). [지우기] hides it
  * (soft delete, like everywhere else).

@@ -9,7 +9,7 @@ import com.htb.carplan.shared.model.Place
 fun Place.kindLine(): String? = category.split(">").map { it.trim() }.filter { it.isNotBlank() }.drop(1).takeLast(2).joinToString(" · ").ifBlank { null }
 
 /**
- * 평점·메뉴·사진·리뷰: the Kakao Map page of the place (정원 2026-11-04 "평점이나 뭐 파는지 볼 수 있나" — the search API
+ * 평점·메뉴·사진·리뷰: the Kakao Map page of the place (팀장 2026-11-04 "평점이나 뭐 파는지 볼 수 있나" — the search API
  * gives none of them, the page has all). Opens in the Kakao Map app if installed, else the browser.
  */
 fun openPlacePage(context: Context, p: Place) {

@@ -88,7 +88,7 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
     }
 
     /**
-     * 픽업 칸 (정원 2026-11-09): [uid]'s pickup place as an ordinary slot. Moves the existing slot's place, or puts a new
+     * 픽업 칸 (팀장 2026-11-09): [uid]'s pickup place as an ordinary slot. Moves the existing slot's place, or puts a new
      * one before the places still to go (after other pickups not yet reached) — the group can then drag or 동선 정렬 it.
      */
     suspend fun upsertPickupStop(groupId: String, eventId: String, date: String, uid: String, name: String, place: Place, byUid: String) {

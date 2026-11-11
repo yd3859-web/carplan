@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
-/** 여행별 채팅방 (정원 2026-11-03 A안): words and cards (다트 결과 · 투표) in one stream per group. */
+/** 여행별 채팅방 (팀장 2026-11-03 A안): words and cards (다트 결과 · 투표) in one stream per group. */
 class ChatRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     /** The latest [limit] lines, oldest first. A line still waiting for its server time sorts last. */

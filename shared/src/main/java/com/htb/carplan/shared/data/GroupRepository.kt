@@ -26,7 +26,7 @@ class GroupRepository(private val db: FirebaseFirestore = FirebaseFirestore.getI
     }
 
     /**
-     * 초대 = 일정 단위 (정원 2026-10-31, A안): there is no "make a group first". The first invite to an event that
+     * 초대 = 일정 단위 (팀장 2026-10-31, A안): there is no "make a group first". The first invite to an event that
      * is not yet in its own group (it lives in the solo group, or in a 묶음 from before) gives it one — named after
      * it, with the people who could already see it — and moves it there with everything under it: days, stops,
      * pickups, comments, records and their comments. The old copy is only marked deleted. Returns the group to

@@ -24,7 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
 /**
- * Motion on the car (정원 2026-10-31: 순간이동 말고 부드럽게). One length everywhere so the screen feels like one thing.
+ * Motion on the car (팀장 2026-10-31: 순간이동 말고 부드럽게). One length everywhere so the screen feels like one thing.
  * Pleos: no animation while driving — [LocalMotion] is false then and everything below snaps.
  */
 const val MOTION_MS = 250

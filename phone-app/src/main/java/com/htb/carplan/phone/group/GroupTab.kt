@@ -114,7 +114,7 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
             }
         }
         message?.let { Text(it, color = Palette.TextStrong, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp).clickable { vm.clearMessage() }) }
-        // 초대 = 일정 (정원 2026-10-31): each event invites its own people; this tab keeps the people — 묶음 and friends.
+        // 초대 = 일정 (팀장 2026-10-31): each event invites its own people; this tab keeps the people — 묶음 and friends.
         // A 묶음 with nobody else in it (left over from an old car QR) says nothing: not listed (디자인 평가 2026-11-04).
         val shared = groups.filter { it.isCircle && it.memberIds.any { m -> m != me?.uid } }
         LazyColumn(Modifier.weight(1f).padding(top = 10.dp), state = list) {
@@ -371,7 +371,7 @@ fun JoinDialog(vm: GroupViewModel, onJoined: (String) -> Unit) {
     val c = code ?: return
     var group by remember(c) { mutableStateOf<Group?>(null) }
     var missing by remember(c) { mutableStateOf(false) }
-    // The same link/QR can carry a friend code (car QR on a day without a trip, 정원 2026-10-31).
+    // The same link/QR can carry a friend code (car QR on a day without a trip, 팀장 2026-10-31).
     var friend by remember(c) { mutableStateOf<com.htb.carplan.shared.model.User?>(null) }
     LaunchedEffect(c) {
         group = vm.groupForCode(c)

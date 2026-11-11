@@ -113,7 +113,7 @@ class VoteDartViewModel(private val groupId: String, private val eventId: String
         message.value = "${com.htb.carplan.shared.text.Josa.eul(place.name)} 칸으로 넣었어요"
     }
 
-    /** 다트 동네의 대표 코스(기억장치)를 통째로 칸으로 (정원 2026-11-09 "다트로 지역 뽑히면 추천도"). */
+    /** 다트 동네의 대표 코스(기억장치)를 통째로 칸으로 (팀장 2026-11-09 "다트로 지역 뽑히면 추천도"). */
     fun addCourseAsStops(c: com.htb.carplan.shared.calendar.Course, d: Dart) = act {
         val e = eventId ?: return@act
         var put = 0

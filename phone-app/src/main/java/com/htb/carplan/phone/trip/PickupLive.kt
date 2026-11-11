@@ -44,7 +44,7 @@ import com.htb.carplan.shared.calendar.RouteMath
 import com.htb.carplan.shared.model.Place
 
 /**
- * 픽업 · 차가 오는 중 (카카오T 택시 참고, 정원 11/2): the whole screen is a flat map, the car glides along its road
+ * 픽업 · 차가 오는 중 (카카오T 택시 참고, 팀장 11/2): the whole screen is a flat map, the car glides along its road
  * between the 5-second position updates (driven part grey, the rest blue), the map keeps the car and my pickup place
  * in frame above the card, and the card says when it arrives, how far it still is, and [탔어요].
  */

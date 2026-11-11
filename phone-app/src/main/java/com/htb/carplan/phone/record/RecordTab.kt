@@ -388,7 +388,7 @@ private fun BookCard(b: DiaryBook, with: List<String>, onOpen: (DiaryDay) -> Uni
     val single = b.pages.size == 1
     val photos = b.photos
     Column(Modifier.fillMaxWidth().clickable { onOpen(if (single) first else b.pages.first().first) }.padding(vertical = 14.dp)) {
-        // No photo yet: the day's way on a real map (정원 2026-11-09 "흰 바탕 선 말고 지도로"), so the book still has a face.
+        // No photo yet: the day's way on a real map (팀장 2026-11-09 "흰 바탕 선 말고 지도로"), so the book still has a face.
         if (photos.isEmpty()) {
             val pts = b.pages.flatMap { it.second }.map { it.place }.filter { it.lat != 0.0 || it.lng != 0.0 }.map { it.lat to it.lng }
             if (pts.size >= 2) {

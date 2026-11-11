@@ -29,7 +29,7 @@ import java.time.ZoneId
 import java.util.Date
 
 /**
- * 시연 메뉴 [오래 쓴 것처럼 채우기] (정원 2026-10-31): two months of made-up use, so every screen has something real
+ * 시연 메뉴 [오래 쓴 것처럼 채우기] (팀장 2026-10-31): two months of made-up use, so every screen has something real
  * to show — friends with names, groups, past trips with records (times, notes, photos, comments), fuel and service
  * history, a weekday commute and plans ahead.
  *
@@ -141,7 +141,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
     }
 
     /**
-     * 시연 메뉴 [여행 기록 더 채우기] (정원 2026-11-04: "여행 기록 같은 거 많이, 이것저것"): ten more past trips around the
+     * 시연 메뉴 [여행 기록 더 채우기] (팀장 2026-11-04: "여행 기록 같은 거 많이, 이것저것"): ten more past trips around the
      * country (one to three days, notes, comments by the made friends, parking, 또 갈래요) and a dozen 일상 기록, in
      * the groups [run] made. Each press adds a fresh set (remembered for [clear]). Photos go to Storage; when Storage
      * refuses (rules not deployed), a web sample picture stands in so the diary still shows photos.
@@ -248,7 +248,7 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
     )
 
     /**
-     * 시연 메뉴 [11월 다시 채우기] (정원 2026-11-10: "채워져 있는 기록·일정 다 지우고 진짜 사람이 쓴 것처럼 11월 한 달"):
+     * 시연 메뉴 [11월 다시 채우기] (팀장 2026-11-10: "채워져 있는 기록·일정 다 지우고 진짜 사람이 쓴 것처럼 11월 한 달"):
      * every event of the owner's groups goes away for good (차량 관리 기록·다음 점검만 남김), then November is written
      * as one person's month — trips of four or more places, records with notes and photos on the days already past,
      * plenty of talk from the group under each place, plans ahead with the chat that comes before a trip.

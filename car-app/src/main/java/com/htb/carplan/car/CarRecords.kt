@@ -61,7 +61,7 @@ private val Corner = RoundedCornerShape(4.dp)
 private fun dayText(d: LocalDate) = "${d.monthValue}월 ${d.dayOfMonth}일 (${d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)})"
 
 /**
- * 기록 탭 (⑤, 정원 2026-10-31: 날짜 목록 대신 캘린더 + 오늘 화면 같은 타임라인). Left (half screen: top) the month —
+ * 기록 탭 (⑤, 팀장 2026-10-31: 날짜 목록 대신 캘린더 + 오늘 화면 같은 타임라인). Left (half screen: top) the month —
  * days the car stopped are marked with a bar per trip (일상 기록 grey). Right (below) the chosen day as a rail: when
  * the car stood where, how long, the line written, parking, photos, and the drive between. Reading only: photos and
  * lines are added on the phone.
@@ -87,7 +87,7 @@ fun RowScope.CarRecords(vm: CarHomeViewModel) {
         VerticalDivider(color = c.line)
         line(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 20.dp))
     } else androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-        // Half screen (정원 2026-10-31): month on top, the day below — pushing the day up folds the month away
+        // Half screen (팀장 2026-10-31): month on top, the day below — pushing the day up folds the month away
         // (it slides up out of sight) so the records get the whole height; pulling down at the top brings it back.
         val full = maxHeight * 0.48f
         val fullPx = with(androidx.compose.ui.platform.LocalDensity.current) { full.toPx() }
@@ -203,7 +203,7 @@ private fun RecordMonth(coverOf: suspend (RecordDay) -> String?, month: java.tim
 }
 
 /**
- * One day on the rail, like the 오늘 timeline (정원 2026-10-31: 타임라인 모양으로, 감상이 주인공). Each stop is a ✓
+ * One day on the rail, like the 오늘 timeline (팀장 2026-10-31: 타임라인 모양으로, 감상이 주인공). Each stop is a ✓
  * node with its time on the left; beside it the photos taken there, the line written in large type and the group's
  * comments as named bubbles — the facts (stay, parking) small underneath, the drive to the next stop between.
  */

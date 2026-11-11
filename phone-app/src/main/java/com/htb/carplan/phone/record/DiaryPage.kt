@@ -77,7 +77,7 @@ import java.time.ZoneId
 import java.util.Locale
 
 /**
- * 14장 기록 탭 — 읽는 일기 한 장 (정원 2026-11-04: "바로 전체가 보이는 게 아니라 스크롤할수록 하나씩 이어지게").
+ * 14장 기록 탭 — 읽는 일기 한 장 (팀장 2026-11-04: "바로 전체가 보이는 게 아니라 스크롤할수록 하나씩 이어지게").
  * Scrollytelling, like Polarsteps' step pages or the scroll-drawn timelines on the web: **the scroll is the clock**.
  * How far a place has come up the screen decides how much of it is drawn — the rail grows down to it, the dot lands
  * (with a tick), the place and time, then the big photo, the line someone wrote and the comments, then the rail heads
@@ -260,7 +260,7 @@ private fun journeyNow(state: LazyListState, records: List<Record>, pts: List<Re
 }
 
 /**
- * The day as a moving map (정원 2026-11-04 "흑백 지도에 경로만이면 재미없다 — 움직이면서 어디서 섰고 얼마나 갔는지"):
+ * The day as a moving map (팀장 2026-11-04 "흑백 지도에 경로만이면 재미없다 — 움직이면서 어디서 섰고 얼마나 갔는지"):
  * the car drives the real road as you scroll, the road behind it turns blue, a ring spreads where it is parked, and
  * the card says where it stopped and for how long, or how far along the drive it is — with today's distance counting.
  */
