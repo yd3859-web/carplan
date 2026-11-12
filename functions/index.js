@@ -9,16 +9,38 @@ admin.initializeApp();
 setGlobalOptions({ region: "asia-northeast3", maxInstances: 5 });
 const db = admin.firestore();
 
-/** 그룹 멤버(제외 uid 빼고)의 모든 토큰. */
-async function groupTokens(groupId, excludeUid) {
-  const group = await db.doc(`groups/${groupId}`).get();
-  const members = (group.get("memberIds") || []).filter((u) => u !== excludeUid);
-  return userTokens(members);
+// 시연 계정 (팀장 2026-11-12: 컴 한 대 + 폰 한 대로 시연 영상): 시연 친구들(민지·지훈…)은 폰이 없는 계정이라, 그들에게
+// 갈 알림은 시연 차주 폰으로 보낸다. 실제 사용자 그룹은 그대로(시연 계정 uid가 아니면 아무것도 안 바뀜).
+const DEMO_OWNER_EMAIL = "owner@carplan-demo.app";
+const DEMO_FRIEND_EMAILS = ["minji", "junho", "seoyeon", "mom", "jihoon", "dad"].map((n) => `${n}@carplan-demo.app`);
+let demoCache = null;
+async function demo() {
+  if (demoCache) return demoCache;
+  const uidOf = async (email) => { try { return (await admin.auth().getUserByEmail(email)).uid; } catch (e) { return null; } };
+  const owner = await uidOf(DEMO_OWNER_EMAIL);
+  const friends = new Set((await Promise.all(DEMO_FRIEND_EMAILS.map(uidOf))).filter(Boolean));
+  demoCache = { owner, friends };
+  return demoCache;
 }
 
-async function userTokens(uids) {
-  if (!uids.length) return [];
-  const snaps = await db.getAll(...uids.map((u) => db.doc(`users/${u}`)));
+/**
+ * 그룹 멤버(제외 uid 빼고)의 모든 토큰. [toDriverToo]: 운전자라서 빠지는 알림(주차장)도 시연 그룹이면 시연 차주 폰으로.
+ */
+async function groupTokens(groupId, excludeUid, toDriverToo = false) {
+  const group = await db.doc(`groups/${groupId}`).get();
+  const all = group.get("memberIds") || [];
+  const { owner } = await demo();
+  const members = all.filter((u) => u !== excludeUid || (toDriverToo && owner && u === owner));
+  // The demo owner's own action (칸 빼기·채팅…) still is not pushed back to them through the friends standing in.
+  return userTokens(members, toDriverToo ? null : excludeUid);
+}
+
+async function userTokens(uids, dropUid = null) {
+  const { owner, friends } = await demo();
+  // 시연 친구 → 시연 차주 (한 번만)
+  const to = [...new Set(uids.map((u) => (owner && friends.has(u) ? owner : u)))].filter((u) => u !== dropUid);
+  if (!to.length) return [];
+  const snaps = await db.getAll(...to.map((u) => db.doc(`users/${u}`)));
   return snaps.flatMap((s) => s.get("fcmTokens") || []);
 }
 
@@ -110,7 +132,7 @@ exports.onParkingHint = onDocumentWritten("groups/{gid}/events/{eid}/days/{date}
   if (!stopId || before?.parkingHintStopId === stopId) return;
   const { gid, eid, date } = event.params;
   const [ev, stop] = await Promise.all([db.doc(`groups/${gid}/events/${eid}`).get(), db.doc(`groups/${gid}/events/${eid}/days/${date}/stops/${stopId}`).get()]);
-  const tokens = await groupTokens(gid, ev.get("driverUid"));
+  const tokens = await groupTokens(gid, ev.get("driverUid"), true);
   // kind/stopId: tapping it opens the phone's 주차장 찾기 around that stop, nearest first (팀장 2026-11-04).
   await push(tokens, "주차장 찾아봐 주세요", `${stop.get("place")?.name || "다음 장소"} 도착 5분 전이에요 · 눌러서 근처 주차장 보기`, { groupId: gid, eventId: eid, date, kind: "parking", stopId });
 });
