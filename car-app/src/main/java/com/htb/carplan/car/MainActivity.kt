@@ -1377,6 +1377,10 @@ private fun CarAddDialog(vm: CarHomeViewModel, date: LocalDate = LocalDate.now()
     if (darting) CarDartGame(vm, onDismiss = { darting = false }, onPick = { p ->
         darting = false; picked = p; place = p.name
         if (title.isBlank()) title = p.name
+    }, onCourse = { town, places ->
+        // 하루 코스 통째로: 고른 날짜에 여행 하나 + 코스 칸들 (팀장 2026-11-12).
+        vm.addCourseTrip(LocalDate.now().plusDays(dayOffset), title.trim().ifBlank { "$town 하루" }, town, places)
+        darting = false; onDismiss()
     })
     if (datePick) CarDatePickDialog(LocalDate.now().plusDays(dayOffset), onPick = { dayOffset = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), it); datePick = false }, onDismiss = { datePick = false })
 }

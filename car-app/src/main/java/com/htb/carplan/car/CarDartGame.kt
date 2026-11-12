@@ -103,6 +103,8 @@ fun CarDartGame(
     vm: CarHomeViewModel, onDismiss: () -> Unit,
     /** 일정 추가 창에서 열면(A안): the chosen place goes back to that window instead of today's trip. */
     onPick: ((Place) -> Unit)? = null,
+    /** 일정 추가 창에서: [이 코스로 여행하기] → 그 날짜에 하루 코스 여행 (동네 이름, 코스 장소들). */
+    onCourse: ((String, List<Place>) -> Unit)? = null,
 ) {
     val dart by vm.dart.collectAsStateWithLifecycle()
 
@@ -247,8 +249,11 @@ fun CarDartGame(
                                 else {
                                     Text(c.joinToString(" → ") { it.name }, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 2)
                                     Text("관광지 → 점심 → 관광지 → 카페 · 장소 정보 카카오", fontSize = 20.sp, color = Palette.TextSoft)
-                                    if (onPick == null) OutlinedButton(
-                                        onClick = { vm.addCourseStops(c, d.resultName.split(" ").last()); onDismiss() }, shape = Corner,
+                                    if (onPick == null || onCourse != null) OutlinedButton(
+                                        onClick = {
+                                            val town = d.resultName.split(" ").last()
+                                            if (onCourse != null) onCourse(town, c) else { vm.addCourseStops(c, town); onDismiss() }
+                                        }, shape = Corner,
                                         border = androidx.compose.foundation.BorderStroke(1.dp, Palette.SheetEdge),
                                         modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(76.dp),
                                     ) { Text("이 코스로 여행하기", fontSize = 24.sp, color = Palette.TextStrong, fontWeight = FontWeight.SemiBold) }

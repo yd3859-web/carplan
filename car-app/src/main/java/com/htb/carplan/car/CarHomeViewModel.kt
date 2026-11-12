@@ -217,6 +217,22 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 일정 추가 → 다트 → [이 코스로 여행하기]: 그 날짜에 여행 하나를 만들고 코스 장소들을 차례로 칸으로. */
+    fun addCourseTrip(date: LocalDate, title: String, town: String, places: List<Place>) {
+        val u = owner.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                val day = date.toString()
+                val eid = calendar.addEvent(u.soloGroupId, Event(
+                    categoryId = com.htb.carplan.shared.model.BuiltInCategory.TRIP.id,
+                    title = title, startDate = day, endDate = day, allDay = true, createdBy = u.uid))
+                val repo = TripRepository()
+                places.forEach { p -> repo.addStop(u.soloGroupId, eid, day, p, null, "다트 · $town", u.uid) }
+            }.onSuccess { navigator.notify("$title 여행을 만들었어요 · ${places.size}곳") }
+                .onFailure { _error.value = it.message }
+        }
+    }
+
     /** A recommended place from the dart window → a stop at the end of today's trip. */
     fun addPlaceAsStop(place: Place, memo: String) {
         val t = trip.value ?: return
