@@ -86,6 +86,12 @@ exports.onPickupWritten = onDocumentWritten("groups/{gid}/events/{eid}/days/{dat
   const data = { groupId: event.params.gid, eventId: event.params.eid, date: event.params.date };
   // 11장 6: "곧 도착해요" once, when the car's ETA (written by the car every 30 s) drops under 3 minutes.
   const SOON = 180;
+  // 출발 알림 (팀장 2026-11-11): the car writes an ETA only while it is driving to this pickup, so the first one is the
+  // moment it set off. Closer than 3 minutes already → "곧 도착해요" below says it instead.
+  if (!after.arrivedAt && after.etaSeconds != null && before?.etaSeconds == null && after.etaSeconds > SOON) {
+    const tokens = await userTokens([event.params.uid]);
+    await push(tokens, "차가 출발했어요", `약 ${Math.max(1, Math.round(after.etaSeconds / 60))}분 뒤 ${after.place?.name || "픽업 장소"}에 와요`, data);
+  }
   if (!after.arrivedAt && after.etaSeconds != null && after.etaSeconds <= SOON && !(before?.etaSeconds != null && before.etaSeconds <= SOON)) {
     const tokens = await userTokens([event.params.uid]);
     await push(tokens, "곧 도착해요", `차가 약 ${Math.max(1, Math.round(after.etaSeconds / 60))}분 뒤 ${after.place?.name || "픽업 장소"}에 와요`, data);
