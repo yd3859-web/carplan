@@ -81,6 +81,8 @@ fun BackScreen(onBack: () -> Unit, content: @Composable (back: () -> Unit) -> Un
         Box(
             Modifier.fillMaxSize()
                 .graphicsLayer { translationX = gone.value * size.width; shadowElevation = if (gone.value > 0f) 16.dp.toPx() else 0f }
+                // Opaque: a screen that draws no ground of its own must not show the one underneath (그룹 화면, 2026-11-11).
+                .background(Palette.Background)
                 // Touches stop here: the screen underneath must not get them.
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         ) { content(leave) }
