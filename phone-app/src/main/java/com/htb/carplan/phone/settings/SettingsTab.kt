@@ -195,7 +195,7 @@ fun SettingsTab(vm: SettingsViewModel = viewModel()) {
 
         Section("앱")
         // Long-press (once, on the owner's phone that holds the 시연 data): that anonymous account becomes the demo account.
-        androidx.compose.foundation.layout.Box(Modifier.combinedClickable(onClick = {}, onLongClick = { if (loginVm.demoAvailable && provider == null) loginVm.becomeDemo() })) {
+        androidx.compose.foundation.layout.Box(Modifier.combinedClickable(onClick = {}, onLongClick = { if (loginVm.demoAvailable && provider == null) loginVm.becomeDemo() else if (provider == "demo") loginVm.tidyDemo() })) {
             SettingRow("버전", "carplan ${BuildConfig.VERSION_NAME}")
         }
         Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 4.dp))

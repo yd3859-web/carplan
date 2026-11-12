@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /** 설정 탭 "로그인 연결" → the gate opens again even though the user skipped it before. */
 object LoginGateBus { val reopen = MutableStateFlow(false) }
@@ -102,6 +103,34 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
     fun becomeDemo() = run("시연 계정 만들기") {
         sessions.becomeDemo(com.htb.carplan.phone.BuildConfig.DEMO_PASSWORD)
         message.value = "이 계정이 시연 계정이 됐어요"
+    }
+
+    /**
+     * 시연 계정 정리 (설정 · 버전 길게, 시연 계정일 때만 — 2026-11-11): the demo account keeps only its made-up friends.
+     * Real accounts that became friends or members while testing (실명이 심사위원에게 보임) are let go: friendships both
+     * sides, members of the demo account's own groups, and groups someone else owns are left. Nothing else is deleted.
+     */
+    fun tidyDemo() = run("시연 계정 정리") {
+        val me = FirebaseAuth.getInstance().currentUser?.uid ?: return@run
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        val keep = setOf("민지", "준호", "서연", "엄마", "지훈", "아빠")
+        val names = HashMap<String, String>()
+        suspend fun nameOf(uid: String) = names.getOrPut(uid) { runCatching { db.document(com.htb.carplan.shared.data.FirestorePaths.user(uid)).get().await().getString("name") }.getOrNull().orEmpty() }
+        var friends = 0; var members = 0; var left = 0
+        db.collection(com.htb.carplan.shared.data.FirestorePaths.friends(me)).get().await().documents.forEach { f ->
+            if (nameOf(f.id) !in keep) {
+                f.reference.delete().await()
+                runCatching { db.document("${com.htb.carplan.shared.data.FirestorePaths.friends(f.id)}/$me").delete().await() }
+                friends++
+            }
+        }
+        val groups = com.htb.carplan.shared.data.GroupRepository()
+        db.collection(com.htb.carplan.shared.data.FirestorePaths.GROUPS).whereArrayContains("memberIds", me).get().await().documents.forEach { g ->
+            val ids = (g.get("memberIds") as? List<*>)?.filterIsInstance<String>().orEmpty()
+            if (g.getString("ownerUid") == me) ids.filter { it != me && nameOf(it) !in keep }.forEach { groups.removeMember(g.id, it); members++ }
+            else { groups.removeMember(g.id, me); left++ }
+        }
+        message.value = "정리했어요 · 친구 ${friends}명, 그룹 멤버 ${members}명, 남의 그룹 ${left}개에서 나옴"
     }
 
     fun saveName(name: String) = viewModelScope.launch {
