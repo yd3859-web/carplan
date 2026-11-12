@@ -100,7 +100,10 @@ class RecordTabViewModel : ViewModel() {
      * The diary as books: one per trip (every day up to yesterday that has records) and one per 일상 day. null while
      * loading. Today's page lives in the big "오늘" card instead.
      */
-    val books: StateFlow<List<DiaryBook>?> = kotlinx.coroutines.flow.combine(days, groupList) { d, g -> d to g }
+    /** Bumped after a page is edited, so the books (covers, counts) read their records again. */
+    private val edits = MutableStateFlow(0)
+
+    val books: StateFlow<List<DiaryBook>?> = kotlinx.coroutines.flow.combine(days, groupList, edits) { d, g, _ -> d to g }
         .mapLatest { (list, gs) ->
             val today = LocalDate.now()
             kotlinx.coroutines.coroutineScope {
@@ -293,6 +296,39 @@ class RecordTabViewModel : ViewModel() {
                 note?.let { records.setNote(p.groupId, p.eventId, p.date, rid, it.trim()) }
                 jpeg?.let { message.value = "사진 올리는 중…"; records.addPhoto(p.groupId, p.eventId, p.date, rid, it); message.value = null }
             }.onFailure { message.value = it.message }
+            done()
+        }
+    }
+
+    /**
+     * 기록 칸 고치기 (팀장 2026-11-11: 일기 페이지에서 칸마다 수정·사진 추가): whatever is given changes on that slot —
+     * a line, the parking spot, the place's name (its position stays), a photo in or out. [done] reloads the page.
+     */
+    fun editSlot(
+        page: DiaryDay, r: com.htb.carplan.shared.model.Record,
+        note: String? = null, parking: String? = null, name: String? = null,
+        addJpeg: ByteArray? = null, removeUrls: List<String> = emptyList(), done: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                val (g, e, d) = Triple(page.groupId, page.eventId, page.date)
+                note?.takeIf { it.trim() != r.note }?.let { records.setNote(g, e, d, r.id, it.trim()) }
+                parking?.takeIf { it.trim() != r.parkingNote }?.let { records.setParkingNote(g, e, d, r.id, it.trim()) }
+                name?.trim()?.takeIf { it.isNotEmpty() && it != r.place.name }?.let { records.setPlace(g, e, d, r.id, r.place.copy(name = it)) }
+                removeUrls.forEach { records.removePhoto(g, e, d, r.id, it) }
+                addJpeg?.let { message.value = "사진 올리는 중…"; records.addPhoto(g, e, d, r.id, it); message.value = null }
+            }.onFailure { message.value = it.message }
+            edits.value++
+            done()
+        }
+    }
+
+    /** [또 갈래요] on a diary slot: mine on or off. */
+    fun toggleAgain(page: DiaryDay, r: com.htb.carplan.shared.model.Record, done: () -> Unit) {
+        val me = me() ?: return
+        viewModelScope.launch {
+            runCatching { records.setAgain(page.groupId, page.eventId, page.date, r, me, me !in r.againBy) }.onFailure { message.value = it.message }
+            edits.value++
             done()
         }
     }

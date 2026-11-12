@@ -6,6 +6,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -94,7 +96,25 @@ fun DiaryPage(
     onPage: (DiaryDay) -> Unit,
     onEdit: () -> Unit,
 ) {
-    val records = book.pages.firstOrNull { it.first.date == page.date }?.second.orEmpty()
+    // The page's records, read again after each edit made here (칸 고치기).
+    var tick by remember { mutableStateOf(0) }
+    val first = book.pages.firstOrNull { it.first.date == page.date }?.second.orEmpty()
+    // Kept while the new read comes in (a reset to the first list would make the page jump).
+    var records by remember(page) { mutableStateOf(first) }
+    LaunchedEffect(page, tick) { if (tick > 0) records = vm.summary(page) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var editing by remember { mutableStateOf<Record?>(null) }
+    var photoFor by remember { mutableStateOf<Record?>(null) }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        val r = photoFor
+        if (uri != null && r != null) Photos.downscaleToJpeg(ctx, uri)?.let { jpeg -> vm.editSlot(page, r, addJpeg = jpeg) { tick++ } }
+    }
+    fun addPhoto(r: Record) {
+        photoFor = r
+        pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+    editing?.let { r -> SlotEditSheet(r, onAddPhoto = { addPhoto(r) }, onDismiss = { editing = null },
+        onSave = { name, note, parking, removed -> vm.editSlot(page, r, note = note, parking = parking, name = name, removeUrls = removed) { tick++ }; editing = null }) }
     val comments by produceState<List<Comment>>(emptyList(), page) { value = vm.comments(page) }
     val names by vm.names.collectAsStateWithLifecycle()
     val state = rememberLazyListState()
@@ -144,6 +164,8 @@ fun DiaryPage(
                             travel = remember(state, i, zonePx) { derivedStateOf { travelNow(state, i + 1, zonePx) } },
                             zoneH = if (i < records.lastIndex) zoneH else 24.dp, legMeters = legKm[i],
                             onPhoto = { at -> viewing = r.photoUrls to at },
+                            mine = vm.me()?.let { it in r.againBy } == true,
+                            onAddPhoto = { addPhoto(r) }, onAgain = { vm.toggleAgain(page, r) { tick++ } }, onEdit = { editing = r },
                         )
                     }
                     item(key = "end") {
@@ -385,6 +407,7 @@ private fun seg(p: Float, from: Float, to: Float) = ((p - from) / (to - from)).c
 private fun StoryStop(
     number: Int, r: Record, next: Record?, first: Boolean, said: List<Comment>, nameOf: (String?) -> String,
     progress: State<Float>, travel: State<Float>, zoneH: Dp, legMeters: Double?, onPhoto: (Int) -> Unit,
+    mine: Boolean = false, onAddPhoto: () -> Unit = {}, onAgain: () -> Unit = {}, onEdit: () -> Unit = {},
 ) {
     // The dot doesn't scrub: it lands with a little bounce (and a tick) once its part of the scroll is reached.
     val landed by remember { derivedStateOf { progress.value > DOT_AT } }
@@ -455,6 +478,12 @@ private fun StoryStop(
                     if (r.againBy.isNotEmpty()) add("또 갈래요 · " + r.againBy.map(nameOf).joinToString("·"))
                 }
                 if (small.isNotEmpty()) Text(small.joinToString("   "), fontSize = 15.sp, color = Palette.ChipText, modifier = Modifier.padding(top = 10.dp))
+                // 칸 고치기 (팀장 2026-11-11): a photo, 또 갈래요, and [고치기] for the rest (line, name, parking, photos out).
+                Row(Modifier.padding(top = 12.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EditChip("사진 추가", onClick = onAddPhoto)
+                    EditChip(if (mine) "또 갈래요 취소" else "또 갈래요", active = mine, onClick = onAgain)
+                    EditChip("고치기", onClick = onEdit)
+                }
             }
             // The drive to the next place: a stretch of rail with how long and how far, lit while the car is on it.
             Box(Modifier.fillMaxWidth().height(zoneH), contentAlignment = Alignment.CenterStart) {
@@ -526,4 +555,53 @@ private fun moveLine(r: Record, next: Record?): String? {
     val from = (r.leftAt ?: r.arrivedAt)?.toDate()?.time ?: return null
     val to = next.arrivedAt?.toDate()?.time ?: return null
     return hours(to - from)?.let { "이동 $it" }
+}
+
+/** A small edit button under a diary slot: white with a thin edge, or black when it is on (또 갈래요 pressed). */
+@Composable
+private fun EditChip(label: String, active: Boolean = false, onClick: () -> Unit) {
+    Text(label, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (active) Color.White else Palette.Navy,
+        modifier = Modifier.clip(Corner).background(if (active) Palette.Navy else Palette.Background).border(1.dp, if (active) Palette.Navy else Palette.Line, Corner)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp))
+}
+
+/**
+ * [고치기] on a diary slot: the place's name, the line, the parking spot, and the photos (× takes one out, [사진 추가]
+ * adds) — in the centred sheet like every editor. Photos taken out go only when [저장] is pressed.
+ */
+@Composable
+private fun SlotEditSheet(r: Record, onAddPhoto: () -> Unit, onDismiss: () -> Unit, onSave: (name: String, note: String, parking: String, removed: List<String>) -> Unit) {
+    var name by remember { mutableStateOf(r.place.name) }
+    var note by remember { mutableStateOf(r.note) }
+    var parking by remember { mutableStateOf(r.parkingNote) }
+    var removed by remember { mutableStateOf(emptyList<String>()) }
+    com.htb.carplan.phone.ui.CenterSheet(onDismiss = onDismiss) {
+        Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+            com.htb.carplan.phone.ui.SheetTitle("칸 고치기")
+            @Composable fun Field(label: String, value: String, hint: String, lines: Int = 1, onChange: (String) -> Unit) {
+                Text(label, fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+                androidx.compose.material3.TextField(value, onChange, placeholder = { Text(hint, fontSize = 17.sp) }, minLines = lines, maxLines = maxOf(lines, 1) + 2,
+                    singleLine = lines == 1, shape = Corner, colors = com.htb.carplan.phone.ui.sheetFieldColors(),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, lineHeight = 26.sp), modifier = Modifier.fillMaxWidth())
+            }
+            Field("장소 이름", name, "이 곳을 뭐라고 부를까요?") { name = it.take(40) }
+            Field("한 줄", note, "여기서 어땠나요?", lines = 2) { note = it.take(200) }
+            Field("주차 자리", parking, "예: B2 C-14") { parking = it.take(40) }
+            Text("사진", fontSize = 15.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+            Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                r.photoUrls.filterNot { it in removed }.forEach { url ->
+                    Box {
+                        coil3.compose.AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(88.dp).clip(Corner))
+                        Text("×", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.align(Alignment.TopEnd).background(Color(0x99000000)).clickable { removed = removed + url }.padding(horizontal = 8.dp, vertical = 2.dp))
+                    }
+                }
+                Box(Modifier.size(88.dp).clip(Corner).border(1.dp, Palette.SheetEdge, Corner).clickable(onClick = onAddPhoto), contentAlignment = Alignment.Center) {
+                    Text("사진 추가", fontSize = 14.sp, color = Palette.Navy, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            if (removed.isNotEmpty()) Text("사진 ${removed.size}장은 저장하면 빠져요", fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
+            com.htb.carplan.phone.ui.SheetActions("저장", onAction = { onSave(name, note, parking, removed) }, onCancel = onDismiss)
+        }
+    }
 }
