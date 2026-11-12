@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -32,6 +34,7 @@ import com.htb.carplan.phone.ui.Corner
 import com.htb.carplan.phone.ui.Palette
 import com.htb.carplan.shared.calendar.RouteMath
 import com.htb.carplan.shared.data.ChatRepository
+import com.htb.carplan.shared.data.TripRepository
 import com.htb.carplan.shared.model.Place
 import com.htb.carplan.shared.net.KakaoCategory
 import kotlinx.coroutines.launch
@@ -39,15 +42,16 @@ import kotlinx.coroutines.launch
 /**
  * 12장 "주차장 찾아봐 주세요" (팀장 2026-11-04: 알림을 누르면 바로 근처 주차장, 목적지에서 가까운 순). The parking lots around
  * the place the car is about to reach — measured from that place, not from the phone — nearest first. A passenger
- * can post one to the trip chat (the driver hears about it there) or open it in a map app. One Kakao call per open.
+ * sends one to the car ([차로 보내기] → [Stop.parkAt]: the car drives there for this place), or posts it to the trip chat. One Kakao call per open.
  */
 @Composable
-fun ParkingSheet(target: Place, groupId: String, eventId: String, date: String, me: String?, shareToChat: Boolean, onDismiss: () -> Unit) {
+fun ParkingSheet(target: Place, stopId: String, current: Place?, canSend: Boolean, groupId: String, eventId: String, date: String, me: String?, shareToChat: Boolean, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var lots by remember(target) { mutableStateOf<List<Pair<Place, Int>>?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var posted by remember { mutableStateOf(setOf<String>()) }
+    var sentKey by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(target) {
         if (!target.hasCoords()) { lots = emptyList(); message = "목적지 위치를 몰라서 찾을 수 없어요"; return@LaunchedEffect }
         if (!kakao.available) { lots = emptyList(); message = "주차장 검색을 쓸 수 없어요"; return@LaunchedEffect }
@@ -62,7 +66,7 @@ fun ParkingSheet(target: Place, groupId: String, eventId: String, date: String, 
     CenterSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
             Text("주차장 찾기", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
-            Text("${target.name.ifBlank { "목적지" }} 근처 · 가까운 순", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
+            Text("${target.name.ifBlank { "목적지" }} 근처 · 가까운 순" + if (canSend) " · 고르면 차가 그리로 가요" else "", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
             HorizontalDivider(color = Palette.Line)
             val list = lots
             when {
@@ -70,23 +74,32 @@ fun ParkingSheet(target: Place, groupId: String, eventId: String, date: String, 
                 list.isEmpty() -> Text(message ?: "주차장이 없어요", fontSize = 17.sp, color = Palette.TextSoft, modifier = Modifier.padding(vertical = 20.dp))
                 else -> LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 520.dp)) {
                     itemsIndexed(list, key = { i, (p, _) -> p.kakaoId ?: "$i" }) { i, (p, m) ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${i + 1}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1)
-                                Text(listOf(distanceText(m), p.address).filter { it.isNotBlank() }.joinToString("  ·  "), fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
+                        val key = p.kakaoId ?: p.name
+                        val isSent = sentKey == key || (sentKey == null && current != null && current.name == p.name && current.lat == p.lat && current.lng == p.lng)
+                        Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${i + 1}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong, modifier = Modifier.padding(end = 12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(p.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, maxLines = 1)
+                                    Text(listOf(distanceText(m), p.address).filter { it.isNotBlank() }.joinToString("  ·  "), fontSize = 14.sp, color = Palette.TextSoft, maxLines = 1)
+                                }
                             }
-                            // Open in a map app (길 안내는 운전자 내비, 동승자는 위치 확인용).
-                            TextButton(onClick = {
-                                val uri = android.net.Uri.parse("geo:${p.lat},${p.lng}?q=${p.lat},${p.lng}(${android.net.Uri.encode(p.name)})")
-                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure { message = "지도 앱이 없어요" }
-                            }) { Text("지도", fontSize = 15.sp, color = Palette.TextSoft) }
-                            if (shareToChat && me != null) {
-                                val key = p.kakaoId ?: p.name
-                                OutlinedButton(
+                            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                                // Open in a map app (길 안내는 운전자 내비, 동승자는 위치 확인용).
+                                TextButton(onClick = {
+                                    val uri = android.net.Uri.parse("geo:${p.lat},${p.lng}?q=${p.lat},${p.lng}(${android.net.Uri.encode(p.name)})")
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure { message = "지도 앱이 없어요" }
+                                }) { Text("지도", fontSize = 15.sp, color = Palette.TextSoft) }
+                                if (shareToChat && me != null) TextButton(
                                     onClick = { scope.launch { runCatching { ChatRepository().sharePlace(groupId, me, p, eventId, date) }.onSuccess { posted = posted + key } } },
-                                    enabled = key !in posted, shape = Corner, border = BorderStroke(1.dp, Palette.Line),
-                                ) { Text(if (key in posted) "올렸어요" else "채팅에", fontSize = 15.sp, color = if (key in posted) Palette.TextSoft else Palette.Navy, fontWeight = FontWeight.SemiBold) }
+                                    enabled = key !in posted,
+                                ) { Text(if (key in posted) "올렸어요" else "채팅에", fontSize = 15.sp, color = Palette.TextSoft) }
+                                // 팀장 2026-11-13: the lot goes straight to the car — it drives there for this place (10장: says so, [원래대로] on the car).
+                                if (me != null && canSend) Button(
+                                    onClick = { scope.launch { runCatching { TripRepository().setParkAt(groupId, eventId, date, stopId, p, me) }.onSuccess { sentKey = key }.onFailure { message = "보내지 못했어요 · ${it.message?.take(40)}" } } },
+                                    enabled = !isSent, shape = Corner, modifier = Modifier.padding(start = 6.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Palette.Navy, contentColor = androidx.compose.ui.graphics.Color.White, disabledContainerColor = Palette.InputBg, disabledContentColor = Palette.TextSoft),
+                                ) { Text(if (isSent) "차로 보냈어요" else "차로 보내기", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
                             }
                         }
                         HorizontalDivider(color = Palette.Line)

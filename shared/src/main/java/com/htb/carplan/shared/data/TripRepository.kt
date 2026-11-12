@@ -144,6 +144,17 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         }.await()
     }
 
+    /** 12장 [차로 보내기]: the parking lot for [stopId] (null takes it out). A change of the day, so the car re-routes (10장). */
+    suspend fun setParkAt(groupId: String, eventId: String, date: String, stopId: String, parking: Place?, byUid: String) {
+        db.runBatch { batch ->
+            batch.update(
+                db.document("${FirestorePaths.stops(groupId, eventId, date)}/$stopId"),
+                mapOf("parkAt" to parking, "parkAtBy" to parking?.let { byUid }, "updatedBy" to byUid, "updatedAt" to FieldValue.serverTimestamp()),
+            )
+            batch.bumpDay(groupId, eventId, date, byUid)
+        }.await()
+    }
+
     /** Every comment of the day, oldest first; the UI groups them by [Comment.stopId]. */
     fun observeDayComments(groupId: String, eventId: String, date: String): Flow<List<Comment>> = callbackFlow {
         val reg = db.collection(FirestorePaths.dayComments(groupId, eventId, date))

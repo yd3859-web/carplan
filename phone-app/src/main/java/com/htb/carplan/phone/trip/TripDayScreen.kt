@@ -214,8 +214,8 @@ private fun TripDayBody(ref: TripRef, vm: TripDayViewModel, onRefChange: (TripRe
     var parkingShown by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(parkingStopId, stops.isNotEmpty()) { if (parkingStopId != null && !parkingShown && stops.isNotEmpty()) { parkingShown = true; parkingAround = parkingStopId } }
     parkingAround?.let { sid ->
-        val target = stops.firstOrNull { it.id == sid }?.place
-        if (target != null) ParkingSheet(target, ref.groupId, ref.eventId, date, me, shareToChat = sharedTrip, onDismiss = { parkingAround = null })
+        val st = stops.firstOrNull { it.id == sid }
+        if (st != null) ParkingSheet(st.place, st.id, st.parkAt, canSend = !st.visited && !st.deleted, ref.groupId, ref.eventId, date, me, shareToChat = sharedTrip, onDismiss = { parkingAround = null })
     }
     // 내보내기 메뉴 — the chat's [하루 카드 만들기] opens it too.
     var exportMenu by remember { mutableStateOf(false) }
@@ -729,6 +729,13 @@ private fun StopBox(
                 Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     tag?.let { Text(it, fontSize = 14.sp, color = Palette.TextSoft, modifier = Modifier.border(1.dp, Palette.Line, Corner).padding(horizontal = 6.dp, vertical = 1.dp)) }
                     if (rest.isNotBlank()) Text(rest, fontSize = 16.sp, color = Palette.ChipText, modifier = Modifier.padding(start = if (tag != null) 6.dp else 0.dp))
+                }
+            }
+            // 12장 [차로 보내기]: the parking lot picked for this place — the car drives there.
+            stop.parkAt?.takeIf { !stop.visited }?.let { lot ->
+                Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("주차", fontSize = 14.sp, color = Palette.Teal, modifier = Modifier.border(1.dp, Palette.Teal, Corner).padding(horizontal = 6.dp, vertical = 1.dp))
+                    Text(lot.name + " · 차가 여기로 가요", fontSize = 16.sp, color = Palette.Teal, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
                 }
             }
         }

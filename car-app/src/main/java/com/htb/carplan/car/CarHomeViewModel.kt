@@ -714,6 +714,7 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
                         val mineStop = s.createdBy == u.uid
                         if (s.deleted == mineStop) trips.setDeleted(t.groupId, t.eventId, t.date, s.id, !mineStop, u.uid)
                     }
+                    all.filter { it.parkAt != null }.forEach { trips.setParkAt(t.groupId, t.eventId, t.date, it.id, null, u.uid) } // 12장 [차로 보내기] picked in a take
                     trips.setDayStatus(t.groupId, t.eventId, t.date, com.htb.carplan.shared.model.DayStatus.READY)
                     t.pickups.forEach { p -> runCatching { PickupRepository().remove(t.groupId, t.eventId, t.date, p.uid) } }
                     runCatching { PickupRepository().remove(t.groupId, t.eventId, t.date, TEST_PICKUP_UID) }

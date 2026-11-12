@@ -1026,6 +1026,13 @@ private fun TripStops(trip: TodayTrip, big: Boolean = false, foldVisited: Boolea
                         if (rest.isNotBlank()) Text(rest, color = Soft, fontSize = if (detail) 24.sp else 20.sp, maxLines = 1, modifier = Modifier.padding(start = if (tag != null) 8.dp else 0.dp))
                     }
                 }
+                // 12장 [차로 보내기]: the parking lot a passenger picked — where the car actually drives for this place.
+                s.parkAt?.takeIf { !s.visited && (isNext || !big || detail) }?.let { lot ->
+                    Row(Modifier.padding(start = if (detail || s.time != null) timeW else 0.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("주차", color = Accent, fontSize = 20.sp, modifier = Modifier.border(1.dp, Accent, Corner).padding(horizontal = 6.dp, vertical = 1.dp))
+                        Text(lot.name, color = Accent, fontSize = if (detail) 24.sp else 20.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
                 // What the group said, as speech bubbles under the place — to read, not to answer (남기기는 폰에서).
                 if (detail) comments[s.id].orEmpty().forEach { c ->
                     Column(Modifier.padding(start = timeW, top = 8.dp).border(1.dp, Line, Corner).padding(horizontal = 14.dp, vertical = 8.dp)) {

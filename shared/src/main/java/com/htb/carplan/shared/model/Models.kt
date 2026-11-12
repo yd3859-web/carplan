@@ -292,6 +292,13 @@ data class Stop(
      * day's order (several pickups, 동선 정렬), kept in step with pickups/{uid} by [PickupRepository].
      */
     val pickupUid: String? = null,
+    /**
+     * 12장 [차로 보내기] (팀장 2026-11-13): the parking lot a passenger picked for this place from the phone. The car
+     * drives there instead of the place's own point, and parking there is arriving at this place — the next departure
+     * goes on to the place after it, not back to this one. null = none picked.
+     */
+    val parkAt: Place? = null,
+    val parkAtBy: String? = null,
 )
 
 enum class PickupStatus { WAITING, ON_BOARD, DONE }

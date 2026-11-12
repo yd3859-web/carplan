@@ -72,7 +72,7 @@ data class TodayTrip(val groupId: String, val eventId: String, val title: String
     /** The pickup the car goes to first: a front one, or the next slot when it is a pickup slot. */
     val nextPickup: Pickup? get() = frontPickups.firstOrNull() ?: next?.pickupUid?.let { u -> waitingPickups.firstOrNull { it.uid == u } }
     /** 팀장 2026-11-09: a pickup slot is driven to in its own place in the order, as a pickup (arrival = "픽업 장소예요"). */
-    fun entry(s: Stop): NaviEntry = s.pickupUid?.takeIf { u -> waitingPickups.any { it.uid == u } }?.let { NaviEntry(NaviEntry.Kind.PICKUP, it, s.place) } ?: NaviEntry(NaviEntry.Kind.STOP, s.id, s.place)
+    fun entry(s: Stop): NaviEntry = s.pickupUid?.takeIf { u -> waitingPickups.any { it.uid == u } }?.let { NaviEntry(NaviEntry.Kind.PICKUP, it, s.place) } ?: NaviEntry(NaviEntry.Kind.STOP, s.id, s.parkAt?.takeIf { it.hasCoords() } ?: s.place) // 12장: the parking lot picked for it is where the car drives
     /** Everything still to drive to, in order: front pickups, then the slots. */
     fun routeEntries(): List<NaviEntry> = frontPickups.map { NaviEntry(NaviEntry.Kind.PICKUP, it.uid, it.place) } + remaining.filter { it.place.hasCoords() }.map(::entry)
     val version: Long get() = day?.version ?: 0
@@ -633,7 +633,8 @@ class TripNavigator(
             val t = trip.value
             val today = LocalDate.now().toString()
             val loc = lastLocation
-            fun near(s: Stop) = loc != null && s.place.hasCoords() && RouteMath.metersBetween(loc.first, loc.second, s.place.lat, s.place.lng) <= NEAR_METERS
+            // Parked at the lot a passenger picked for the place (12장 [차로 보내기]) is arriving at the place.
+            fun near(s: Stop) = loc != null && listOfNotNull(s.place, s.parkAt).any { it.hasCoords() && RouteMath.metersBetween(loc.first, loc.second, it.lat, it.lng) <= NEAR_METERS }
             // Just ticked off by the navigation (within the last half hour, and here or position unknown): that stop.
             val reached = lastReached?.takeIf { (s, at) -> System.currentTimeMillis() - at < REACHED_VALID_MS && (loc == null || !s.place.hasCoords() || near(s)) && t?.stops?.any { it.id == s.id } == true }?.first
             val next = t?.next
@@ -1658,6 +1659,7 @@ class TripNavigator(
             val added = after.filter { it.id !in beforeIds }
             val moved = removed.isEmpty() && added.isEmpty() && beforeIds != afterIds
             val replaced = after.filter { a -> before.firstOrNull { it.id == a.id }?.let { b -> b.place.name != a.place.name || b.place.lat != a.place.lat || b.place.lng != a.place.lng } == true }
+            val parked = after.firstOrNull { a -> before.firstOrNull { it.id == a.id }?.let { b -> b.parkAt?.name != a.parkAt?.name || b.parkAt?.lat != a.parkAt?.lat || b.parkAt?.lng != a.parkAt?.lng } == true }
             return when {
                 removed.isNotEmpty() && added.isNotEmpty() -> "${removed.first().place.name} 대신 ${added.first().place.name}${eul(added.first().place.name)} 넣었어요"
                 removed.isNotEmpty() -> "${removed.first().place.name}${eul(removed.first().place.name)} 뺐어요"
@@ -1667,6 +1669,8 @@ class TripNavigator(
                     "${b.place.name}${eul(b.place.name)} ${replaced.first().place.name}${ro(replaced.first().place.name)} 바꿨어요"
                 }
                 moved -> "순서를 바꿨어요"
+                // 12장 [차로 보내기]: a passenger picked (or took out) the parking lot for a place still to go.
+                parked != null -> parked.parkAt?.let { "${parked.place.name} 주차장으로 ${it.name}${eul(it.name)} 골랐어요" } ?: "${parked.place.name} 주차장을 뺐어요"
                 else -> null
             }
         }
