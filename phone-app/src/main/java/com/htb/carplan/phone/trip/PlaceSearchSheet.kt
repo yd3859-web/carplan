@@ -171,7 +171,9 @@ fun PlaceSearchSheet(
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("근처 추천", fontSize = 16.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 12.dp))
+                // 여행이면 기준이 된 여행지 이름을 보여 줌 (어디 근처인지 바로 알게).
+                Text(vm.anchor()?.name?.ifBlank { null }?.let { "$it 근처" } ?: "근처 추천", fontSize = 16.sp, color = Palette.TextSoft, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp).weight(1f, fill = false))
                 RECOMMEND.forEach { c ->
                     FilterChip(
                         selected = activeCategory == c,

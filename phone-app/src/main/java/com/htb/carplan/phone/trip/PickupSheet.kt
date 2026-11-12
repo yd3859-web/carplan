@@ -157,7 +157,7 @@ fun PickupSheet(vm: TripDayViewModel, onDismiss: () -> Unit) {
         }
     }
     if (mapPicking) MapPickSheet(start = mine?.place, onPick = { vm.setMyPickup(it); mapPicking = false }, onSearch = { mapPicking = false; searching = true }, onDismiss = { mapPicking = false })
-    if (searching) PlaceSearchSheet(vm = vm, initialQuery = mine?.place?.name.orEmpty(), onPick = { vm.setMyPickup(it); searching = false }, onDismiss = { searching = false })
+    if (searching) PlaceSearchSheet(vm = FreePlaces, initialQuery = mine?.place?.name.orEmpty(), onPick = { vm.setMyPickup(it); searching = false }, onDismiss = { searching = false })
 }
 
 private fun statusText(s: PickupStatus, arrived: Boolean) = when {

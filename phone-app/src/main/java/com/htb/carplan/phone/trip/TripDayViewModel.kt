@@ -446,8 +446,14 @@ class TripDayViewModel(private val groupId: String, private val eventId: String,
     /** Q58 [또 갈래요] on a record: press again to take it back. */
     fun toggleAgain(r: Record) = write { val me = me(); recordsRepo.setAgain(groupId, eventId, _date.value, r, me, me !in r.againBy) }
 
-    /** The last stop that has real coordinates (to bias searches and recommendations). */
-    override fun anchor(): Place? = stops.value.lastOrNull { it.place.hasCoords() }?.place
+    /**
+     * 근처 추천·검색의 기준 = 그날 첫 여행지 (팀장 2026-11-12): 다트·일정으로 넣은 곳 근처가 나오게.
+     * 친구 픽업 칸과 주유소·충전소·주차장 칸은 여행지가 아니라서 건너뛴다. 없으면 null → 폰 위치.
+     */
+    override fun anchor(): Place? = stops.value.firstOrNull { s ->
+        s.place.hasCoords() && s.pickupUid == null && !s.skipped &&
+            listOf("주유소", "충전소", "주차장").none { it in s.place.category || s.place.name.endsWith(it) }
+    }?.place
 
     // ---------- legs ----------
 
