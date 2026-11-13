@@ -369,7 +369,7 @@ private fun StatusBand(car: Car?, v: CarState, groupName: String?, passengers: I
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 시연 메뉴 is not for drivers: hold the logo to open it (C5).
-        Text("PlanCard", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Black,
+        Text("carplan", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Black,
             modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onDemo))
         Stat(if (v.isEv == true) "배터리" else "연료", v.fuelPercent?.let { "${it.toInt()}%" } ?: "—")
         // At or under the alert level (설정 cars.fuelAlertPercent): say it in words, no extra colour (one accent only).

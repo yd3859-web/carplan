@@ -70,7 +70,7 @@ class TripSyncService : LifecycleService() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "일정 동기화", NotificationManager.IMPORTANCE_LOW))
         val notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("PlanCard")
+            .setContentTitle("carplan")
             .setContentText("일정과 차 상태를 맞추는 중")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .build()

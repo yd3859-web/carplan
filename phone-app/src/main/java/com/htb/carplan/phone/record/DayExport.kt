@@ -74,7 +74,7 @@ object DayExport {
             y += rowH
         }
         soft.textSize = 26f
-        c.drawText("PlanCard · 캘린더가 차를 움직인다", PAD.toFloat(), (h - 30).toFloat(), soft)
+        c.drawText("carplan · 캘린더가 차를 움직인다", PAD.toFloat(), (h - 30).toFloat(), soft)
 
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, "carplan_${System.currentTimeMillis()}.png")

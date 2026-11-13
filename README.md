@@ -1,4 +1,4 @@
-# PlanCard
+# carplan
 
 **캘린더에 쓴 일정이 차를 움직이는 차량용 캘린더 앱.**
 일행이 폰으로 같이 짠 하루 일정이 그대로 현대 내비의 경유지가 되고, 차를 세울 때마다 그날의 기록이 한 칸씩 쌓여 일기장이 됩니다. 쌓인 기록은 다음 여행 추천으로 이어집니다.
@@ -25,8 +25,8 @@
 
 | 파일 | 설치할 곳 |
 |---|---|
-| [`apk/ArCARic_PlanCard-car_release.apk`](apk/) | Pleos Connect Emulator (또는 Pleos 차) |
-| [`apk/ArCARic_PlanCard-phone_release.apk`](apk/) | 안드로이드 폰 (Android 9 이상) |
+| [`apk/ArCARic_carplan-car_release.apk`](apk/) | Pleos Connect Emulator (또는 Pleos 차) |
+| [`apk/ArCARic_carplan-phone_release.apk`](apk/) | 안드로이드 폰 (Android 9 이상) |
 
 두 APK 모두 release 서명 빌드이고 항상 최신 코드 기준으로 올라 있습니다. 서버(Firebase)는 운영 중이라 따로 설정할 것이 없습니다.
 
@@ -46,9 +46,9 @@
 ### 1. 설치
 ```bash
 # 차: Pleos Connect Emulator를 Cold boot로 켠 뒤
-adb install -r apk/ArCARic_PlanCard-car_release.apk
+adb install -r apk/ArCARic_carplan-car_release.apk
 # 폰: USB 디버깅을 켠 폰을 연결한 뒤 (또는 APK 파일을 폰에서 열어 설치)
-adb install -r apk/ArCARic_PlanCard-phone_release.apk
+adb install -r apk/ArCARic_carplan-phone_release.apk
 ```
 에뮬레이터 하나로 같이 볼 때는 폰 앱을 에뮬레이터에 함께 설치해도 됩니다(앱마다 계정이 따로 생깁니다).
 
@@ -59,7 +59,7 @@ adb install -r apk/ArCARic_PlanCard-phone_release.apk
 2. **폰 앱**: 첫 화면에서 **[시연 계정으로 시작]** → 차와 같은 계정으로 들어갑니다
    - 내 계정으로 새로 시작하려면 [나중에 할게요] → 차 화면 시연 메뉴 [차주 연결 풀기] → 차에 뜬 6자리 코드를 폰 차량 탭에 입력
 3. 폰 캘린더에서 날짜를 눌러 여행을 만들고 장소 칸을 넣으면, 차 "오늘"과 내비 경로에 바로 반영됩니다
-4. 차 화면 **왼쪽 위 "PlanCard"를 길게 누르면 시연 메뉴** → [오늘 여행 만들기] → [주행 재생]: 실제 주행 없이 타기 → 주행 → 도착 → 기록까지 자동 재생
+4. 차 화면 **왼쪽 위 "carplan"를 길게 누르면 시연 메뉴** → [오늘 여행 만들기] → [주행 재생]: 실제 주행 없이 타기 → 주행 → 도착 → 기록까지 자동 재생
 5. 폰 기록 탭에서 다녀온 날이 일기장으로 쌓인 것과, 맨 아래 "다음엔 여기 어때요?" → [이 여행 만들기]
 
 ### 3. 차 화면 시연 메뉴 (실제 주행 없이 확인)

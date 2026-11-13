@@ -78,7 +78,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
     ) {
         Column(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             Spacer(Modifier.height(40.dp))
-            Text("PlanCard는 이렇게 써요", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
+            Text("carplan은 이렇게 써요", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Palette.TextStrong)
             Spacer(Modifier.height(20.dp))
             Step("1", "캘린더에 일정과 장소를 써요", "그날 차에 타면 차가 \"여기로 갈까요?\" 하고 그 순서대로 내비를 켜요")
             Step("2", "같이 갈 사람을 초대해요", "일정마다 [같이 갈 사람]. 친구는 한 번만 맺으면 다음부터 이름만 눌러요")
