@@ -533,6 +533,16 @@ class CarHomeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 시연 장면 5: 지훈 opens a vote on his phone and the friends answer — the phone (owner) casts the deciding one. */
+    fun friendVote() {
+        val t = trip.value ?: run { navigator.notify("먼저 [오늘 여행]을 만들어 주세요"); return }
+        val d = demo() ?: return
+        viewModelScope.launch {
+            runCatching { d.friendVote(t.groupId, t.eventId, t.date, qrGroup.value?.memberIds?.size ?: 4) }
+                .onSuccess { navigator.notify("지훈이 투표를 열었어요") }.onFailure { _error.value = it.message; navigator.notify("투표 못 열었어요 · ${it.message?.take(40)}") }
+        }
+    }
+
     /** 7장 3: the group the QR invites to — today's trip's group, or the one made with [새 그룹] (Q16). */
     private val qrGroupId = MutableStateFlow<String?>(null)
     val qrGroup: StateFlow<Group?> = combine(qrGroupId, trip) { chosen, t -> chosen ?: t?.groupId }

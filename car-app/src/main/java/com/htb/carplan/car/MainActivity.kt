@@ -1239,6 +1239,7 @@ private fun DebugDialog(v: CarState, vm: CarHomeViewModel, onDismiss: () -> Unit
             }
             DemoScene("5", "일행 반응", "서연·지훈이 가는 곳에 코멘트, 여행 채팅에 한 줄씩") {
                 DemoButton("일행 코멘트·채팅") { vm.friendsTalk(); onDismiss() }
+                DemoButton("지훈이 투표 열기") { vm.friendVote(); onDismiss() }
             }
             DemoScene("6", "데리러 가기", "지훈이 수내역에서 태워 달라고 함 → 차가 먼저 들름") {
                 DemoButton("픽업 부탁") { vm.makeTestPickup(); onDismiss() }

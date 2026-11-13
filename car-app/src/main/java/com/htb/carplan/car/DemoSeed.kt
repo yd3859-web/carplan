@@ -604,6 +604,17 @@ class DemoSeed(private val context: Context, private val ownerUid: String, priva
     }
 
     /** 장면 6 [픽업 부탁] (11장): 지훈, from his phone, asks to be picked up at 수내역 — the car goes there first. */
+    /** 시연 장면 5 [지훈이 투표 열기] (5장): 지훈 asks where to eat, he and 민지 pick one, 서연 the other — the owner's vote decides. */
+    suspend fun friendVote(gid: String, eid: String, date: String, members: Int) {
+        val (jihoon, jdb) = friend(4)
+        val (minji, mdb) = friend(0)
+        val (seoyeon, sdb) = friend(2)
+        val id = com.htb.carplan.shared.data.VoteRepository(jdb).create(gid, "저녁 어디서 먹을까?", listOf("정자동 떡갈비", "수내동 칼국수"),
+            listOf(P("정자동 떡갈비", 37.3665, 127.1080, "경기 성남시 분당구 정자동").place, P("수내동 칼국수", 37.3780, 127.1150, "경기 성남시 분당구 수내동").place), eid, date, jihoon)
+        com.htb.carplan.shared.data.VoteRepository(jdb).cast(gid, id, jihoon, 0, members)
+        com.htb.carplan.shared.data.VoteRepository(mdb).cast(gid, id, minji, 0, members)
+        com.htb.carplan.shared.data.VoteRepository(sdb).cast(gid, id, seoyeon, 1, members)
+    }
     suspend fun friendPickup(gid: String, eid: String, date: String) {
         val (uid, db) = friend(4)
         com.htb.carplan.shared.data.PickupRepository(db).setMine(gid, eid, date, uid, "지훈",
