@@ -129,6 +129,20 @@
   .getrow a.main { background:var(--ink); color:#fff; border-color:var(--ink); }
   .note { font-size:14px; color:var(--soft); margin-top:12px; max-width:40em; }
 
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:0 32px; margin-top:32px; max-width:44em; }
+  .pair > div { border-top:2px solid var(--line); padding-top:12px; }
+  .pair > div:last-child { border-top-color:var(--go); }
+  .pair-h { font-weight:800; font-size:17px; margin:0 0 6px; }
+  .pair-h.go { color:var(--go); }
+  .pair ul { margin:0; padding-left:18px; font-size:16px; color:#2B2D31; }
+  .pair li { margin:4px 0; }
+  .grow { list-style:none; margin:0; padding:0; max-width:44em; }
+  .grow li { display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:baseline; padding:12px 0; border-top:1px solid var(--line); font-size:16px; color:#2B2D31; }
+  .grow li:last-child { border-bottom:1px solid var(--line); }
+  .grow .tag { justify-self:start; font-size:12px; font-weight:700; line-height:20px; padding:0 6px; border-radius:4px; background:var(--ink); color:#fff; }
+  .grow .tag.soon { background:var(--bg); color:var(--soft); border:1px solid var(--line); }
+  @media (max-width:760px) { .pair { grid-template-columns:1fr; gap:20px; } }
+
   footer { margin-left:var(--gut); max-width:var(--col); padding:56px 0 80px; color:var(--soft); font-size:14px; line-height:1.7; }
   footer p { margin:4px 0; }
 
@@ -171,7 +185,7 @@
 <nav><div class="in">
   <a class="brand" href="#top">carplan</a>
   <div class="stops">
-    <a href="#before">여행 전</a><a href="#day">여행 날</a><a href="#after">다녀와서</a><a href="#next">다음 여행</a><a href="#weekday">여행 없는 날</a><a href="#try">직접 돌려 보기</a>
+    <a href="#before">여행 전</a><a href="#day">여행 날</a><a href="#after">다녀와서</a><a href="#next">다음 여행</a><a href="#weekday">여행 없는 날</a><a href="#later">앞으로</a><a href="#try">직접 돌려 보기</a>
   </div>
   <a class="get" href="#try">앱 받기</a>
 </div></nav>
@@ -485,12 +499,38 @@
         <p style="margin-top:10px">알림을 누르면 바로 그 여행, 그 화면이 열려요. 설정에서 끄거나 바꿀 수 있어요.</p>
       </div>
     </details>
-    <details>
-      <summary>우리만 쌓이는 데이터<span class="more"></span></summary>
-      <div class="d">
-        <p>차가 실제로 선 자리와 주차 위치, 실제 머문 시간, 실제 달린 길, 또 갈래요, 누구와 갔는지. 폰 GPS가 아니라 차 신호로 쌓여요. 지금은 처음 가는 곳을 찾을 때 카카오를 쓰지만, 가 본 곳과 차 내비 즐겨찾기, 공공데이터 코스가 쌓일수록 우리 데이터가 먼저 나와요. 기록 탭은 그달 지도의 몇 %를 우리 차가 달린 길로 그렸는지 보여 줘요.</p>
+  </div>
+</section>
+
+<!-- ───────── 앞으로 ───────── -->
+<section class="stop" id="later">
+  <div class="node"><i></i></div>
+  <div class="body">
+    <p class="when">앞으로</p>
+    <h2>쌓일수록, 우리 것이 됩니다</h2>
+    <p class="say">내비는 목적지만 알아요. carplan에는 <b>계획한 하루</b>와 <b>차가 실제로 보낸 하루</b>가 한 일정 안에 같이 남아요.</p>
+
+    <div class="pair">
+      <div>
+        <p class="pair-h">계획한 하루</p>
+        <ul><li>갈 곳과 순서</li><li>도착 예정 시각</li><li>누구와, 누구를 태우고</li></ul>
       </div>
-    </details>
+      <div>
+        <p class="pair-h go">차가 보낸 하루</p>
+        <ul><li>실제로 선 자리와 주차한 곳 (P단 신호)</li><li>도착 시각과 머문 시간</li><li>실제로 달린 길, 건너뛴 칸, 또 갈래요</li></ul>
+      </div>
+    </div>
+
+    <p class="more-head">이걸로 만드는 것</p>
+    <ul class="grow">
+      <li><span class="tag">지금</span><span>가 본 곳과 차 내비 즐겨찾기가 장소 고르기에서 먼저 나와요.</span></li>
+      <li><span class="tag">지금</span><span>또 갈래요, 머문 시간, 하루 이동 거리로 다음 여행을 추천해요.</span></li>
+      <li><span class="tag">지금</span><span>기록 탭이 이번 달 지도의 몇 %를 우리 차가 달린 길로 그렸는지 보여 줘요.</span></li>
+      <li><span class="tag soon">앞으로</span><span>우리 일행이 계획보다 보통 늦는 만큼, 다음 여행의 도착 시각을 미리 맞춰 줘요.</span></li>
+      <li><span class="tag soon">앞으로</span><span>가족과 갈 때와 친구와 갈 때, 같이 가는 사람에 맞춰 다르게 추천해요.</span></li>
+      <li><span class="tag soon">앞으로</span><span>여럿의 기록을 모아 장소마다 많이 세우는 주차장, 보통 머무는 시간, 끝까지 간 하루 코스를 알려 줘요.</span></li>
+    </ul>
+    <p class="note">내 기록은 우리 그룹만 봐요. 여럿의 기록을 모으는 기능은 동의한 사람의 기록만, 집과 회사 근처는 빼고 통계로만 써요. 이름, 사진, 메모는 모으지 않아요.</p>
   </div>
 </section>
 
