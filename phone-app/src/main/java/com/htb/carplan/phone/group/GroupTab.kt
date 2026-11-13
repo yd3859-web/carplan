@@ -151,7 +151,7 @@ fun GroupTab(vm: GroupViewModel = viewModel()) {
                     Text("내 친구 코드  ${me?.friendCode ?: "…"}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Palette.TextStrong, modifier = Modifier.weight(1f))
                     me?.friendCode?.let { fc ->
                         TextButton(onClick = {
-                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "carplan 친구 코드 $fc — ${InviteLinks.url(fc)}")
+                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "PlanCard 친구 코드 $fc — ${InviteLinks.url(fc)}")
                             context.startActivity(Intent.createChooser(send, "친구 코드 보내기"))
                         }) { Text("보내기", color = Palette.Navy, fontWeight = FontWeight.SemiBold) }
                     }

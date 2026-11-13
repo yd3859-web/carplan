@@ -166,7 +166,7 @@ fun LoginGate(vm: LoginViewModel) {
 
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.weight(1f))
-        Text("carplan", fontSize = 34.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
+        Text("PlanCard", fontSize = 34.sp, fontWeight = FontWeight.Black, color = Palette.TextStrong)
         Text("캘린더에 쓴 일정이 차를 움직여요", fontSize = 17.sp, color = Palette.TextSoft, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.weight(1f))
         Button(

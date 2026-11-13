@@ -27,7 +27,7 @@ class CarplanMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: message.data["title"] ?: "carplan"
+        val title = message.notification?.title ?: message.data["title"] ?: "PlanCard"
         val body = message.notification?.body ?: message.data["body"] ?: return
         show(this, title, body, message.data)
     }

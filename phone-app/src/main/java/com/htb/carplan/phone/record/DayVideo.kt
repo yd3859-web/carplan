@@ -75,7 +75,7 @@ object DayVideo {
         val ink = paint("#111111", 64f, true); val soft = paint("#8A9096", 34f)
         drawWrapped(c, title, 60f, H / 2f - 60, W - 120, ink, 76f)
         c.drawText(subtitle, 60f, H / 2f + 60, soft)
-        c.drawText("carplan · 캘린더가 차를 움직인다", 60f, H - 80f, paint("#8A9096", 26f))
+        c.drawText("PlanCard · 캘린더가 차를 움직인다", 60f, H - 80f, paint("#8A9096", 26f))
         return b
     }
 

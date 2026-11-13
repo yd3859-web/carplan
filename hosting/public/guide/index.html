@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>carplan — 캘린더가 차를 움직인다</title>
+<title>PlanCard — 캘린더가 차를 움직인다</title>
 <meta name="description" content="폰에서 짠 하루가 차 내비의 경로가 되고, 차를 세울 때마다 기록이 남는 차의 캘린더. 현대 Pleos Connect 차량 앱 + 안드로이드 폰 앱.">
-<meta property="og:title" content="carplan — 캘린더가 차를 움직인다">
+<meta property="og:title" content="PlanCard — 캘린더가 차를 움직인다">
 <meta property="og:description" content="폰에서 짠 하루가 차 내비의 경로가 되고, 차를 세울 때마다 기록이 남습니다.">
 <meta property="og:image" content="https://carplan-htb.web.app/guide/img/c_home.jpg">
 <meta property="og:type" content="website">
@@ -183,7 +183,7 @@
 <body>
 
 <nav><div class="in">
-  <a class="brand" href="#top">carplan</a>
+  <a class="brand" href="#top">PlanCard</a>
   <div class="stops">
     <a href="#before">여행 전</a><a href="#day">여행 날</a><a href="#after">다녀와서</a><a href="#next">다음 여행</a><a href="#weekday">여행 없는 날</a><a href="#later">앞으로</a><a href="#try">직접 돌려 보기</a>
   </div>
@@ -194,7 +194,7 @@
 
 <header>
   <h1>캘린더에 쓴 일정이<br>차를 움직입니다.</h1>
-  <p class="lede">carplan은 현대 Pleos Connect 차와 안드로이드 폰이 같이 쓰는 <b>차의 캘린더</b>예요. 폰에서 짠 하루가 그대로 차 내비의 경로가 되고, 차를 세울 때마다 그 자리가 기록으로 남아요.</p>
+  <p class="lede">PlanCard는 현대 Pleos Connect 차와 안드로이드 폰이 같이 쓰는 <b>차의 캘린더</b>예요. 폰에서 짠 하루가 그대로 차 내비의 경로가 되고, 차를 세울 때마다 그 자리가 기록으로 남아요.</p>
 
   <div class="loop" id="loop" aria-label="폰 캘린더에서 차 내비로, 다시 기록으로 이어지는 흐름">
     <div class="mock">
@@ -508,7 +508,7 @@
   <div class="body">
     <p class="when">앞으로</p>
     <h2>쌓일수록, 우리 것이 됩니다</h2>
-    <p class="say">내비는 목적지만 알아요. carplan에는 <b>계획한 하루</b>와 <b>차가 실제로 보낸 하루</b>가 한 일정 안에 같이 남아요.</p>
+    <p class="say">내비는 목적지만 알아요. PlanCard에는 <b>계획한 하루</b>와 <b>차가 실제로 보낸 하루</b>가 한 일정 안에 같이 남아요.</p>
 
     <div class="pair">
       <div>
@@ -550,10 +550,10 @@
     <p class="note">APK는 바로 받아져요(차 앱 약 60MB, 폰 앱 약 45MB). 저장소는 11월 16일부터 누구나 볼 수 있어요.</p>
 
     <ol class="steps-try">
-      <li>에뮬레이터를 Cold boot로 켜고 차 앱을 설치해요. 폰 앱은 이름만 넣으면 시작돼요.</li>
-      <li>차 화면의 6자리 코드를 폰 첫 화면에 넣어요. 이 차의 차주가 돼요.</li>
+      <li>에뮬레이터를 Cold boot로 켜고 차 앱을 설치해요. 처음 켜면 11월 일정과 기록이 채워진 시연 계정의 차가 돼요.</li>
+      <li>폰 앱 첫 화면에서 [시연 계정으로 시작]을 눌러요. 차와 같은 계정으로 들어가요.</li>
       <li>폰 캘린더에서 날짜를 눌러 여행을 만들고 장소를 2~3곳 넣어요. 차 "오늘"에 바로 떠요.</li>
-      <li>차 화면 왼쪽 위 "carplan"을 길게 눌러 시연 메뉴를 열고 [오늘 시험 여행 만들기], [시뮬레이션 재생]. 타기, D, 실제 도로 주행, 도착, P, 기록 칸까지 자동으로 흘러가요.</li>
+      <li>차 화면 왼쪽 위 "PlanCard"를 길게 눌러 시연 메뉴를 열고 [오늘 여행 만들기], [주행 재생]. 타기, D, 실제 도로 주행, 도착, P, 기록 칸까지 자동으로 흘러가요.</li>
       <li>폰 기록 탭에서 다녀온 날이 일기장으로 쌓인 것과, 맨 아래 "다음엔 여기 어때요?"를 봐요.</li>
     </ol>
     <p class="note">기어, 문, 속도는 Virtual Console(<code>adb forward tcp:8088 tcp:8088</code> 후 127.0.0.1:8088)로도 보낼 수 있어요. 구글 로그인, 푸시, 사진은 Google Play 서비스가 있는 실제 폰에서 돼요.</p>
@@ -565,7 +565,7 @@
 <footer>
   <p>기능 명세는 저장소의 <code>docs/작동시나리오.html</code>(0~22장), 추천 규칙은 <code>docs/여행상식.md</code>에 있어요.</p>
   <p>데이터 출처: 지도 © OpenStreetMap contributors, 장소 카카오, 유가 오피넷(한국석유공사), 여행코스 한국관광공사(TourAPI), 행정동 경계 행정안전부, 추천 AI Anthropic Claude.</p>
-  <p>carplan, 현대자동차그룹 차량용 앱 공모전(Pleos Connect) 출품작.</p>
+  <p>PlanCard, 현대자동차그룹 차량용 앱 공모전(Pleos Connect) 출품작.</p>
 </footer>
 
 </div>
