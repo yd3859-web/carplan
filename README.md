@@ -25,8 +25,8 @@
 
 | 파일 | 설치할 곳 |
 |---|---|
-| [`apk/ArCARic_carplan-car_release.apk`](apk/) | Pleos Connect Emulator (또는 Pleos 차) |
-| [`apk/ArCARic_carplan-phone_release.apk`](apk/) | 안드로이드 폰 (Android 9 이상) |
+| [`apk/ArCarIve_carplan-car_release.apk`](apk/) | Pleos Connect Emulator (또는 Pleos 차) |
+| [`apk/ArCarIve_carplan-phone_release.apk`](apk/) | 안드로이드 폰 (Android 9 이상) |
 
 두 APK 모두 release 서명 빌드이고 항상 최신 코드 기준으로 올라 있습니다. 서버(Firebase)는 운영 중이라 따로 설정할 것이 없습니다.
 
@@ -46,9 +46,9 @@
 ### 1. 설치
 ```bash
 # 차: Pleos Connect Emulator를 Cold boot로 켠 뒤
-adb install -r apk/ArCARic_carplan-car_release.apk
+adb install -r apk/ArCarIve_carplan-car_release.apk
 # 폰: USB 디버깅을 켠 폰을 연결한 뒤 (또는 APK 파일을 폰에서 열어 설치)
-adb install -r apk/ArCARic_carplan-phone_release.apk
+adb install -r apk/ArCarIve_carplan-phone_release.apk
 ```
 에뮬레이터 하나로 같이 볼 때는 폰 앱을 에뮬레이터에 함께 설치해도 됩니다(앱마다 계정이 따로 생깁니다).
 

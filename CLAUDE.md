@@ -78,7 +78,7 @@ Pleos SDK: Vehicle 2.3.2, NaviHelper 3.0.5, TextToSpeech·SpeechToText 3.3.1 (`g
 ## 대회 일정·제출 (docs/기획정리본.html 10장)
 - 기획서 마감 **11/15 23:59** (이메일, 접수양식 DOCX, 팀원 전원 CC). 1차에 시연 영상·GitHub·APK 내면 가산점.
 - 1차 결과 11/23 → 2차 오프라인 PT·시연 **12/3–4** (PT 이후엔 버그 수정만 인정) → 최종 발표 12/18.
-- APK는 **release** 빌드, 이름 `ArCARic_carplan-car_release.apk`·`ArCARic_carplan-phone_release.apk`(팀 Ar CAR ic, 앱 이름 carplan — 2026-11-13 PlanCard로 바꿨다가 되돌림; 빌드 뒤 `car-app-release.apk`를 이 이름으로 복사), 저장소 `apk/` 또는 GitHub Releases. 초대할 심사 계정은 없음(2026-11-11 제출 안내 확인): 비공개면 **11/16까지 공개 전환**, 11/23까지 공개 유지. 이메일에 저장소 주소 + **마지막 커밋 해시**. APK 이름 `팀명_앱이름_release.apk`. 공개 전에 실명·키 검사(2026-11-11 완료: 비밀 파일 커밋 이력 없음, 카카오·오피넷 키는 APK 안에 있음 → 11/16~12/2에 Cloud Functions 경유로 바꾸고 키 재발급).
+- APK는 **release** 빌드, 이름 `ArCarIve_carplan-car_release.apk`·`ArCarIve_carplan-phone_release.apk`(팀 아카이브 Ar:Car:Ive, 2026-11-15 ArCARic에서 바꿈, 앱 이름 carplan — 2026-11-13 PlanCard로 바꿨다가 되돌림; 빌드 뒤 `car-app-release.apk`를 이 이름으로 복사), 저장소 `apk/` 또는 GitHub Releases. 초대할 심사 계정은 없음(2026-11-11 제출 안내 확인): 비공개면 **11/16까지 공개 전환**, 11/23까지 공개 유지. 이메일에 저장소 주소 + **마지막 커밋 해시**. APK 이름 `팀명_앱이름_release.apk`. 공개 전에 실명·키 검사(2026-11-11 완료: 비밀 파일 커밋 이력 없음, 카카오·오피넷 키는 APK 안에 있음 → 11/16~12/2에 Cloud Functions 경유로 바꾸고 키 재발급).
 
 ## 정한 것 요약 (자세한 건 작동시나리오 22장 "✓ 정함")
 - 캘린더가 메인. 카테고리 여행·차량 관리·다른 일정 + 사용자 추가(8색). 모든 일정 = `groups/{gid}/events` 하나, 혼자면 나만 그룹.
